@@ -1,25 +1,12 @@
 ---
-title: "Haunted Places in the United States"
+title: "Ghostly Jargon in Haunted Spots: A Gendered Perspective"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: "Tidy Tuesday (Oct 10, 2023)"
-date: "2023-10-10"
+subtitle: "Looking at the dataset for haunted places in USA as a part of Tidy Tuesday (Oct 10, 2023)"
+date: "2023-10-13"
 format:
-  revealjs: 
-    footer: "October 12, 2023"
-    theme: white
-    touch: true
-    controls: true
-    slide-number: true
-    preview-links: auto
-    css: styles.css
-    transition: slide
-    transition-speed: default
-    navigation-mode: vertical
-    controls-layout: bottom-right
-    controls-tutorial: true
-    scrollable: true
-    embed-resources: true
+  html:
+    theme: simplex
 editor_options: 
   chunk_output_type: console
 execute: 
@@ -27,9 +14,17 @@ execute:
   error: false
   message: false
   warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects.html"
+  description: "Ghostly Jargon in Haunted Spots: A Gendered Perspective"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
 ---
-
-Loading Libraries
 
 ```{r}
 #| label: setup
@@ -40,60 +35,378 @@ library(gt)             # beautiful tables
 library(gtExtras)       # themeing the beautful tables
 library(visdat)         # data overview visualization
 library(janitor)        # cleaning the data and column names etc.
-library(ggthemes)       # nice ggplot themes
+library(tidytext)       # to use unnest_tokens()
+library(ggwordcloud)    # to create word cloud
 
 # Reading in the data
 haunted_places <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-10/haunted_places.csv')
 
 # Load the USA state boundaries data
 usa_map <- map_data("state")
-
-
 ```
 
-Study the data set
-
 ```{r}
-#| label: exploratory-data-analysis
+#| label: exploratory-data-analysis-eval-false
 #| eval: false
 
+# See the nature of data and missing values
 haunted_places |>
   visdat::vis_dat()
 
-# Load required packages
-library(ggplot2)
-library(maps)
-library(ggmap)
-
-
-n_distinct(haunted_places$city)
-
+# Examine the 25 most common words in locations and descriptions
 haunted_places |>
-ggplot() +
-  geom_polygon(data = usa_map, 
-               aes(x = long, 
-                   y = lat, 
-                   group = group), 
-               fill = "lightgrey", 
-               color = "white") +
-  geom_point(aes(x = longitude, y = latitude)) +
-  coord_fixed(ratio = 1.3,
-              xlim = c(-130, -70),
-              ylim = c(25, 50)) +
-  labs(title = "Haunted Places in USA") +
+  mutate(location = str_to_lower(location)) |>
+  select(location) |>
+  unnest_tokens(output = "words",
+                input = location) |>
+  group_by(words) |>
+  count(sort = TRUE) |>
+  print(n = 25)
+```
+
+### In the eerie realm of American haunts, male spirits outnumber female in most locales. Yet, within the sinister confines of academia, the scales tip towards women. A spine-chilling revelation!
+
+<br/>
+
+```{r}
+#| label: fig-gender-comparison-bar-chart
+#| fig-cap: "Percentage of haunted locations with gender-specific terms in descriptions"
+#| fig-asp: 0.5
+#| fig-width: 10
+
+# Female and male patterns to detect
+pattern_female <- "(?i)\\b(her|she|hers|lady|girl|female|woman)\\b"
+pattern_male <- "(?i)\\b(?!female\\b)(his|he|man|lad|gentleman|boy|male)\\b"
+
+###### Overall
+# Gender description check : male vs. female
+only_male <- haunted_places |>
+  filter(str_detect(description, pattern_male)) |>
+  anti_join(haunted_places |> filter(str_detect(description, pattern_female)))
+
+only_female <- haunted_places |>
+  filter(str_detect(description, pattern_female)) |>
+  anti_join(haunted_places |> filter(str_detect(description, pattern_male)))
+
+common_df <-  haunted_places |>
+  filter(str_detect(description, pattern_female)) |>
+  inner_join(haunted_places |> filter(str_detect(description, pattern_male)))
+
+df_comp <- tibble(
+  type = "All haunted places in the United States",
+  total = nrow(haunted_places),
+  female = nrow(only_female),
+  male = nrow(only_male),
+  common = nrow(common_df)
+)
+
+####### In Colleges and Universities
+# Choose to select "university" and "college" as the focus point
+univ_coll <- haunted_places |>
+  filter(str_detect(location, 
+                    pattern = "(?i)university|college"))
+
+# Gender description check : male vs. female
+colleges_male <- univ_coll |>
+  filter(str_detect(description, pattern_male)) |>
+  anti_join(univ_coll |> filter(str_detect(description, pattern_female)))
+
+colleges_female <- univ_coll |>
+  filter(str_detect(description, pattern_female)) |>
+  anti_join(univ_coll |> filter(str_detect(description, pattern_male)))
+
+colleges_common <-  univ_coll |>
+  filter(str_detect(description, pattern_female)) |>
+  inner_join(univ_coll |> filter(str_detect(description, pattern_male)))
+
+
+# Total number of spooky places in Universities and Colleges
+df_comp <- df_comp |>
+  rbind(
+    tibble(
+      type = "Haunted places in American Universities and Colleges",
+      total = nrow(univ_coll),
+      female = nrow(colleges_female),
+      male = nrow(colleges_male), 
+      common = nrow(colleges_common)
+    )
+  )
+
+df_names <- df_comp |>
+  mutate(across(.cols = female:common,
+                .fns = function(x) x/total)) |>
+  rename(
+    total_haunted_places = total,
+    places_with_mention_of_males = male,
+    places_with_mention_of_females = female,
+    places_with_mention_of_both = common
+  )
+
+df_clean_names_long <- df_names |>
+  pivot_longer(cols = -type,
+               names_to = "indicator",
+               values_to = "value") |>
+  filter(indicator != "total_haunted_places") |>
+  mutate(indicator = snakecase::to_sentence_case(indicator)) 
+
+df_clean_names_long |>
+  ggplot(aes(x = value,
+             y = indicator,
+             fill = indicator)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(indicator, ": ", round(value*100, 1), "%"),
+                x = 0),
+            hjust = "left") +
+  facet_wrap(~ type, dir = "v") +
+  scale_fill_manual(values = c("#d4d4d4", "#eba0e9", "#5dace8")) +
+  theme_void() +
+  theme(legend.position = "none",
+        strip.text = element_text(size = 14, face = "bold"))
+
+```
+
+```{r}
+#| label: failed-attempt-at-venn-diagram-eval-false
+#| eval: false
+
+# Venn Diagram
+
+# load Venn diagram package 
+library("VennDiagram")
+
+# create pairwise Venn diagram 
+draw.pairwise.venn(area1 = df_comp[1, 3], 
+                   area2 = df_comp[1, 4],
+                   cross.area = df_comp[1, 5], 
+                   category = c(df_clean_names_long[1, "indicator"],
+                                df_clean_names_long[2, "indicator"]),
+                   fill = c("pink","lightblue"))
+```
+
+```{r}
+#| label: create-function-for-word-cloud-dont-evaluate
+#| echo: false
+#| eval: false
+
+
+# Words Analysis: Create Function
+
+# Credit to Steven Ponce, https://github.com/poncest
+# https://github.com/poncest/tidytuesday/blob/main/2023/Week_41/2023_41.R
+
+
+# Create a function for word cloud for all
+
+word_cloud_haunt <- function(data) {
+  
+  data |>
+  
+  # We are only interested in description words
+  select(description) |>
+  mutate(description = str_to_lower(description)) |>
+  
+  # computing word proportions
+  unnest_tokens(output = word, 
+                input  = description) |>
+  
+  # remove various stop words from English
+  anti_join(stop_words) |>
+  
+  # count the number of words commonly occuring
+  count(word, sort = TRUE) |>
+  mutate(
+    proportion = n / sum(n),
+    gender_col = case_when(
+      str_detect(word, pattern = pattern_male) ~ "male",
+      str_detect(word, pattern = pattern_female) ~ "female",
+      .default = "others"
+    ),
+    gender_col = fct(gender_col, 
+                     levels = c("male", "female", "others"))
+  ) |>
+  group_by(gender_col) |>
+  slice_max(n = 30, order_by = n) |> 
+  ungroup() |>
+  ggplot(aes(label = word,
+             size = proportion,
+             color = gender_col)) +
+  geom_text_wordcloud(rm_outside = TRUE, shape = "sqaure") +
+  scale_color_manual(values = c("#5dace8", "#eba0e9", "darkgrey"), drop = FALSE) + 
+  theme_void()
+
+}
+
+```
+
+## Ghostly Jargon in Haunted Spots: A Gendered Perspective
+
+@fig-word-clouds-by-gender illustrates the prevalence of gender-specific common words in haunted locations, comparing all American locations to haunted spots in universities and colleges.
+
+```{r}
+#| label: fig-word-clouds-by-gender
+#| fig-cap: "Gender-specific words' prevalence in haunted locations, comparing sites across USA with those in universities and colleges."
+#| fig-width: 10
+
+bind_rows(
+  only_male |>
+  mutate(facet_type = "All Haunted places citing males"),
+  
+  only_female |>
+  mutate(facet_type = "All Haunted places citing females"),
+  
+  colleges_male |>
+  mutate(facet_type = "University / Colleges' Haunted places mentioning males"),
+  
+  colleges_female |>
+  mutate(facet_type = "University / Colleges' Haunted places mentioning females")
+  
+  ) |>
+  
+  # We are only interested in description words
+  select(description, facet_type) |>
+  mutate(description = str_to_lower(description)) |>
+  
+  # computing word proportions
+  unnest_tokens(output = word, 
+                input  = description) |>
+  
+  # remove various stop words from English
+  anti_join(stop_words) |>
+  
+  # count the number of words commonly occuring
+  count(facet_type, word, sort = TRUE) |>
+  group_by(facet_type) |>
+  mutate(
+    prop_n = n/sum(n),
+    gender_col = case_when(
+      str_detect(word, pattern = pattern_male) ~ "male",
+      str_detect(word, pattern = pattern_female) ~ "female",
+      .default = "others"
+    ),
+    gender_col = fct(gender_col, 
+                     levels = c("male", "female", "others"))
+  ) |>
+  group_by(facet_type, gender_col) |>
+  slice_max(n = 30, order_by = prop_n) |>
+  ungroup() |>
+  ggplot(aes(label = word,
+             size = prop_n,
+             color = gender_col)) +
+  geom_text_wordcloud(rm_outside = TRUE) +
+  facet_wrap(~ facet_type, scales = "free") +
+  scale_color_manual(values = c("#5dace8", "#eba0e9", "darkgrey"), drop = FALSE) + 
+  scale_size_area(max_size = 12) +
   theme_void()
 
 
-# Create a ggplot object
-ggplot(usa, aes(x = long, y = lat, group = group)) +
-  geom_map(map = usa, aes(fill = "State"), color = "black") +
-  expand_limits(x = usa$long, y = usa$lat) +
-  scale_fill_manual(values = "lightblue", name = "State") +
-  labs(title = "Map of USA with States") +
-  theme_minimal()
-
-# Display the map
-gg
-
-
 ```
+
+*Credits: Sentiment Analysis [@mohammad2012] and code inspiration from [Steven Ponce](https://github.com/poncest)'s [R script](https://github.com/poncest/tidytuesday/blob/main/2023/Week_41/2023_41.R) on GitHub.*
+
+## Unique Verbiage in these haunted places
+
+In contrast to the previous slide's word clouds featuring overlapping terms, the @fig-unique-words-to-each-gender shows distinct vocabulary found exclusively in male and female haunted locations.
+
+```{r}
+# Finding words unique to each data frame
+
+# Create a function to list all words, firstly
+common_words <- function(data){
+  
+  data |>
+  
+  # We are only interested in description words
+  select(description) |>
+  mutate(description = str_to_lower(description)) |>
+  
+  # computing word proportions
+  unnest_tokens(output = word, 
+                input  = description) |>
+  
+  # remove various stop words from English
+  anti_join(stop_words) |>
+  
+  # count the number of words commonly occuring
+  count(word, sort = TRUE) |>
+  mutate(
+    proportion = n / sum(n),
+    gender_col = case_when(
+      str_detect(word, pattern = pattern_male) ~ "male",
+      str_detect(word, pattern = pattern_female) ~ "female",
+      .default = "others"
+    ),
+    gender_col = fct(gender_col, 
+                     levels = c("male", "female", "others"))
+  ) |>
+  
+  filter(proportion > 0.001)
+}
+
+
+
+# Unique words in all places (males), not present in all places (females)
+
+uniq_all_males <- only_male |> 
+  common_words() |>
+  anti_join(common_words(only_female), by = join_by(word)) |>
+  filter(gender_col == "others")
+  
+# Unique words in all places (females), not present in all places (males)
+
+uniq_all_females <- only_female |> 
+  common_words() |>
+  anti_join(common_words(only_male), by = join_by(word)) |>
+  filter(gender_col == "others")
+
+# Unique words in univ/college places (males), 
+# not present in iniv/college places (females)
+
+uniq_colleges_males <- colleges_male |> 
+  common_words() |>
+  anti_join(common_words(colleges_female), by = join_by(word)) |>
+  filter(gender_col == "others")
+
+# Unique words in univ/college places (females), 
+# not present in iniv/college places (males)
+
+uniq_colleges_females <- colleges_female |> 
+  common_words() |>
+  anti_join(common_words(colleges_male), by = join_by(word)) |>
+  filter(gender_col == "others")
+```
+
+```{r}
+#| label: fig-unique-words-to-each-gender
+#| fig-cap: "Unique words in descriptions of gender-specific haunted locations, but absent in descriptions of the opposite gender's haunted places."
+#| fig-width: 10
+
+bind_rows(
+  uniq_all_males |>
+  mutate(facet_type = "All Haunted places citing males"),
+  
+  uniq_all_females |>
+  mutate(facet_type = "All Haunted places citing females"),
+  
+  uniq_colleges_males |>
+  mutate(facet_type = "University / Colleges' Haunted places mentioning males"),
+  
+  uniq_colleges_females |>
+  mutate(facet_type = "University / Colleges' Haunted places mentioning females")
+  
+  ) |>
+  
+  group_by(facet_type) |>
+  
+  ggplot(aes(label = word,
+             size = proportion,
+             col = facet_type)) +
+  geom_text_wordcloud(rm_outside = TRUE) +
+  facet_wrap(~ facet_type, 
+             scales = "free") +
+  scale_color_manual(values = c("#eba0e9", "#5dace8", "#eba0e9", "#5dace8"), 
+                     drop = FALSE) + 
+  scale_size_area(max_size = 12) +
+  theme_void()
+```
+
+Carefully look at ***All Haunted Places citing males***: Who knew America's haunted places had such a penchant for **"wife"** -- even beyond the grave! Ghostly husbands, you've got some explaining to do! 😄👻
