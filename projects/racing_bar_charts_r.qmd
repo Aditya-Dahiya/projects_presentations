@@ -1,0 +1,379 @@
+---
+format: 
+  html:
+    theme: simplex
+title: "Creating racing bar charts in R with gganimate"
+author: "Aditya Dahiya"
+subtitle: "Annotated code to create racing bar charts using nycflight13 dataset"
+image: "gganimate.png"
+editor: visual
+editor_options: 
+  chunk_output_type: console
+date: "2023-10-17"
+execute: 
+  error: false
+  message: false
+  warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects.html"
+  description: "Creating racing bar charts in R with gganimate"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+# Background
+
+We're about to embark on a thrilling journey through the world of animated **racing bar charts** in `R` - dynamic, action-packed data visualization that showcases the ebb and flow of information over time.
+
+Inspired by the ingenious work of [Deepsha Meghnani](https://deepshamenghani.quarto.pub/dmenghani/)'s [article](https://deepshamenghani.quarto.pub/dmenghani/tidytuesday/gganimate/) on [TidyTuesday](https://deepshamenghani.quarto.pub/dmenghani/tidytuesday.html) and drawing creative insights from the brilliant minds at [datacornering.com](https://datacornering.com/bar-chart-race-in-r-using-ggplot2-and-gganimate/), we'll be crafting our very own data-driven racing bar chart masterpiece.
+
+Our canvas is the `nycflights13` dataset, with details on flights departing from New York City's three iconic airports, courtesy of various carriers, all throughout the year 2013.
+
+But that's not all. We won't stop at just displaying the numbers. We'll also throw in some flair by illustrating the average delays associated with each of these carriers, injecting a dose of character into the aviation landscape of the Big Apple. We're going to unravel the secrets of creating animated racing bar charts using the formidable `ggplot2` and `gganimate` packages in `R`.
+
+```{r}
+#| label: setup
+#| code-fold: true
+
+library(tidyverse)          # Loading Tidyverse for data wrangling
+library(gt)                 # Loading gt package for beautiful tables
+library(gganimate)          # For animations
+library(nycflights13)       # for the flights data-set
+library(lubridate)          # to handle dates in tidyverse
+```
+
+```{r}
+#| label: loading the data set and cleaning it for use
+#| code-fold: true
+#| eval: false
+
+# Loading the flights dataset
+data("flights")
+
+# Pick out the top nine airline carriers only, to avoid crowding the
+# upcoming animated plot
+carriers_to_plot <- flights |>
+  
+  # Count the number of flights for each carrier and sort them in descending order
+  count(carrier, sort = TRUE) |>
+  
+  # Select the top 9 carriers based on flight count
+  slice_head(n = 9) |>
+  
+  # Extract the 'carrier' column from the result
+  pull(carrier)
+
+df <- flights |> 
+  
+  # Filter the flights dataset to include only the top 9 carriers
+  filter(carrier %in% carriers_to_plot) |> 
+  
+  # Create a new 'date' column by combining year, month, and day
+  # This allows us to make a single date variable, that nicely evolves
+  # over time in an animated plot
+  mutate(date = make_date(year = year, month = month, day = day)) |> 
+  
+  # Select only the 'date' and 'carrier' columns
+  select(date, carrier) |>
+  
+  # Joining the full names of airlines for the annotations in animated plot
+  left_join(nycflights13::airlines, by = join_by(carrier)) |>
+  
+  # Remove the 'carrier' column after joining
+  select(-carrier) |>
+  
+  # Rename the 'name' column to 'carrier'
+  rename(carrier = name) |>
+  
+  # Count the number of flights for each date and carrier combination
+  count(date, carrier)
+```
+
+# Example 1
+
+The visualization [below](#anim1) captures the total number of flights operated by each carrier each month, spanning the entire year from January to December 2013. This is an animated bar chart, evolving over time, rather than a truly "racing" bar chart.
+
+```{r}
+#| eval: false
+#| code-fold: true
+
+gganim <- df |>
+  
+  # Create two new columns, 'month' and 'month_anim'
+  mutate(month = month(date, label = TRUE, abbr = FALSE),
+         month_anim = month(date)) |>
+  
+  # Group the data by 'month' and 'month_anim', and count the number 
+  # of flights for each 'carrier'
+  group_by(month, month_anim) |>
+  count(carrier, wt = n) |>
+  
+  # Calculate the rank of each 'carrier' based on the flight count
+  mutate(rank_car = rank(n)) |>
+  
+  # Remove grouping information
+  ungroup() |>
+  
+  # Create a ggplot object with specific aesthetics for rectangles
+  ggplot(aes(xmin = 0,
+             xmax = n,
+             y = rank_car,
+             ymin = rank_car - 0.45,
+             ymax = rank_car + 0.45,
+             fill = carrier,
+             label = round(n, 0))) +
+  
+  # Add filled rectangles with transparency
+  geom_rect(alpha = 0.5) +
+  
+  # Add text labels for flight counts
+  geom_text(aes(x = n, label = as.character(n)), hjust = "left") +
+  
+  # Add text labels for carriers
+  geom_text(aes(x = 0, label = carrier), hjust = "left") +
+  
+  # Adjust the x-axis scale limits
+  scale_x_continuous(limits = c(0, 5500)) +
+  
+  # Customize labels and titles
+  labs(x = NULL, y = NULL, title = "Number of flights each month") +
+  
+  # Add a label indicating the month
+  geom_label(aes(label = month), 
+             x = 4500, y = 1, 
+             fill = "white", col = "black",
+             size = 10, 
+             label.padding = unit(0.5, "lines")) +
+  
+  # Apply a classic theme
+  theme_classic() +
+  
+  # Customize plot appearance
+  theme(legend.position = "none",
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_blank(),
+        title = element_text(size = 20, hjust = 0.5)) +
+  
+  # Create multiple subplots for each month
+  facet_wrap(~month_anim) +
+  
+  # Remove facet labels: this allows us to superlay the facets on top of each other
+  # and then animate the facets
+  facet_null() + 
+  
+  # Create a time-based animation based on 'month_anim'
+  transition_time(month_anim)
+
+# Animate the ggplot object with specified settings
+animate(gganim,
+        duration = 30,
+        fps = 10,
+        width = 800,
+        height = 500,
+        start_pause = 10, 
+        end_pause = 20)
+```
+
+![Animated Horizontal Bar chart showing the total flights operated by each carrier, per month.](/docs/fig-anim1-1.gif){#anim1 fig-align="center"}
+
+------------------------------------------------------------------------
+
+# Example 2
+
+The visualization [below](#anim2) offers a unique perspective, showcasing the cumulative total of flights operated by each carrier from January to December 2013, steadily building the story month by month. A truly "racing" bar chart.
+
+```{r}
+#| eval: false
+#| code-fold: true
+
+df1 <- df |>
+  
+  # Group the data by 'carrier'
+  group_by(carrier) |>
+  
+  # Calculate the cumulative sum of 'n' within each carrier group
+  # This allows us to ahve a cumulative number of flights over time in a 
+  # truly "racing" bar cahrt over time
+  mutate(cum_n = cumsum(n)) |>
+  
+  # Remove grouping information
+  ungroup() |>
+  
+  # Group the data by 'date'
+  group_by(date) |>
+  
+  # Calculate the rank of 'cum_n' within each date group
+  mutate(day_rank = rank(cum_n, ties.method = "first"))
+
+gganim <- df1 |> 
+  
+  # Create a ggplot object with specific aesthetics for reactangles
+  ggplot(aes(xmin = 0,
+             xmax = cum_n,
+             y = day_rank,
+             ymin = day_rank - 0.45,
+             ymax = day_rank + 0.45,
+             fill = carrier,
+             label = cum_n)) +
+  
+  # Add filled rectangles with transparency
+  geom_rect(alpha = 0.5) +
+  
+  # Add text labels for cumulative flight counts
+  geom_text(aes(x = cum_n, label = as.character(cum_n)), hjust = "left") +
+  
+  # Add text labels for carriers
+  geom_text(aes(x = 0, label = carrier), hjust = "left") +
+  
+  # Customize labels and titles. Adding {closest_state} adds the transition
+  # variable value to the plot title
+  labs(x = NULL, y = NULL, title = "Number of total flights operated up to {closest_state}") +
+  
+  # Apply a classic theme
+  theme_classic() +
+  
+  # Customize plot appearance
+  theme(legend.position = "none",
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_blank(),
+        title = element_text(size = 20, hjust = 0.5)) +
+  
+  # Create multiple subplots for each date
+  facet_wrap(~ date) +
+ 
+   # Remove facet labels
+  facet_null() +
+  
+  # Transition the plot by 'date'
+  transition_states(date) +
+  
+  # Follow the view with a fixed x-axis
+  view_follow(fixed_x = FALSE)
+
+# Animate the ggplot object with specified settings
+animate(gganim,
+        duration = 40,
+        fps = 6,
+        width = 800,
+        height = 500,
+        start_pause = 10, 
+        end_pause = 20)
+
+```
+
+![Cumulative Horizontal racing bar-chart depicting total flights operated by each carrier over the course of the year.](/docs/fig-anim2-1.gif){#anim2 fig-alt="Cumulative Horizontal racing bar-chart depicting total flights operated by each carrier over the course of the year"}
+
+------------------------------------------------------------------------
+
+# Example 3
+
+In the final visualiation [below](#anim3), we delve into the average flights' ***arrival delay (in minutes)*** for each carrier, every month, over the course of the year. What makes this data dance even more exciting is how it ranks carriers from the highest delay to the lowest delay, and as we traverse the months, watch as these rankings twirl and pirouette.
+
+```{r}
+#| eval: false
+#| code-fold: true
+
+gganim2 <- flights |>
+ 
+   # Filter the flights dataset to include only the top 9 carriers
+  filter(carrier %in% carriers_to_plot) |>
+  
+  # Create new columns: 'date' by combining year, month, and day, and 
+  # 'month' to represent the month as a label
+  mutate(date = make_date(year = year, month = month, day = day),
+         month = month(date, label = TRUE, abbr = FALSE)) |>
+  
+  # Select specific columns for the subsequent analysis
+  select(date, month, carrier, arr_delay) |>
+ 
+  # Group the data by 'month' and 'carrier', and calculate the average arrival delay
+  group_by(month, carrier) |>
+  summarize(
+    avg_delay = mean(arr_delay, na.rm = TRUE)
+  ) |>
+  
+  # Join the full names of airlines for the annotations in the animated plot
+  left_join(nycflights13::airlines, by = join_by(carrier)) |>
+  
+  # Remove the 'carrier' column after joining and rename 'name' to 'carrier'
+  select(-carrier) |>
+  rename(carrier = name) |>
+  
+  # Calculate the rank of average delay, considering ties
+  mutate(delay_rank = rank(avg_delay, ties.method = "first")) |>
+  
+  # Create a ggplot object with specific aesthetics for the rectangles
+  ggplot(aes(xmin = 0,
+             xmax = avg_delay,
+             y = delay_rank,
+             ymin = delay_rank - 0.45,
+             ymax = delay_rank + 0.45,
+             fill = carrier
+             )
+         ) +
+  
+  # Add filled rectangles with transparency
+  geom_rect(alpha = 0.5) +
+  
+  # Add text labels for average delay values
+  geom_text(aes(x = avg_delay, 
+                label = as.character(round(avg_delay, 1))), 
+            hjust = "left") +
+  
+  # Add text labels for carriers
+  geom_text(aes(x = 0, label = carrier), hjust = "left") +
+  
+  # Add a label indicating the month
+  geom_label(aes(label = month),
+             x = 4500, y = 1,
+             fill = "white", col = "black",
+             size = 10,
+             label.padding = unit(0.5, "lines")) +
+  
+  # Customize labels and titles
+  labs(x = NULL, y = NULL,
+       title = "Average flight arrival delay (in minutes) during {closest_state}") +
+  
+  # Apply a classic theme
+  theme_classic() +
+ 
+  # Customize plot appearance
+  theme(legend.position = "none",
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.x = element_blank(),
+        title = element_text(size = 20, hjust = 0.5)) +
+  
+  # Create multiple subplots for each month
+  facet_wrap(~ month) +
+  
+  # Remove facet labels
+  facet_null() +
+  
+  # Transition the plot by 'month'
+  transition_states(month)
+
+# Animate the ggplot object with specified settings
+animate(gganim2,
+        duration = 40,
+        fps = 10,
+        width = 800,
+        height = 500,
+        start_pause = 10, 
+        end_pause = 20)
+
+```
+
+![An animated horizontal bar chart for average flight arrival delay in each month for different airline carriers](/docs/fig-anim3-1.gif){#anim3}
+
+Notice that in some bad weather months (like June, July and December), almost every airline has considerable delays. On the contrary, if you like being on time, the best months to fly seem to be September to November.
