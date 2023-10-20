@@ -1,0 +1,235 @@
+---
+title: "Making road-maps of cities with Open Street Maps"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "A user-created function to create street art maps in a single line of code"
+date: "2023-10-20"
+image: "gurugram_city_centre.png"
+format:
+  html:
+    theme: simplex
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  echo: false
+  eval: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/street_map_art.html"
+  description: "......"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+Here, I have tried to create a user friends single line of code fucntion to recreate street art maps using *OpenStreetMaps*. The inspiration is from the [Github](https://github.com/failedfast-failedoften) [Workflow](https://github.com/failedfast-failedoften/gis_playground/blob/main/art_map_w_osmdata/clean_workflow/art_map_clean_workflow.Rmd) of [Evgeny Politov](https://medium.com/@evgeny.politov). Credits to [him](https://medium.com/@evgeny.politov) for the majority of the code here, taken from his insights explained in [this](https://blog.devgenius.io/design-a-map-art-with-r-and-openstreetmap-eac6fc7a912b) article on [medium.com](https://medium.com/).
+
+```{r}
+#| label: setup
+
+# Loading libraries
+library(osmdata)      # wrapper for Overpass API from Open Street Maps
+library(sf)           # library for manipulating Simple features objects
+library(tidyverse)    # data wrangling and ggplot2
+
+```
+
+```{r}
+#| eval: false
+#| echo: true
+
+# Code used for Chandigarh
+cty <- opq("Chandigarh")
+
+cty_roads <- cty |>
+  add_osm_feature(key = "highway") |>
+  osmdata_sf()
+
+very_minor <- cty_roads$osm_lines |>
+  filter(highway %in% c("footway", "track", "path", "tertiary_link", "secondary_link", "primary_link", "trunk_link"))
+
+minor_road <- cty_roads$osm_lines |>
+  filter(highway %in% c("residential", "tertiary", "secondary"))
+
+main_roads <- cty_roads$osm_lines |>
+  filter(highway %in% c("primary", "trunk"))
+
+cty_map <- ggplot() +
+  geom_sf(
+    data = very_minor,
+    linewidth = 0.1,
+    alpha = 0.2
+  ) +
+  geom_sf(
+    data = minor_road,
+    linewidth = 0.3,
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = main_roads,
+    linewidth = 0.6,
+    alpha = 0.8
+  ) +
+  labs(title = "Chandigarh") +
+theme_void()
+
+ggsave("docs/cty_map.png",
+  plot = cty_map,
+  device = "png",
+  width = 1800,
+  height = 1800,
+  units = "px"
+)
+
+```
+
+![](/docs/chd_map.png)
+
+Now, I create a function `draw_street_map()` to do this task and automate for other cities. If you want, simply copy paste the function, and use it for any city.
+
+```{r}
+#| echo: true
+#| eval: false
+
+# Code used for Chandigarh
+
+draw_street_map <- function(cityname, filename){
+  require(osmdata)
+  require(tidyverse)
+  require(sf)
+  
+  cty <- osmdata::opq(cityname)
+  
+  cty_roads <- cty |>
+  add_osm_feature(key = "highway") |>
+  osmdata_sf()
+
+  very_minor <- cty_roads$osm_lines |>
+    filter(highway %in% c("footway", "track", "path", 
+                          "tertiary_link", "secondary_link", 
+                          "primary_link", "trunk_link"))
+
+  minor_road <- cty_roads$osm_lines |>
+    filter(highway %in% c("residential", "tertiary", 
+                          "secondary"))
+
+  main_roads <- cty_roads$osm_lines |>
+    filter(highway %in% c("primary", "trunk"))
+
+  cty_map <- ggplot() +
+    geom_sf(
+      data = very_minor,
+      linewidth = 0.1,
+      alpha = 0.2
+    ) +
+    geom_sf(
+      data = minor_road,
+      linewidth = 0.3,
+      alpha = 0.5
+    ) +
+    geom_sf(
+      data = main_roads,
+      linewidth = 0.6,
+      alpha = 0.8
+    ) +
+    labs(title = cityname) +
+  theme_void()
+
+  ggsave(filename,
+    plot = cty_map,
+    device = "png",
+    width = 1800,
+    height = 1800,
+    units = "px")
+  
+}
+```
+
+```{r}
+#| echo: true
+#| eval: false
+
+draw_street_map("Panchkula", "docs/panchkula.png")
+```
+
+![](/docs/panchkula.png)
+
+```{r}
+#| echo: true
+#| eval: false
+
+draw_street_map("Faridabad", "docs/faridabad.png")
+```
+
+![](/docs/faridabad.png)
+
+```{r}
+#| echo: true
+#| eval: false
+
+draw_street_map("Gurugram", "docs/gurugram.png")
+```
+
+![](/docs/gurugram.png)
+
+Now, we create a Gurugram city centre map with some tweaks in the code. Can use `opq()` or the Open Street Maps' Export Interface [here](https://www.openstreetmap.org/export#map=5/51.500/-0.100) to get the latitude and longitude of any portion of any city and then just paste it here.
+
+```{r}
+#| echo: true
+#| eval: false
+
+# Code used for Chandigarh
+cty <- opq("Gurugram")
+
+cty$bbox <- "28.4071, 76.9881, 28.5106, 77.1051"
+
+cty_roads <- cty |>
+  add_osm_feature(key = "highway") |>
+  osmdata_sf()
+
+very_minor <- cty_roads$osm_lines |>
+  filter(highway %in% c("footway", "track", "path", "tertiary_link", "secondary_link", "primary_link", "trunk_link"))
+
+minor_road <- cty_roads$osm_lines |>
+  filter(highway %in% c("residential", "tertiary", "secondary"))
+
+main_roads <- cty_roads$osm_lines |>
+  filter(highway %in% c("primary", "trunk"))
+
+cty_map <- ggplot() +
+  geom_sf(
+    data = very_minor,
+    linewidth = 0.1,
+    alpha = 0.2
+  ) +
+  geom_sf(
+    data = minor_road,
+    linewidth = 0.3,
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = main_roads,
+    linewidth = 0.6,
+    alpha = 0.8
+  ) +
+  labs(title = "Gurugram City (Central Area)") +
+theme_void()
+
+ggsave("docs/gurugram_city_centre.png",
+  plot = cty_map,
+  device = "png",
+  width = 1800,
+  height = 1800,
+  units = "px"
+)
+
+
+```
+
+![](/docs/gurugram_city_centre.png)
