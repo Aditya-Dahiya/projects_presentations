@@ -413,9 +413,11 @@ risk_factors |>
 
 ![](/docs/patient_risk_profiles.png)
 
-### Interactive Visualization
+------------------------------------------------------------------------
 
-A static graph can only show so few risk factor to avoid overcrowding. Lets look at an interactive graph now using `ggplotly()` [@plotly] to display all the risk factors: --
+## Interactive Visualization
+
+A static graph can only show so few risk factor to avoid overcrowding. Lets look at an interactive graph now using `ggplotly()` to display all the risk factors: --
 
 ```{r}
 #| label: fig-interactive-1
@@ -474,9 +476,49 @@ plotly::ggplotly(
 
 ------------------------------------------------------------------------
 
-### Other visualization methods: Datawrapper
+### Other visualization methods: [Observable](https://observablehq.com/)
 
-Another better interactive visualization with higlighting feature across ailments using [*datawrapper.de*](https://app.datawrapper.de/) . However, I am unable to add [tool-tips](https://academy.datawrapper.de/article/116-how-to-create-useful-tooltips-for-your-maps) to this interactive visualization: --
+Trying to create and embed an interactive visualization from observable, with data wrangling in R: --
+
+```{=html}
+<iframe width="100%" height="658.90625" frameborder="0"
+  src="https://observablehq.com/embed/ee37899b8816a506@842?cells=patient_risk_profile&api_key=551ab729de0e5fad020e3fd6021046214d725d87"></iframe>
+```
+```{r}
+#| label: observable-data-creation
+#| eval: false
+#| echo: false
+
+risk_factors |> 
+  drop_na() |> 
+  mutate(
+    outcome_variable = str_remove(outcome_variable,
+                                       "predicted_risk_of_"),
+    outcome_variable = to_title_case(outcome_variable),
+    risk_factors = to_sentence_case(risk_factors),
+    outcome_variable = str_remove(outcome_variable, " with"),
+    outcome_variable = str_remove(outcome_variable, " Trd")
+  ) |> 
+  separate_wider_delim(cols = outcome_variable,
+                       delim = " No ",
+                       names = c("outcome_variable", NA),
+                       too_few = "align_start") |> 
+  separate_wider_delim(cols = outcome_variable,
+                       delim = " or 2 Nd ",
+                       names = c("outcome_variable", NA),
+                       too_few = "align_start") |>
+  group_by(outcome_variable) |> 
+  mutate(reorder_var = sum(percentage_increase_in_MSE)) |> 
+  ungroup() |> 
+  filter(percentage_increase_in_MSE > 0) |> 
+  write_csv("docs/patient_risk_profile.csv")
+```
+
+------------------------------------------------------------------------
+
+### Other visualization methods: [Datawrapper](https://www.datawrapper.de/)
+
+Another better interactive visualization with highlighting feature across ailments using [*datawrapper.de*](https://app.datawrapper.de/) . However, I am unable to add [tool-tips](https://academy.datawrapper.de/article/116-how-to-create-useful-tooltips-for-your-maps) to this interactive visualization: --
 
 ```{=html}
 <div style="min-height:671px"><script type="text/javascript" defer src="https://datawrapper.dwcdn.net/SCQXn/embed.js?v=1" charset="utf-8"></script><noscript><img src="https://datawrapper.dwcdn.net/SCQXn/full.png" alt="A horizontal bar chart depicting the importance (as percentage increase in Mean Squared Error) of each of the 64 risk factors in predicting the risk for 13 different ailments, using Random Forests in R." /></noscript></div>
@@ -484,7 +526,7 @@ Another better interactive visualization with higlighting feature across ailment
 
 ------------------------------------------------------------------------
 
-### Removing the effect of age to see other risk factors
+### Removing the effect of age to see other risk factors in detail
 
 Now, since we know that age is such a dominant risk factor, lets remove it and see the other most important risk factor in an interactive visualization with [**`plotly`**](https://plotly.com/ggplot2/): --
 
