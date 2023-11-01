@@ -1,0 +1,379 @@
+---
+title: "#TidyTuesday Week 44: Horror Legends"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "Looking at the snopes.com articles as a part of #TidyTuesday Week 44 (Oct 31, 2023)"
+categories:
+  - "#TidyTuesday"
+date: "2023-10-31"
+image: "horror_legends.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  cache: true
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/horror_legends.html"
+  description: "Exploring the articles listed on snopes.com"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+## Loading Libraries and Data
+
+```{r}
+# Loading libraries
+library(tidyverse)      # for everything tidy manipulation and plot
+library(gt)             # for nice tables
+library(visdat)         # for visualizing data
+library(tidytext)       # Text Evaluation
+library(rvest)          # Web-scraping for complete articles
+
+# Read data directly from GitHub
+# horror_articles <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-31/horror_articles.csv')
+
+# Using harvested data - to include complete text of all articles
+horror_articles <- read_csv("horror_legends.csv")
+
+vis_dat(horror_articles)
+```
+
+Alternate: Cleaning Script from *#TidyTuesday* [webpage](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-10-31/readme.md#cleaning-script)
+
+```{r}
+#| label: cleaning_script_not_used
+#| eval: false
+
+
+library(tidyverse)
+library(here)
+library(fs)
+library(rvest)
+
+working_dir <- here::here("data", "2023", "2023-10-31")
+
+urls <- paste0(
+  "https://www.snopes.com/fact-check/category/horrors/?pagenum=",
+  1:15
+)
+
+extract_rating <- function(article_page) {
+  rating <- article_page |> 
+    rvest::html_element(".rating_title_wrap") |> 
+    rvest::html_text2() |> 
+    stringr::str_remove("About this rating")
+  if (is.na(rating)) {
+    rating <- article_page |> 
+      rvest::html_element(".status_color") |> 
+      rvest::html_text2()
+  }
+  if (is.na(rating)) {
+    rating <- article_page |> 
+      rvest::html_elements("noindex") |> 
+      rvest::html_text2() |> 
+      stringr::str_squish() |> 
+      stringr::str_subset("^Status:") |> 
+      stringr::str_remove("Status:")
+  }
+  rating <- tolower(rating) |> 
+    stringr::str_squish() |> 
+    stringr::str_remove("\\.|\\:")
+  rating <- dplyr::case_match(
+    rating,
+    c(
+      "a number of real entries, one unknown, and one fiction",
+      "multiple",
+      "multiple — see below",
+      "two real entries, the others are fiction"
+    ) ~ "mixture",
+    .default = rating
+  )
+  return(rating)
+}
+
+extract_claim <- function(article_page) {
+  claim <- article_page |> 
+    rvest::html_element(".claim_cont") |> 
+    rvest::html_text2() |> 
+    stringr::str_squish()
+  if (is.na(claim)) {
+    claim <- rvest::html_elements(article_page, "p") |> 
+      rvest::html_text2() |> 
+      stringr::str_subset("^Claim:") |> 
+      stringr::str_remove("Claim:") |> 
+      stringr::str_squish()
+  }
+  return(claim)
+}
+
+horror_articles <- urls |>
+  purrr::map(
+    \(article_list_url) {
+      article_list_url |> 
+        rvest::read_html() |> 
+        rvest::html_elements(".article_wrapper") |> 
+        purrr::map(
+          \(article) {
+            # Grabbbing info from this page can result in truncation. Instead grab the
+            # URL and dig into that.
+            url <- article |>
+              rvest::html_element("a") |>
+              rvest::html_attr("href")
+            article_page <- rvest::read_html(url)
+            tibble::tibble(
+              title = article_page |>
+                rvest::html_element("h1") |> 
+                rvest::html_text2(),
+              url = url,
+              # Failed for some articles <= 2015-05-16
+              rating = extract_rating(article_page),
+              subtitle = article_page |>
+                rvest::html_element("h2") |> 
+                rvest::html_text2(),
+              author = article_page |> 
+                rvest::html_element(".author_name") |> 
+                rvest::html_text() |> 
+                stringr::str_squish(),
+              published = article |> 
+                rvest::html_element(".article_date") |> 
+                rvest::html_text2() |> 
+                lubridate::mdy(),
+              # Failed for some articles <= 2015-05-16
+              claim = extract_claim(article_page)
+            )
+          }
+        ) |> 
+        purrr::list_rbind()
+    }
+  ) |> 
+  purrr::list_rbind()
+
+readr::write_csv(
+  horror_articles,
+  fs::path(working_dir, "horror_articles.csv")
+)
+```
+
+### Exploratory Data Analysis
+
+Two authors dominate the articles' authorship
+
+```{r}
+horror_articles |> 
+  count(author, sort = TRUE)
+```
+
+## Other Ideas:
+
+1.  Study [Text Mining with R](https://www.tidytextmining.com/)
+
+2.  Text Analysis of the title, subtitle and claim - facet them by true, false and others.
+
+3.  Scrape story text from url and try to do text analysis by true, false and others.
+
+4.  Improve visualization skills this time - make a nice poster with custom fonts and shape as from the Halloween previous Tidy Tuesday.
+
+### Most common words in Titles, Sub-titles and Claim over time
+
+There are no enough recurring words in "title" to draw meaningful conclusions.
+
+```{r}
+horror_articles |> 
+  select(published, title) |> 
+  unnest_tokens(output = "word",
+                input = "title") |> 
+  anti_join(stop_words) |> 
+  group_by(published) |> 
+  count(word, sort = TRUE) |> 
+  ungroup() |> 
+  arrange(desc(n)) |> 
+  slice_head(n = 5)
+```
+
+Lets try the same in subtitle. Again, very few words that are common or recurring in subtitles.
+
+```{r}
+horror_articles |> 
+  select(published, subtitle) |> 
+  unnest_tokens(output = "word",
+                input = "subtitle") |> 
+  anti_join(stop_words) |> 
+  group_by(published) |> 
+  count(word, sort = TRUE) |> 
+  ungroup() |> 
+  arrange(desc(n)) |> 
+  slice_head(n = 5)
+```
+
+Now, let us try in the claim. First seeing how long the claims are: --
+
+```{r}
+horror_articles |> 
+  mutate(claim_length = str_length(claim)) |> 
+  pull(claim_length) |> 
+  summary()
+```
+
+So, we see that the claims are not very long. On average they are 100 characters long only! Still, let us try to find the common words in claims: --
+
+```{r}
+horror_articles |> 
+  select(published, claim) |> 
+  unnest_tokens(output = "word",
+                input = "claim") |> 
+  anti_join(stop_words) |> 
+  group_by(published) |> 
+  count(word, sort = TRUE) |> 
+  filter(n >= 2) |> 
+  ungroup() |> 
+  arrange(desc(n)) |> 
+  slice_head(n = 5)
+```
+
+Again, not enough words to plot. Let's see if we can download the complete article text? Yes, we can!
+
+```{r}
+#| label: harvesting-complete-articles-data-from-website
+#| eval: false
+#| echo: false
+
+# An empty data frame to write the complete text of all articles into
+textdf <- tibble()
+
+# Harvest data of complete text of all articles on snopes.com
+for (i in 1:nrow(horror_articles)) {
+  rvest_urls <- horror_articles[i, ] |> pull(url)
+  rvest_title <- horror_articles[i, ] |> pull(title)
+
+  tempdf <- read_html(rvest_urls) |> 
+    html_nodes("p") |> 
+    html_text2() |> 
+    as_tibble() |> 
+    filter(str_length(value) > 250) |> 
+    mutate(
+      paragraph = row_number(),
+      title = rvest_title
+    )
+  
+  textdf <- bind_rows(textdf, tempdf)
+
+}
+
+# Combining harvested data with provided data and save as csv
+# to avoid scraping a website again and again
+textdf |> 
+  left_join(horror_articles) |> 
+  rename(text = value) |> 
+  write_csv("docs/horror_legends.csv")
+```
+
+Finding common words in complete text by dates
+
+```{r}
+
+# Number of common words to plot
+common_n <- 9
+
+stop_words <- 
+  bind_rows(stop_words,
+            tibble(
+              word = c("nbsp", "nobr", "dt", "dd"),
+              lexicon = "CUSTOM"
+            ))
+
+tidy_horror <- horror_articles |> 
+  select(text, paragraph, title, published) |> 
+  unnest_tokens(output = "word", 
+                input = text) |> 
+  anti_join(stop_words) 
+
+common_words <- tidy_horror |> 
+  count(word, sort = TRUE) |> 
+  slice_head(n = common_n) |> 
+  pull(word)
+
+tidy_horror |>
+  filter(word %in% common_words) |>
+  mutate(word = fct(word, levels = common_words)) |> 
+  count(published, word, sort = TRUE) |> 
+  ggplot(aes(x = published, y = n, col = word)) +
+  geom_smooth(se = FALSE, span = 0.2) +
+  gghighlight::gghighlight() +
+  facet_wrap(~ word, ncol = (common_n %/% 3)) +
+  labs(title = "The most common words in snopes.com articles over time",
+       y = "Number of times the word appears in the articles",
+       x = NULL) +
+  scale_x_date(date_breaks = "3 year",
+               date_labels = "%Y") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        plot.title.position = "plot")
+```
+
+### Sentiment Analysis over the course of time
+
+Using `nrc` sentiment analysis. [@mohammad2012]
+
+```{r}
+
+# seeing the distribution of the number of paragraphs in each article
+horror_articles |>
+  select(title, paragraph) |> 
+  group_by(title) |> 
+  mutate(max_p = max(paragraph)) |> 
+  ggplot() +
+  geom_histogram(aes(max_p), col = "darkgrey", fill = "white") +
+  theme_minimal()
+
+# One time download / agree to license of get_sentiments()
+# get_sentiments("afinn")
+# get_sentiments("bing")
+get_sentiments("nrc")
+
+# Sentiment Analysis
+horror_articles |>
+  select(published, title, paragraph, text) |> 
+  unnest_tokens(word, text) |>
+  mutate(index = row_number()) |>
+  anti_join(stop_words) |>
+  inner_join(get_sentiments("nrc"),
+             relationship = "many-to-many") |> 
+  count(published, sentiment) |>
+  group_by(published) |> 
+  mutate(prop_n = n / sum(n)) |>
+  filter(!(sentiment %in% c("joy", "positive"))) |> 
+  ggplot(aes(x = published,
+             y = prop_n,
+             col = sentiment)) + 
+  geom_smooth(span = 0.1, se = FALSE) +
+  gghighlight::gghighlight() +
+  facet_wrap(~ sentiment, nrow = 2) +
+  labs(x = NULL, y = NULL) +
+  scale_y_continuous(labels = )
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))
+  
+  
+  
+```
+
+### Word-Cloud
+
+### Important Words: tf-idf (by author)
+
+### Analyse bi-grams to find most common bi-grams
+
+### Visualize a network with `ggraph`
