@@ -1,0 +1,541 @@
+---
+title: "Week 45 #TidyTuesday"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "#TidyTuesday Week 45 (Nov 6, 2023)"
+categories:
+  - "#TidyTuesday"
+date: "2023-11-06"
+image: "us_house_election_results.png"
+format:
+  html:
+    code-fold: true
+server: shiny
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/us_house_election_results.html"
+  description: "#TidyTuesday Week 45"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+# #TidyTuesday (Week 45)
+
+## US House Election Results
+
+This data comes from the [MIT Election Data and Science Lab](#0) (MEDSL), and from the MEDSL's report [New Report: How We Voted in 2022](https://electionlab.mit.edu/articles/new-report-how-we-voted-2022)
+
+We're specifically working on the data on House elections from 1976-2022. Check out the [MEDSL website](#0) for additional datasets and tools.
+
+Clean data and dictionary downloaded from the [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/IG0UN2).
+
+```{r}
+#| label: setup
+
+# Load libraries and data
+
+library(tidyverse)    # all things tidy
+library(shiny)        # shiny app
+library(sf)           # for maps
+library(ggparliament) # for parliament seats plots
+# library(gganimate)    # to create animations
+
+# Using the Option of Reading data directly from GitHub
+
+# house <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv')
+
+# write_csv(house, file = here::here("docs", "house.csv"))
+
+# For faster loading times, I ahve saved the interim tibbles as csv
+# and simply loading them, hoever, all the code to generate the following csv
+# are given below
+
+house <- read_csv(here::here("docs", "house.csv"))
+us_map <- read_csv(here::here("docs", "us_map.csv"))
+map_data <- read_csv(here::here("docs", "map_data.csv"))
+totalparl <- read_csv(here::here("docs", "totalparl.csv"))
+propparl <- read_csv(here::here("docs", "propparl.csv"))
+```
+
+## Exploratory Data Analysis
+
+Explain the meaning of first-past the post system and the proportional representation system.
+
+Explain in 2-3 line system of Congress in USA.
+
+```{r}
+#| eval: false
+
+visdat::vis_dat(house)
+
+summarytools::dfSummary(house)
+```
+
+## Calculate victor and percentage votes
+
+Create a tibble of proportion of votes received for each candidate
+
+```{r}
+
+main_parties <- c("DEMOCRAT", "REPUBLICAN")
+
+h1 <- house |> 
+  group_by(state, district, year) |> 
+  mutate(
+    prop_votes = candidatevotes / totalvotes,
+    victory = (prop_votes == max(prop_votes)),
+    party = party,
+    .keep = "used"
+  ) |> 
+  ungroup()
+```
+
+```{r}
+#| eval: false
+
+ganim <- h1 |> 
+  filter(victory) |> 
+  group_by(year) |> 
+  count(party) |>
+  ungroup() |> 
+  mutate(
+    party = snakecase::to_title_case(party),
+    party = fct(party),
+    party = fct_lump_n(party, n = 2)) |> 
+  
+  ggplot(aes(x = n, y = fct_rev(party), fill = party)) +
+    geom_col() +
+    geom_vline(xintercept = 218, lwd = 1, alpha = 0.2) +
+    facet_wrap( ~ year) +
+    scale_fill_manual(values = c("blue", "red", "darkgrey")) +
+    labs(x = "Seats in House of Representatives", 
+         y = NULL,
+         title = 'Year: {closest_state}') +
+    
+    ggthemes::theme_clean() +
+    theme(legend.position = "none",
+          axis.line.y = element_blank(),
+          plot.background = element_rect(colour = "white"),
+          plot.title = element_text(size = 36, hjust = 0.5),
+          axis.text = element_text(size = 15)) +
+    facet_null() +
+    transition_states(year, 
+                      transition_length = 10, 
+                      state_length = 1) +
+    enter_fade() +
+    exit_fade()
+
+
+anim_save(
+  here::here("docs", "us_house_anim1.gif"),
+  animation = ganim, 
+  fps = 30, 
+  duration = 45,
+  end_pause = 3)
+```
+
+![](/docs/us_house_anim1.gif)
+
+### Comparing seats won and the popular vote percentage over the years for main two parties
+
+```{r}
+#| eval: false
+
+# Number of seats for each party in the Congress
+h1a <- h1 |> 
+  filter(victory) |> 
+  group_by(year) |> 
+  count(party) |> 
+  filter(party %in% c("DEMOCRAT", "REPUBLICAN")) |> 
+  mutate(party = fct(party, levels = c("DEMOCRAT", "REPUBLICAN")))
+
+# Number of votes for each party in that election
+h1b <- h1 |> 
+  group_by(year, party) |> 
+  summarise(
+    votes = sum(candidatevotes)
+  ) |> 
+  mutate(prop_votes = votes / sum(votes)) |> 
+  filter(party %in% main_parties) |> 
+  mutate(party = fct(party, levels = c("DEMOCRAT", "REPUBLICAN"))) |> 
+  ungroup()
+
+# A multiplication factor for the dual y-axis
+sec_axis_factor = 435
+
+ggplot(data = h1a, 
+         aes(x = year, y = n, col = party)) +
+  geom_line() +
+  geom_point() +
+  geom_line(data = h1b, aes(y = prop_votes*sec_axis_factor), lty = 2, alpha = 0.4) +
+  geom_point(data = h1b, aes(y = prop_votes*sec_axis_factor), alpha = 0.2) +
+  geom_hline(aes(yintercept = sec_axis_factor/2), alpha = 0.2, lwd = 0.5) +
+  
+  
+  scale_color_manual(values = c("blue", "red")) +
+  scale_x_continuous(breaks = unique(h1 |> pull(year))) +
+  scale_y_continuous(
+    sec.axis = sec_axis(trans = ~./(sec_axis_factor/100), 
+                        name = "Percentage of Popular Vote (% votes polled)")
+  ) +
+  
+  labs(x = NULL, y = "Number of seats won",
+       title = "Winning party almost always has a lower share of popular vote than number of seats reflect") +
+  
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        legend.position = "none", 
+        plot.title.position = "plot")
+```
+
+![Seats and Popular Vote Percentage for the two major US parties](/docs/ushouse1.png){#fig-1 .figure}
+
+```{r}
+#| eval: false
+
+h1 |> 
+  mutate(victory = if_else(victory,
+                           "Victorious Candidates",
+                           "All other candidates")) |> 
+  group_by(year, victory) |> 
+  
+  # Votes for victorious candidates vs. the rest
+  summarize(votes = sum(candidatevotes)) |> 
+  
+  # Total polled votes overall
+  mutate(total = sum(votes),
+         perc = votes/total) |> 
+  drop_na() |> 
+  
+  # Plotting trend over the years
+  ggplot(aes(x = year, y = perc, col = victory)) +
+  geom_point() + 
+  geom_line() +
+  geom_hline(yintercept = 0.5, col = "grey", lty = 2) +
+  
+  scale_x_continuous(breaks = unique(h1 |> pull(year))) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  
+  labs(x = NULL, 
+       y = "Percentage of votes",
+       col = NULL) +
+  
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        legend.position = "bottom")
+```
+
+### **Checking the proportion of people who voted for the party controlling the house majority**
+
+```{r}
+#| eval: false
+
+# A tibble of party controlling the congress each bi-year (party_in_power)
+p_in_p <- h1 |> 
+  
+  # taking only victorious candidates
+  filter(victory) |> 
+  
+  # number of seats won by each party
+  count(year, party) |> 
+  
+  # add a column of total number of seats
+  group_by(year) |> 
+  mutate(total_seats = sum(n)) |> 
+  rename(seats = n) |> 
+  mutate(control = seats/total_seats > 0.5) |> 
+  filter(control) |> 
+  select(year, party) |> 
+  rename(party_in_power = party)
+
+# Computing percetnage of people who voted for winning party
+h1 |> 
+  left_join(p_in_p) |> 
+  mutate(victory = if_else(party == party_in_power,
+                           "Victorious Party",
+                           "Others",
+                           missing = "Others")) |> 
+  group_by(year, victory) |> 
+  summarise(votes = sum(candidatevotes)) |> 
+  mutate(prop = votes / sum(votes)) |> 
+  filter(victory == "Victorious Party") |> 
+  mutate(col_prop = prop < 0.5) |> 
+  
+  # Plot the votes percentage
+  ggplot(aes(x = year, 
+             y = prop)) +
+  geom_point(aes(col = col_prop)) + 
+  geom_line(lty = 2, 
+            lwd = 0.2) +
+  geom_hline(yintercept = 0.5, 
+             col = "grey", 
+             alpha = 0.5,
+             lty = 2) +
+  
+  scale_x_continuous(breaks = unique(h1 |> pull(year))) +
+  scale_y_continuous(labels = scales::percent_format(),
+                     limits = c(0.4, 0.6)) +
+  scale_color_manual(values = c("black", "red")) +
+  
+  labs(x = NULL, 
+       y = "% Votes polled for Party controlling Congress",
+       col = NULL,
+       title = "The ruling party did not have the majority popular vote in 9 out of 24 Houses") +
+  
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        legend.position = "none",
+        plot.title.position = "plot")
+```
+
+![](/docs/ushouse2.png)
+
+### Drawing the USA Map and Parliament with election results: An attempt at a Shiny or Interactive plotting to select year through a slider
+
+```{r}
+#| label: datasets for use in plotting - run only once
+#| eval: false
+
+library(USAboundaries)
+
+############## USA Map: Electoral Districts Boundaries #################
+us_map <- USAboundaries::us_congressional(resolution = "low") |> 
+  
+  # Extract District Number
+  mutate(district = parse_number(namelsad)) |> 
+  
+  select(state_abbr, district, geometry) |> 
+  as_tibble() |> 
+  
+  # Correct encoding of districts to match our data
+  mutate(district = replace_na(district, replace = 0))
+
+
+############### Data for Vicotrious parties in each district ###############
+map_data <- house |> 
+  
+  # State and District Numbers
+  rename(state_abbr = state_po) |> 
+  mutate(district = parse_number(district)) |> 
+  group_by(year, state, district) |> 
+  
+  # Find victorious candidate party and percentage of votes
+  mutate(victor = (candidatevotes == max(candidatevotes)),
+         vic_perc_votes = if_else(victor,
+                                  candidatevotes/totalvotes,
+                                  NA),
+         party = snakecase::to_title_case(party),
+         party = replace_na(party, "Unknown")
+         ) |> 
+  select(year, state, state_abbr, district, 
+         party, victor, vic_perc_votes) |> 
+  ungroup() |> 
+  
+  # Create a lumped factor of Democrats, Republicans and Others
+  mutate(party = fct(party),
+         party = fct_lump_n(party, n = 2)) |> 
+  
+  # Pick only victorious candidates
+  filter(victor) |> 
+  
+  # Correcting some miscodings of districts in states with 1/2 districts
+  mutate(district = if_else(state_abbr %in% c("MT", "SD"),
+                            0,
+                            district))
+
+############ Transforming data into a parliament form ################
+
+totalparl <- map_data |> 
+  # Creating result in a format that ggparliament understands
+  group_by(year, party) |> 
+  count(name = "seats") |> 
+  mutate(government = as.numeric(seats >= 218)) |> 
+  mutate(party_long = party) |> 
+  mutate(party_short = case_when(
+           party == "Democrat" ~ "Dem",
+           party == "Republican" ~ "GOP",
+           .default = "Ind"),
+         colour = case_when(
+           party_long == "Democrat" ~ "#3333FF",
+           party_long == "Republican" ~ "#E81B23",
+           .default = "#B4B4B4"
+         )) |> 
+  ungroup() |> 
+  select(year, party_short, party_long, seats, government, colour) 
+
+########## Hypothetical Seats if USA had proportional representation #########
+propparl <- house |> 
+ 
+  mutate(party = snakecase::to_title_case(party),
+         party = replace_na(party, "Unknown"),
+         party = fct(party),
+         party = fct_lump_n(party, n = 2)) |> 
+  
+  group_by(year, party) |> 
+  summarise(partyvotes = sum(candidatevotes)) |> 
+  mutate(totalvotes = sum(partyvotes),
+         seats = round(435 * partyvotes / totalvotes, 0)) |> 
+  
+  # Creating result in a format that ggparliament understands
+  mutate(government = as.numeric(seats >= 218)) |> 
+  mutate(party_long = party) |> 
+  mutate(party_short = case_when(
+           party == "Democrat" ~ "Dem",
+           party == "Republican" ~ "GOP",
+           .default = "Ind"),
+         colour = case_when(
+           party_long == "Democrat" ~ "#3333FF",
+           party_long == "Republican" ~ "#E81B23",
+           .default = "#B4B4B4"
+         )) |> 
+  ungroup() |> 
+  select(year, party_short, party_long, seats, government, colour) 
+
+write_csv(us_map, here::here("docs", "us_map.csv"))
+write_csv(map_data, here::here("docs", "map_data.csv"))
+write_csv(totalparl, here::here("docs", "totalparl.csv"))
+write_csv(propparl, here::here("docs", "propparl.csv"))
+```
+
+```{r}
+
+```
+
+The Actual plots: --
+
+```{r}
+sliderInput(inputId = "year", 
+            label = "Select the Year of Elections", 
+            min = 1976, 
+            max = 2022, 
+            value = 2020,
+            step = 2,
+            sep = "",
+            round = TRUE)
+
+plotOutput("g1")
+
+plotOutput("g2")
+
+plotOutput("g3")
+```
+
+```{r}
+#| context: server
+
+us_map <- USAboundaries::us_congressional(resolution = "low") |> 
+  
+  # Extract District Number
+  mutate(district = parse_number(namelsad)) |> 
+  
+  select(state_abbr, district, geometry) |> 
+  as_tibble() |> 
+  
+  # Correct encoding of districts to match our data
+  mutate(district = replace_na(district, replace = 0))
+
+################# Plotting Map #################
+
+output$g1 <- renderPlot({
+  
+  map_data |> 
+  
+  # Join with the map geometry column
+  left_join(us_map) |> 
+  
+  # Leave out non-continental USA
+  filter(!state_abbr %in% c("PR", "AK", "HI")) |>
+  filter(year == input$year) |>
+  
+  ggplot(aes(fill = party, 
+             geometry = geometry)) + 
+  geom_sf(col = "white") + 
+  geom_text(aes(label = year, x = -75, y = 48), size = 12) +
+  coord_sf() + 
+  
+  scale_fill_manual(values = c("#3333FF", "#E81B23", "#B4B4B4")) +
+  
+  theme_void() +
+  theme(legend.position = "none")
+})
+
+##### Plotting Parliament
+
+
+output$g2 <- renderPlot({
+  
+  usparl <- totalparl |> 
+  filter(year == input$year)
+
+  majority <- usparl |> 
+  filter(seats >= 218) |> 
+  pull(party_long) |> 
+  as.character() 
+
+  majority <- if_else(is.na(majority), "Coalition", majority)
+
+  usparl |> 
+  parliament_data(type = "semicircle", 
+                  parl_rows = 10,
+                  party_seats = usparl$seats) |> 
+  ggplot(aes(x = x, y = y, colour = party_short)) +
+  geom_parliament_seats() +
+  draw_majoritythreshold(n = 218, label = TRUE, type = "semicircle") +
+  draw_partylabels(type = "semicircle",
+                   party_names = party_long,
+                   party_seats = seats,
+                   party_colours = colour) +
+  geom_highlight_government(government == 1, size = 4) +
+  
+  labs(title = paste0("USA House of Representatives: ", input$year),
+       subtitle = paste0("Majority: ", majority)) +
+  theme_ggparliament(legend = FALSE) +
+  scale_colour_manual(values = usparl$colour,
+                      limits = usparl$party_short)
+
+})
+
+##### Plotting Hypothetical Parliament
+
+output$g3 <- renderPlot({
+  
+  uspropparl <- propparl |> 
+  filter(year == input$year)
+
+  uspropparl |> 
+  parliament_data(type = "semicircle", 
+                  parl_rows = 10,
+                  party_seats = uspropparl$seats) |> 
+  ggplot(aes(x = x, y = y, colour = party_short)) +
+  geom_parliament_seats() +
+  draw_majoritythreshold(n = 218, label = TRUE, type = "semicircle") +
+  draw_partylabels(type = "semicircle",
+                   party_names = party_long,
+                   party_seats = seats,
+                   party_colours = colour) +
+  geom_highlight_government(government == 1, size = 4) +
+  
+  labs(title = paste0("Hypothetical USA House with seats proportional to popular vote: ", input$year),
+       subtitle = paste0("Majority: ", majority)) +
+  theme_ggparliament(legend = FALSE) +
+  scale_colour_manual(values = usparl$colour,
+                      limits = usparl$party_short) 
+
+})
+```
