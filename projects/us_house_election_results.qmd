@@ -1,16 +1,16 @@
 ---
-title: "Week 45 #TidyTuesday"
+title: "Electoral Kaleidoscope: Visualizing the Impact of Proportional Representation"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: "#TidyTuesday Week 45 (Nov 6, 2023)"
+subtitle: "How the PSR System could've changed the 1992 and 2020 US House of Representatives majority party!"
 categories:
   - "#TidyTuesday"
-date: "2023-11-06"
+  - "Data Visualization"
+date: "2023-11-12"
 image: "us_house_election_results.png"
 format:
   html:
     code-fold: true
-server: shiny
 editor_options: 
   chunk_output_type: console
 execute: 
@@ -29,15 +29,11 @@ share:
   mastodon: true
 ---
 
-# #TidyTuesday (Week 45)
+In the thrilling world of elections, there are two main contenders duking it out for the title of "Best Voting System": the classic [First-Past-the-Post](https://en.wikipedia.org/wiki/First-past-the-post_voting) (**FPTP**) and the avant-garde [Proportional Seats Representation](https://en.wikipedia.org/wiki/Proportional_representation) (**PSR**).
 
-## US House Election Results
+Think of FPTP as the sprinter, the first to cross the finish line takes it all, while PSR is more like a democratic marathon, ensuring everyone's voice is heard. Or, imagine you're at a pizza party---FPTP would be that one friend who grabs the last slice before you even realize it's up for grabs, while PSR ensures everyone gets a fair share of the cheesy goodness.
 
-This data comes from the [MIT Election Data and Science Lab](#0) (MEDSL), and from the MEDSL's report [New Report: How We Voted in 2022](https://electionlab.mit.edu/articles/new-report-how-we-voted-2022)
-
-We're specifically working on the data on House elections from 1976-2022. Check out the [MEDSL website](#0) for additional datasets and tools.
-
-Clean data and dictionary downloaded from the [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/IG0UN2).
+Now, let's dive into the wild world of U.S. House of Representatives elections from 1976 to 2022 and see how these systems have been throwing their punches in the political ring. The data comes from the [MIT Election Data and Science Lab](#0) (MEDSL), and from the MEDSL's report [New Report: How We Voted in 2022](#0). I'll be specifically working on the data on House elections from 1976-2022 downloaded from the [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/IG0UN2).
 
 ```{r}
 #| label: setup
@@ -48,7 +44,10 @@ library(tidyverse)    # all things tidy
 library(shiny)        # shiny app
 library(sf)           # for maps
 library(ggparliament) # for parliament seats plots
-# library(gganimate)    # to create animations
+library(gganimate)    # to create animations
+library(gt)           # gt tables
+library(gtExtras)     # nicer gt tables
+library(RColorBrewer) # colours
 
 # Using the Option of Reading data directly from GitHub
 
@@ -56,63 +55,83 @@ library(ggparliament) # for parliament seats plots
 
 # write_csv(house, file = here::here("docs", "house.csv"))
 
-# For faster loading times, I ahve saved the interim tibbles as csv
+# For faster loading times, I have saved the interim tibbles as csv
 # and simply loading them, hoever, all the code to generate the following csv
 # are given below
 
-house <- read_csv(here::here("docs", "house.csv"))
-us_map <- read_csv(here::here("docs", "us_map.csv"))
 map_data <- read_csv(here::here("docs", "map_data.csv"))
 totalparl <- read_csv(here::here("docs", "totalparl.csv"))
 propparl <- read_csv(here::here("docs", "propparl.csv"))
 ```
 
-## Exploratory Data Analysis
+### Data Analysis and Tools
 
-Explain the meaning of first-past the post system and the proportional representation system.
-
-Explain in 2-3 line system of Congress in USA.
+To unravel the secrets hidden within the labyrinth of U.S. House of Representatives election results from 1976 to 2022, I've armed myself with an arsenal of `tidyverse` [@tidyverse] tools and a few trusty sidekicks: `sf` [@sf] to map out the results, and `ggparliament` [@ggparliament] and `gganimate` [@gganimate] to add some visual spice, and `gt` [@gt] and `gtExtras` [@gtExtras] step in for a dash of elegance. If you wish to peek behind the curtain and explore the data science magic, just hit the "Code" button.
 
 ```{r}
 #| eval: false
 
+# Read the CSV file from the specified URL using the readr package
+house <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-07/house.csv')
+
+# Visualize the structure and missing values of the data using the visdat package
 visdat::vis_dat(house)
 
+# Generate a summary report of the data using the dfSummary function from the summarytools package
 summarytools::dfSummary(house)
+
 ```
 
-## Calculate victor and percentage votes
+## Each election result over time: 1976 - 2022
 
-Create a tibble of proportion of votes received for each candidate
+::: grid
+::: g-col-4
+[This animated bar chart](#anim-1) is a mesmerizing dance of political prowess. It reveals the ebb and flow of seats won by the dynamic duo of the two main parties in each biennial election from 1976 to 2022. It seems the stage is monopolized by the headliners, leaving the "Other" party contenders with no representation.
+:::
+
+::: g-col-8
+![](/docs/us_house_anim1.gif){#anim-1}
+:::
+:::
 
 ```{r}
+#| label: Initial Analysis
+#| eval: false
 
+# Define a vector containing the names of the main political parties
 main_parties <- c("DEMOCRAT", "REPUBLICAN")
 
+# Create a new dataframe 'h1' using the magrittr pipe operator %>%
 h1 <- house |> 
+  # Group the data by state, district, and year
   group_by(state, district, year) |> 
+  # Add new columns: prop_votes (proportion of votes), victory (boolean indicating victory), party
   mutate(
     prop_votes = candidatevotes / totalvotes,
     victory = (prop_votes == max(prop_votes)),
     party = party,
     .keep = "used"
   ) |> 
+  # Remove grouping
   ungroup()
-```
 
-```{r}
-#| eval: false
-
+# Create a new dataframe 'ganim' using the magrittr pipe operator %>%
 ganim <- h1 |> 
+  # Filter rows where 'victory' is TRUE
   filter(victory) |> 
+  # Group the data by 'year' and count the occurrences of each 'party'
   group_by(year) |> 
   count(party) |>
+  # Remove grouping
   ungroup() |> 
+  # Mutate columns: convert 'party' to title case, convert to factor, and lump categories to top 2
   mutate(
     party = snakecase::to_title_case(party),
     party = fct(party),
-    party = fct_lump_n(party, n = 2)) |> 
+    party = fct_lump_n(party, n = 2)
+  ) |> 
   
+  # Create a ggplot visualization
   ggplot(aes(x = n, y = fct_rev(party), fill = party)) +
     geom_col() +
     geom_vline(xintercept = 218, lwd = 1, alpha = 0.2) +
@@ -123,30 +142,36 @@ ganim <- h1 |>
          title = 'Year: {closest_state}') +
     
     ggthemes::theme_clean() +
-    theme(legend.position = "none",
-          axis.line.y = element_blank(),
-          plot.background = element_rect(colour = "white"),
-          plot.title = element_text(size = 36, hjust = 0.5),
-          axis.text = element_text(size = 15)) +
+    theme(
+      legend.position = "none",
+      axis.line.y = element_blank(),
+      plot.background = element_rect(colour = "white"),
+      plot.title = element_text(size = 36, hjust = 0.5),
+      axis.text = element_text(size = 15)
+    ) +
     facet_null() +
+    # Create an animated transition over 'year' using gganimate
     transition_states(year, 
                       transition_length = 10, 
                       state_length = 1) +
     enter_fade() +
     exit_fade()
 
-
+# Save the animated plot as a GIF
 anim_save(
   here::here("docs", "us_house_anim1.gif"),
   animation = ganim, 
   fps = 30, 
   duration = 45,
-  end_pause = 3)
+  end_pause = 3
+)
 ```
 
-![](/docs/us_house_anim1.gif)
+## Seats won Vs. the popular vote for the main two parties
 
-### Comparing seats won and the popular vote percentage over the years for main two parties
+Now, you'd think the seats would just follow the popular vote, right? Wrong! The [graph below](#fig-1) spills the beans on the popular vote percentages versus the actual seats won by the [**Democrat**]{style="color:blue;"} and [**Republican**]{style="color:red;"} parties --- the solid-colored lines show the seats won, and the faint, see-through ones are the actual percentage of popular votes!
+
+Surprise, surprise, the winning party is always snagging more seats than its popular vote percentages would lead you to believe.
 
 ```{r}
 #| eval: false
@@ -202,44 +227,9 @@ ggplot(data = h1a,
 
 ![Seats and Popular Vote Percentage for the two major US parties](/docs/ushouse1.png){#fig-1 .figure}
 
-```{r}
-#| eval: false
+## **Popular Vote % for the party controlling the House**
 
-h1 |> 
-  mutate(victory = if_else(victory,
-                           "Victorious Candidates",
-                           "All other candidates")) |> 
-  group_by(year, victory) |> 
-  
-  # Votes for victorious candidates vs. the rest
-  summarize(votes = sum(candidatevotes)) |> 
-  
-  # Total polled votes overall
-  mutate(total = sum(votes),
-         perc = votes/total) |> 
-  drop_na() |> 
-  
-  # Plotting trend over the years
-  ggplot(aes(x = year, y = perc, col = victory)) +
-  geom_point() + 
-  geom_line() +
-  geom_hline(yintercept = 0.5, col = "grey", lty = 2) +
-  
-  scale_x_continuous(breaks = unique(h1 |> pull(year))) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  
-  labs(x = NULL, 
-       y = "Percentage of votes",
-       col = NULL) +
-  
-  theme_minimal() +
-  theme(panel.grid.minor = element_blank(),
-        panel.grid.major.y = element_blank(),
-        axis.text.x = element_text(angle = 90),
-        legend.position = "bottom")
-```
-
-### **Checking the proportion of people who voted for the party controlling the house majority**
+Now, [this graph](#fig-2) depicts the percentage of popular votes snagged by the party in control of the House each year. Brace yourselves for a mind-bender --- out of the 24 times people cast their votes for the House of Representatives, a whopping nine times saw the winning party clutching victory with less than 50% of the popular vote.
 
 ```{r}
 #| eval: false
@@ -292,7 +282,7 @@ h1 |>
   scale_color_manual(values = c("black", "red")) +
   
   labs(x = NULL, 
-       y = "% Votes polled for Party controlling Congress",
+       y = "% Votes polled for Party controlling the House",
        col = NULL,
        title = "The ruling party did not have the majority popular vote in 9 out of 24 Houses") +
   
@@ -304,13 +294,151 @@ h1 |>
         plot.title.position = "plot")
 ```
 
-![](/docs/ushouse2.png)
+![](/docs/ushouse2.png){#fig-2}
 
-### Drawing the USA Map and Parliament with election results: An attempt at a Shiny or Interactive plotting to select year through a slider
+# The numbers
+
+Now, diving deep into the hypothetical world of proportional representation in USA, @fig-gt-table shows the difference between actual seats won versus the hypothetical seats each party would have snagged if USA used proportionality over the past four decades. We see two important revelations:
+
+In nearly every election, those "Other Parties" would have bagged higher number of seats if USA had a proportional representation system. It's like they've been waiting at the buffet, and FPTP just didn't hand them enough plates!
+
+And, in 1992 and 2020, the actual party ruling the House would have changed! Instead of the usual solo act, it would have been a coalition on the throne. Seems like the Democrats have been the belle of the FPTP ball, reaping more benefits from the current system.
+
+```{r}
+#| label: fig-gt-table
+#| fig-cap: "Parties' representation in House of Representatives (USA)"
+#| fig-width: 10
+
+t1 <- totalparl |> 
+  select(year, party_long, seats) |>
+  mutate(type = "Actual House (FPTP System)") |> 
+  bind_rows(
+    propparl |> select(year, party_long, seats) |> mutate(type = "House by PSR system")
+  ) 
+
+# Finding out the years in which the majority party would have changed
+
+maj = 218
+
+change_years <- t1 |> 
+  mutate(party_long = if_else(type == "Actual House (FPTP System)",
+                              party_long,
+                              paste0(party_long, "_1"))) |> 
+  select(-type) |> 
+  pivot_wider(names_from = party_long,
+              values_from = seats) |>
+  mutate(Other = replace_na(Other, 0)) |> 
+  mutate(
+    Dem_Gov = (Democrat >= maj) & (Democrat_1 >= maj),
+    Rep_Gov = (Republican >= maj) & (Republican >= maj),
+    Change = !xor(Dem_Gov, Rep_Gov)
+  ) |> 
+  filter(Change) |> 
+  pull(year)
+
+t1 |> 
+  mutate(party_long = if_else(type == "Actual House (FPTP System)",
+                              party_long,
+                              paste0(party_long, "_1"))) |> 
+  select(-type) |> 
+  pivot_wider(names_from = party_long,
+              values_from = seats) |>
+  mutate(Other = replace_na(Other, 0)) |> 
+  mutate(
+    Difference_D = Democrat_1 - Democrat,
+    Difference_R = Republican_1 - Republican,
+    Difference_O = Other_1 - Other
+  ) |> 
+  mutate(across(everything(), na_if, 0)) |> 
+  
+  
+  gt::gt() |> 
+  
+  tab_header(
+    title = "Parties' representation in the House of Representatives",
+    subtitle = md("**Actual seats Vs. Seats by popular vote**")) |> 
+  tab_source_note(
+    source_note = md("_Data: MIT Election Data and Science Lab (MEDSL). House Elections: 1976-2022._")
+  ) |> 
+  
+  
+  tab_spanner(label = "Actual House Results",
+              columns = 2:4) |> 
+  tab_spanner(label = "Hypothetical Seats by Popular Vote",
+              columns = 5:7) |>  
+  tab_spanner(label = "Change in seats, if using popular vote",
+              columns = 8:10) |>  
+  sub_missing(missing_text = "") |> 
+  cols_align(align = "center") |> 
+  
+  gtExtras::gt_fa_rank_change(column = Difference_D, fa_type = "arrow") |> 
+  gtExtras::gt_fa_rank_change(column = Difference_R, fa_type = "arrow") |> 
+  gtExtras::gt_fa_rank_change(column = Difference_O, fa_type = "arrow") |> 
+  
+  gt_highlight_rows(rows = year %in% change_years,
+                    fill = "lightgrey") |> 
+  
+  
+  cols_label(
+    Democrat_1 = html("Democrat<sub>p</sub>"),
+    Republican_1 = html("Republican<sub>p</sub>"),
+    Other_1 = html("Other<sub>p</sub>"),
+    
+    year = "Year",
+    
+    Difference_D = html("Democrat<sub>c</sub>"),
+    Difference_R = html("Republican<sub>c</sub>"),
+    Difference_O = html("Other<sub>c</sub>"),
+  ) |> 
+  
+  gtExtras::gt_theme_538()
+```
+
+To make it easier, I've conjured up a stacked bar chart that peels back the curtain on the electoral enchantment of a proportional representation system instead of the boring numbers above. As we see in @fig-stack-bar, in the spotlight are the pivotal years of 1992 and 2020, where the absence of a clear majority would have ushered in a coalition government. Also, take a gander at the spectrum of colors, especially that prominent shade of grey---it's the chorus of "Other Parties" belting out their potential under a proportional system. They're like the unsung heroes finally stepping into the limelight!
+
+```{r}
+#| label: fig-stack-bar
+#| fig-cap: "A stacked bar chart showing number of seats won by each party in elections 1976-2022 under FPTP & PRS systems"
+
+cap_plot <- md("**FPTP**: First-Past-the-Post (actual system in USA).  **PSR**: Proportional Seats Representation. _Viz: Aditya Dahiya_")
+
+t1 |>
+  mutate(
+    alpha_year = year %in% change_years,
+    year = as_factor(year),
+    ) |> 
+  ggplot(aes(x = seats, 
+             y = year, 
+             fill = party_long,
+             alpha = alpha_year)) +
+  geom_col(position = "stack") +
+  geom_vline(xintercept = 218) +
+  scale_fill_manual(values = c("#3333FF", "#B4B4B4", "#E81B23")) +
+  scale_x_continuous(breaks = c(0, 218, 435)) +
+  scale_alpha_discrete(range = c(0.5, 1)) +
+  
+  facet_wrap(~ type) +
+  
+  labs(x = "Seats in the House of Representatives", y = NULL,
+       title = "United States House of Representatives",
+       subtitle = "Party dominance in First-Past-the-Post vs. Proportional Seats Representation systems",
+       caption = cap_plot) +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        legend.position = "none",
+        plot.title.position = "plot",
+        plot.caption = ggtext::element_markdown())
+
+```
+
+## The two times that PSR would've changed majority party
+
+To cap off our journey, let's zoom in on the pivotal election years of 1992 and 2020, where the very fabric of majority rule would have been rewoven under a Proportional Seats Representation (PSR) system. In 1992, the Democratic majority would've been replaced with requirement of a coalition of sorts. Fast forward to 2020, and similar outcome would've arisen. But the real star of the show? Those grey coloured "Other Parties" section of the graphs below. In a PSR universe, they step into the limelight, their influence reaching far beyond regional boundaries. #PSRRevolution #TidyTuesday #ElectionEpilogue
 
 ```{r}
 #| label: datasets for use in plotting - run only once
 #| eval: false
+#| echo: false
 
 library(USAboundaries)
 
@@ -413,32 +541,13 @@ write_csv(totalparl, here::here("docs", "totalparl.csv"))
 write_csv(propparl, here::here("docs", "propparl.csv"))
 ```
 
-```{r}
-
-```
-
-The Actual plots: --
+## **1992: US House of Representatives Results**
 
 ```{r}
-sliderInput(inputId = "year", 
-            label = "Select the Year of Elections", 
-            min = 1976, 
-            max = 2022, 
-            value = 2020,
-            step = 2,
-            sep = "",
-            round = TRUE)
+#| fig-width: 10
 
-plotOutput("g1")
-
-plotOutput("g2")
-
-plotOutput("g3")
-```
-
-```{r}
-#| context: server
-
+input = NULL
+input$year = 1992
 us_map <- USAboundaries::us_congressional(resolution = "low") |> 
   
   # Extract District Number
@@ -450,11 +559,7 @@ us_map <- USAboundaries::us_congressional(resolution = "low") |>
   # Correct encoding of districts to match our data
   mutate(district = replace_na(district, replace = 0))
 
-################# Plotting Map #################
-
-output$g1 <- renderPlot({
-  
-  map_data |> 
+map_data |> 
   
   # Join with the map geometry column
   left_join(us_map) |> 
@@ -469,28 +574,27 @@ output$g1 <- renderPlot({
   geom_text(aes(label = year, x = -75, y = 48), size = 12) +
   coord_sf() + 
   
-  scale_fill_manual(values = c("#3333FF", "#E81B23", "#B4B4B4")) +
+  scale_fill_manual(values = c("#3333FF", "#B4B4B4", "#E81B23")) +
   
   theme_void() +
   theme(legend.position = "none")
-})
 
-##### Plotting Parliament
+```
 
+```{r}
+#| layout-ncol: 2
 
-output$g2 <- renderPlot({
-  
-  usparl <- totalparl |> 
+usparl <- totalparl |> 
   filter(year == input$year)
 
-  majority <- usparl |> 
+majority <- usparl |> 
   filter(seats >= 218) |> 
   pull(party_long) |> 
   as.character() 
 
-  majority <- if_else(is.na(majority), "Coalition", majority)
+majority <- if_else(is.na(majority), "Coalition", majority)
 
-  usparl |> 
+usparl |> 
   parliament_data(type = "semicircle", 
                   parl_rows = 10,
                   party_seats = usparl$seats) |> 
@@ -503,22 +607,18 @@ output$g2 <- renderPlot({
                    party_colours = colour) +
   geom_highlight_government(government == 1, size = 4) +
   
-  labs(title = paste0("USA House of Representatives: ", input$year),
+  labs(title = paste0("Actual House of Representatives: ", input$year),
        subtitle = paste0("Majority: ", majority)) +
   theme_ggparliament(legend = FALSE) +
   scale_colour_manual(values = usparl$colour,
-                      limits = usparl$party_short)
+                      limits = usparl$party_short)  +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14))
 
-})
-
-##### Plotting Hypothetical Parliament
-
-output$g3 <- renderPlot({
-  
-  uspropparl <- propparl |> 
+uspropparl <- propparl |> 
   filter(year == input$year)
 
-  uspropparl |> 
+uspropparl |> 
   parliament_data(type = "semicircle", 
                   parl_rows = 10,
                   party_seats = uspropparl$seats) |> 
@@ -531,11 +631,99 @@ output$g3 <- renderPlot({
                    party_colours = colour) +
   geom_highlight_government(government == 1, size = 4) +
   
-  labs(title = paste0("Hypothetical USA House with seats proportional to popular vote: ", input$year),
+  labs(title = paste0("USA House of Reps (PSR Sytem): ", input$year),
+       subtitle = "No party would've had majority.") +
+  theme_ggparliament(legend = FALSE) +
+  scale_colour_manual(values = usparl$colour,
+                      limits = usparl$party_short)  +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14))
+```
+
+## **2020: US House of Representatives Results**
+
+```{r}
+#| fig-width: 10
+
+input = NULL
+input$year = 2020
+
+map_data |> 
+  
+  # Join with the map geometry column
+  left_join(us_map) |> 
+  
+  # Leave out non-continental USA
+  filter(!state_abbr %in% c("PR", "AK", "HI")) |>
+  filter(year == input$year) |>
+  
+  ggplot(aes(fill = party, 
+             geometry = geometry)) + 
+  geom_sf(col = "white") + 
+  geom_text(aes(label = year, x = -75, y = 48), size = 12) +
+  coord_sf() + 
+  
+  scale_fill_manual(values = c("#3333FF", "#E81B23")) +
+  
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+```{r}
+#| layout-ncol: 2
+
+usparl <- totalparl |> 
+  filter(year == input$year)
+
+majority <- usparl |> 
+  filter(seats >= 218) |> 
+  pull(party_long) |> 
+  as.character() 
+
+majority <- if_else(is.na(majority), "Coalition", majority)
+
+usparl |> 
+  parliament_data(type = "semicircle", 
+                  parl_rows = 10,
+                  party_seats = usparl$seats) |> 
+  ggplot(aes(x = x, y = y, colour = party_short)) +
+  geom_parliament_seats() +
+  draw_majoritythreshold(n = 218, label = TRUE, type = "semicircle") +
+  draw_partylabels(type = "semicircle",
+                   party_names = party_long,
+                   party_seats = seats,
+                   party_colours = colour) +
+  geom_highlight_government(government == 1, size = 4) +
+  
+  labs(title = paste0("Actual House of Representatives: ", input$year),
        subtitle = paste0("Majority: ", majority)) +
   theme_ggparliament(legend = FALSE) +
   scale_colour_manual(values = usparl$colour,
-                      limits = usparl$party_short) 
+                      limits = usparl$party_short)  +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14))
 
-})
+uspropparl <- propparl |> 
+  filter(year == input$year)
+
+uspropparl |> 
+  parliament_data(type = "semicircle", 
+                  parl_rows = 10,
+                  party_seats = uspropparl$seats) |> 
+  ggplot(aes(x = x, y = y, colour = party_short)) +
+  geom_parliament_seats() +
+  draw_majoritythreshold(n = 218, label = TRUE, type = "semicircle") +
+  draw_partylabels(type = "semicircle",
+                   party_names = party_long,
+                   party_seats = seats,
+                   party_colours = colour) +
+  geom_highlight_government(government == 1, size = 4) +
+  
+  labs(title = paste0("USA House of Reps (PSR Sytem): ", input$year),
+       subtitle = "No party would've had majority") +
+  theme_ggparliament(legend = FALSE) +
+  scale_colour_manual(values = usparl$colour,
+                      limits = usparl$party_short) +
+  theme(plot.title = element_text(size = 20),
+        plot.subtitle = element_text(size = 14))
 ```
