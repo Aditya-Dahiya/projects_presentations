@@ -8,12 +8,6 @@ library(ggimage)        # Using images in ggplot2
 library(rvest)          # Get states population data
 library(fontawesome)    # Social Media icons
 library(ggtext)         # Markdown Text in ggplot2
-install.packages(nrBrand)
-
-# Learning Targets
-# 1. GridExtra
-# 2. ggsave and infographics layout
-# 3. Image background
 
 # Loading the data
 diwali <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-14/diwali_sales_data.csv') |> 
