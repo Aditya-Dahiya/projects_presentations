@@ -8,6 +8,7 @@ library(fontawesome)    # Social Media icons
 library(ggtext)         # Markdown Text in ggplot2
 library(patchwork)      # For compiling plots
 library(figpatch)       # Images in patchwork
+library(ggfittext)      # Fitting text inside boxes in ggplot2
 
 # Loading the data--------------------------------------------------------------
 
