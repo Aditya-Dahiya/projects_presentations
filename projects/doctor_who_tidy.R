@@ -66,7 +66,7 @@ showtext_auto()
 # mypal
 
 # Define colours
-plotcol <-c("#34ebd5", "#6e50bf", "#201ab0")      # Scatter Plot palette
+plotcol <-c("#34ebd5", "#6e50bf", "#8d8e8f")      # Scatter Plot palette
 bg_col <- "#010c3b"                     # Background Colour
 text_col <- "#CBCBCB"                   # Colour for the text
 text_hil <- "#91e4ff"                   # Colour for highlighted text
@@ -91,7 +91,7 @@ social_caption <- glue::glue(
 # Add text to plot--------------------------------------------------------------
 plot_title <- "Doctor Who Episodes: Writers' impact on Ratings and Viewership"
 
-plot_subtitle <- "The ratings (and viewership) of Dr Who Episodes first rose, then peaked during Season 4 and thereafter declined gradually. Of the many factors that could explain this rise and fall,\nlet's focus on Writers. Two writers dominate authorship. Ratings rose and peaked during Russell Davies' time; plateaued and started declining during Steven Moffat's \ntenure, and thereafter declined considerably. This could, perhaps, be one of the reasons of falling popularity and ratings."
+plot_subtitle <- "The ratings (and viewership) of Doctor Who first rose, then peaked during Season 4 and thereafter declined gradually. Of the many factors that could explain this rise and fall,\nlet's focus on Writers. Two writers dominate authorship. Ratings rose and peaked during Russell Davies' time; plateaued and started declining during Steven Moffat's \ntenure, and thereafter declined considerably. This could, perhaps, be one of the reasons of falling popularity and ratings."
 
 plot_caption <- paste("Source: Wikipedia", "| Data Compilation: {datardis} package by Jonathan Kitt |", "#TidyTuesday  |  Graphics: Aditya Dahiya ", social_caption)
 
