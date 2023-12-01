@@ -5,7 +5,7 @@
 library(tidyverse)      # Data Wrangling and Plotting
 library(here)           # Files location and loading
 library(summarytools)   # Exploratory Data Analysis
-library(colorfindr)  # To get colour palettes for the Viz
+library(colorfindr)     # To get colour palettes for the Viz
 library(showtext)       # Using Fonts More Easily in R Graphs
 library(ggimage)        # Using Images in ggplot2
 library(fontawesome)    # Social Media icons
@@ -13,8 +13,7 @@ library(ggtext)         # Markdown Text in ggplot2
 library(patchwork)      # For compiling plots
 library(figpatch)       # Images in patchwork
 library(magick)         # Work with Images and Logos
-library(ggimage)         # Background Image
-library(ggpubr)
+library(ggimage)        # Background Image
 
 # Loading the data--------------------------------------------------------------
 

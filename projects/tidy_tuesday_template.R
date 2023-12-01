@@ -1,14 +1,16 @@
 # Loading required libraries----------------------------------------------------
 library(tidyverse)      # Data Wrangling and Plotting
-library(sf)             # Maps and plotting
 library(here)           # Files location and loading
+library(summarytools)   # Exploratory Data Analysis
+library(colorfindr)     # To get colour palettes for the Viz
 library(showtext)       # Using Fonts More Easily in R Graphs
 library(ggimage)        # Using Images in ggplot2
 library(fontawesome)    # Social Media icons
 library(ggtext)         # Markdown Text in ggplot2
 library(patchwork)      # For compiling plots
 library(figpatch)       # Images in patchwork
-library(ggfittext)      # Fitting text inside boxes in ggplot2
+library(magick)         # Work with Images and Logos
+library(ggimage)        # Background Image
 
 # Loading the data--------------------------------------------------------------
 
@@ -22,17 +24,33 @@ library(ggfittext)      # Fitting text inside boxes in ggplot2
 # Visualization parameters------------------------------------------------------
 
 # Load fonts
-font_add_google("...", "title_font")       # Font for titles
-font_add_google("...", "caption_font")     # Font for the caption
-font_add_google("...", "body_font")        # Font for plot text
+font_add_google("Rowdies", 
+                family = "title_font",
+                bold.wt = 900)               # Font for titles
+font_add_google("Saira Extra Condensed", 
+                family = "caption_font")     # Font for the caption
+font_add_google("Roboto", 
+                family = "body_font")        # Font for plot text
 showtext_auto()
 
+# Creating a Colour Palette for the Visualization
+# Image to extract
+img <- "https://pbs.twimg.com/profile_images/1605297940242669568/q8-vPggS_400x400.jpg"
+
+# Number of Colours to have in the palette
+col_numbers = 5
+set.seed(3)
+# Colour Palette
+mypal <- get_colors(img) |> 
+   make_palette(n = col_numbers)
+mypal
+
 # Define colours
-low_col <- "lightgrey"               # Heat map: low colour
-hi_col <- "darkgrey"                 # Heat map: high colour
-bg_col <- "white"                    # Background Colour
-text_col <- "black"                  # Colour for the text
-text_hil <- "red"                    # Colour for highlighted text
+low_col <- mypal[2]                   # Heat map: low colour
+hi_col <- mypal[3]                    # Heat map: high colour
+bg_col <- mypal[1]                    # Background Colour
+text_col <- mypal[4]                  # Colour for the text
+text_hil <- mypal[4]                  # Colour for highlighted text
 
 # Define Text Size
 ts = 24                              # Text Size
@@ -44,28 +62,27 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-mastodon <- "&#xf4f6"
-mastodon_username <- "@adityadahiya@mastodon.social"
-social_caption <- glue::glue(
-  "<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: #000000'>{github_username}  </span>
-  <span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: #000000'>{xtwitter_username}</span>"
-)
+linkedin <- "&#xf08c"
+linkedin_username <- "dr-aditya-dahiya-ias"
+social_caption <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span> <span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span> <span style='font-family:\"Font Awesome 6 Brands\";'>{linkedin};</span> <span style='color: {text_col}'>{linkedin_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
 plot_title <- "..."
 
 plot_subtitle <- "..."
 
-plot_caption <- paste0("...", social_caption)
+plot_caption <- paste0("**Data:** ...", "**Graphics:** ", social_caption)
 
 # Actual Plots------------------------------------------------------------------
-
-
-# Compiling Plot----------------------------------------------------------------
-my_theme <- theme(
+ggplot() +
+  labs(title = plot_title,
+       caption = plot_caption,
+       subtitle = plot_subtitle) +
+  theme(
   plot.caption =  element_textbox(family = "caption_font",
                                   hjust = 1,
-                                  colour = text_col),
+                                  colour = text_col,
+                                  size = ts/2),
   plot.title   =     element_text(hjust = 0.5,
                                   size = ts,
                                   family = "title_font",
