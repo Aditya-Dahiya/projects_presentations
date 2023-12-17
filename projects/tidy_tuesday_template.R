@@ -85,7 +85,8 @@ social_caption <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\"
 # Add text to plot--------------------------------------------------------------
 plot_title <- "..."
 
-plot_subtitle <- "..."
+subtitle_text <- "..."
+plot_subtitle <- paste(strwrap(subtitle_text, 50), collapse = "\n")
 
 plot_caption <- paste0("**Data:** ...", "**Graphics:** ", social_caption)
 
