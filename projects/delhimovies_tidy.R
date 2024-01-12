@@ -22,7 +22,7 @@ library(ggimage)        # Background Image
 # Data Load-in------------------------------------------------------------------
 #==============================================================================#
 
-del_mov <- read_csv("https://raw.githubusercontent.com/HarshaDevulapalli/indian-movie-theatres/master/indian-movie-theatres.csv") |> 
+del_mov_data <- read_csv("https://raw.githubusercontent.com/HarshaDevulapalli/indian-movie-theatres/master/indian-movie-theatres.csv") |> 
   filter(city == "Delhi")
 
 main_roads <- st_read(here::here("data", 
@@ -61,13 +61,26 @@ coords[3] <- coords[3] +
 # Impute average value to NAs
 
 impute_na <- median(del_mov$average_ticket_price, na.rm = TRUE)
-del_mov <- del_mov |> 
+del_mov <- del_mov_data |> 
   mutate(average_ticket_price = 
            if_else(is.na(average_ticket_price),
                    impute_na,
-                   average_ticket_price))
+                   average_ticket_price)) |> 
+  ungroup() |> 
+  mutate(
+    theatre_chain = if_else(
+      is.na(theatre_chain),
+      "Other",
+      theatre_chain
+    ),
+    theatre_chain = factor(theatre_chain),
+    theatre_chain = fct_lump_n(theatre_chain, 
+                               n = 5,
+                               ties.method = "first")
+  )
 
-
+del_mov |> 
+  count(theatre_chain, sort = TRUE)
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
@@ -82,15 +95,15 @@ font_add_google("Bree Serif",
 showtext_auto()
 
 # Colour Palette
-mypal_c <- paletteer::scale_colour_paletteer_c("ggthemes::Purple")
-mypal <- paletteer::paletteer_d("rcartocolor::Purp")
+mypal_c <- paletteer::scale_colour_paletteer_c("ggthemes::Red")
+mypal <- paletteer::paletteer_d("RColorBrewer::OrRd")
 
 # Define colours
 low_col <- mypal[4]                   # Low colour
 hi_col <- mypal[6]                    # High colour
 bg_col <- mypal[3] |> lighten(0.9)    # Background Colour
-text_col <- mypal[1] |> darken(0.6)   # Colour for the text
-text_hil <- mypal[6] |> darken(0.4)   # Colour for the title
+text_col <- mypal[8] |> darken(0.1)   # Colour for the text
+text_hil <- mypal[8] |> darken(0.1)   # Colour for the title
 
 # Caption stuff
 sysfonts::font_add(family = "Font Awesome 6 Brands",
@@ -115,10 +128,6 @@ plot_caption <- paste0("**Data:** Harsha Devulapalli  |  ", "**Graphics:** ", so
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
-
-
-
-  
 g <- ggplot() +
   geom_sf(
     data = 
@@ -157,45 +166,45 @@ g <- ggplot() +
       x = lon,
       y = lat,
       size = total_seats,
-      fill = average_ticket_price
+      fill = average_ticket_price,
+      shape = theatre_chain
     ),
-    pch = 21,
     color = text_hil,
-    alpha = 0.6
-  ) +
-  ggrepel::geom_text_repel(
-    data = del_mov,
-    mapping = aes(
-      x = lon,
-      y = lat,
-      label = theatre_name
-    ),
-    alpha = 0.95,
-    family = "body_font",
-    colour = text_col,
-    seed = 42,
-    size = 10,
-    segment.color = text_col
+    alpha = 0.7
   ) +
   coord_sf(
     xlim = coords[c("left", "right")],
     ylim = coords[c("bottom", "top")],
     expand = FALSE) +
-  scale_fill_paletteer_c("ggthemes::Purple") +
+  scale_shape_manual(
+    values = c(
+      "Other" = 21,
+      "PVR" = 22,
+      "Satyam" = 23,
+      "Cinepolis" = 24,
+      "DT Cinemas" = 25
+    )
+  ) +
+  scale_fill_paletteer_c("ggthemes::Red") +
   scale_size_continuous(range = c(1, 15)) +
   labs(title = plot_title,
        subtitle = plot_subtitle,
        caption = plot_caption,
        fill = "Average Ticket Price (in Rs.)",
-       size = "Total Number of Seats") +
+       size = "Total Number of Seats",
+       shape = "Theatre Chain") +
   theme_void() + 
   guides(fill = guide_colorbar(title.position = "top",
                                barheight = unit(0.5, "cm"),
-                               barwidth = unit(8, "cm")),
+                               barwidth = unit(6, "cm")),
          size = guide_legend(title.position = "top",
-                             keywidth = unit(0.5, "cm"),
                              keyheight = unit(0.5, "cm"),
-                             label.hjust = 0)) +
+                             label.hjust = 0),
+         shape = guide_legend(title = "Theatre Chain",
+                              title.position = "top",
+                              keyheight = unit(0.5, "cm"),
+                              label.hjust = 0,
+                              nrow = 2)) +
   theme(
     plot.caption =  element_textbox(family = "caption_font",
                                     hjust = 0.5,
@@ -219,17 +228,20 @@ g <- ggplot() +
                                     linewidth = 0),
     legend.position = "bottom",
     legend.text = element_text(hjust = 0.5,
-                               size = unit(40, "cm"),
+                               size = 30,
                                family = "body_font",
-                               colour = text_col),
+                               colour = text_col,
+                               margin = margin(0,0,0,0)),
     legend.title = element_text(hjust = 0.5,
-                                size = 50,
+                                size = 40,
                                 family = "body_font",
                                 colour = text_col,
                                 margin = margin(0,0,0,0)),
     legend.box.margin = margin(0,0,0.5,0, unit = "cm"),
     legend.box = "horizontal",
-    legend.spacing.y = unit(0.2, "cm")
+    legend.spacing.x = unit(0.05, "cm"),
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.margin = margin(0,0,0,0)
   )
 
 
@@ -241,7 +253,7 @@ g <- ggplot() +
 
 
 ggsave(
-  filename = here::here("docs", "delhimovies_tidy.png"),
+  filename = here::here("docs", "delhimovies_tidy1.png"),
   plot = g,
   device = "png", 
   dpi = "retina", 
@@ -273,7 +285,7 @@ coords <- del_mov |>
 
 coords
 
-Code used for Delhi area: Downloading the Delhi map (1.4 GB !!) 
+# Code used for Delhi area: Downloading the Delhi map (1.4 GB !!) 
 cty <- opq(bbox = coords)
 
 
