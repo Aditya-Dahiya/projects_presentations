@@ -1,5 +1,3 @@
-#=================An Attempt at Shadowed Designer Bar Chart====================#
-
 #==============================================================================#
 # Library Load-in---------------------------------------------------------------
 #==============================================================================#
@@ -307,7 +305,7 @@ social_caption <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\"
 # Add text to plot--------------------------------------------------------------
 plot_title <- "New Polling Sites in US Elections !"
 
-subtitle_text <- "In the last 5 elections, the United States has introduced over 94,000 new polling sites, most of them in the 2020 elections. Here, we look at these new sites located in Churches or Schools. Most of these new polling sites are concentrated in a few States. Further, more Church-based new polling sites occur in the South-West, while more School-based new polling sites lie in the North-East."
+subtitle_text <- "In the last 5 elections, the United States has introduced over 94,000 new polling sites, most of them in the 2020 elections. Here, we look at these new sites located in Churches or Schools. Most of these new polling sites are concentrated in a few States. Further, more Church-based new polling sites occur in the South-East, while more School-based new polling sites lie in the North-East."
 plot_subtitle <- paste(strwrap(subtitle_text, 130), collapse = "\n")
 
 plot_caption <- paste0("**Data & Inspiration:** Center for Public Integrity | ", "**Graphics:** ", social_caption)
