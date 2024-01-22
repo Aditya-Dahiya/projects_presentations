@@ -1,0 +1,442 @@
+---
+title: "A Rayshader Map for India's Power Plants"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "Using Rayshader in R to plot map, inspired by Milos Makes Maps"
+categories:
+  - "Data Visualization"
+date: "last-modified"
+image: "tidy_nhl_Jan_2024.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/rayshader_powerplants.html"
+  description: "#TidyTuesday"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+Using data from , and code from [Learn to Make 3D Maps with Light Bubbles using rayshader in R](https://www.youtube.com/watch?v=nlSu5-Ueuqo) by [Milos Popovic](https://github.com/milos-agathon)
+
+### Loading Libraries
+
+```{r}
+#| label: setup
+
+library(terra)     # For raster maps handling
+library(sf)        # For spatial objects
+library(tidyverse) # Data wrangling
+library(rayshader) # Rayshader Maps
+library(elevatr)   # Get elevation matrices for plotting
+library(here)      # For locating working directory
+library(showtext)       # Using Fonts More Easily in R Graphs
+library(ggimage)        # Using Images in ggplot2
+library(fontawesome)    # Social Media icons
+library(ggtext)         # Markdown Text in ggplot2
+```
+
+### Getting the Data on Power Plants in India
+
+```{r}
+#| eval: false
+#| label: download-data
+
+# The URL of the database
+url <- "https://wri-dataportal-prod.s3.amazonaws.com/manual/global_power_plant_database_v_1_3.zip"
+
+# Saving a filename for downloading the data into
+filename <- basename(url)
+
+download.file(
+    url = url,
+    destfile = here("data", "power_plants", filename),
+    mode = "wb"
+)
+
+unzip(here("data", "power_plants", filename))
+
+list.files(here("data", "power_plants"))
+```
+
+We can directly use the downloaded data from [Global Power Plant Database](https://datasets.wri.org/dataset/globalpowerplantdatabase) as shown below: –
+
+```{r}
+#| label: load-data
+
+
+power_plant_df <- read.csv(
+  here(
+    "data",
+    "power_plants",
+    "global_power_plant_database.csv"
+  )
+) |> 
+  as_tibble()
+
+# Getting the Power Plants data for India
+country_power_plant_df <- power_plant_df |> 
+  filter(country == "IND") |> 
+  select(
+    latitude,
+    longitude,
+    primary_fuel,
+    capacity_mw,
+    commissioning_year
+    )
+
+# Converting the Points into CRS 4326
+country_power_plant_sf <- country_power_plant_df |>
+    sf::st_as_sf(
+        coords = c("longitude", "latitude"),
+        crs = 4326
+    )
+```
+
+### Obtaining Data on India's States and National Borders
+
+```{r}
+#| label: get-india-map
+
+country_sf <- read_sf(
+  here("data", "india_map", "StateBoundary.shp")
+) |> 
+  st_simplify(dTolerance = 1000)
+
+ggplot(country_sf) +
+  geom_sf() +
+  ggthemes::theme_map()
+```
+
+### Creating a digital elevation model for the Rayshader 
+
+```{r}
+#| label: fig-elevation-india
+#| fig-cap: "A simple plot of the elevation raster data for India"
+#| fig-asp: 1
+
+elev <- elevatr::get_elev_raster(
+    locations = country_sf,
+    z = 2,
+    clip = "locations"
+)
+
+elev_lambert <- elev |>
+    terra::rast()
+elev_lambert[elev_lambert < 0] <- 0
+
+plot(elev_lambert)
+
+```
+
+```{r}
+#| label: elevation-matrix
+
+# Creating a matrix of elevation points
+elmat <- elev_lambert |>
+    rayshader::raster_to_matrix()
+
+# Coverting as below sea level points to sea level
+elmat[elmat < 0] <- 0
+
+# Removing missing values of elevation and replacing
+# them with minimum elevation value
+elmat[is.na(elmat)] <- min(
+    elmat,
+    na.rm = T
+)
+
+```
+
+### Selecting Power Plants that are within India's borders
+
+```{r}
+#| label: filter-plants-in-india
+
+country_power_plant_sf <- st_transform(
+  country_power_plant_sf, 
+  crs = st_crs(country_sf))
+
+country_points <- sf::st_intersection(
+    country_power_plant_sf,
+    country_sf
+)
+
+india_terrain <- elev_lambert |> 
+  as.data.frame(xy = TRUE) |> 
+  as_tibble()
+
+names(india_terrain)[3] <- "elevation"
+```
+
+An interim plot: —
+
+```{r}
+#| label: fig-map1
+#| fig-cap: "An interim map of the Power Plants in India"
+#| eval: false
+
+# Colours to use for different Power Plant Types
+cols_vals <- c("#F9A01BFF", "#418FDEFF", "#BA0C2FFF")
+
+
+# Load fonts
+font_add_google("Akronim", 
+                family = "title_font")       # Font for titles
+font_add_google("Saira Extra Condensed", 
+                family = "caption_font")     # Font for the caption
+font_add_google("Redressed", 
+                family = "body_font")        # Font for plot text
+showtext_auto()
+
+bg_col <- "white"                   # Background Colour
+text_col <- "#4f2a00"                 # Colour for the text
+text_hil <- "#4f2a00"                 # Colour for highlighted text
+
+# Define Text Size
+ts = unit(20, units = "cm")                             # Text Size
+
+# Caption stuff
+sysfonts::font_add(family = "Font Awesome 6 Brands",
+                   regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf"))
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+linkedin <- "&#xf08c"
+linkedin_username <- "dr-aditya-dahiya-ias"
+social_caption <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span> <span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span> <span style='font-family:\"Font Awesome 6 Brands\";'>{linkedin};</span> <span style='color: {text_col}'>{linkedin_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "Power Plants in India"
+
+subtitle_text <- "A look at Coal, Hydro and Nuclear Power Plants in India, overlaid on the terrain elevation map of India. The coal plants are concentrated in the deccan trap and central India - the site of coal beds. The Hydro-Electric Plants are mostly found in the northern part (Himalayas Mountains) or the southern hills (Western  & Eastern Ghats)"
+plot_subtitle <- paste(strwrap(subtitle_text, 100), collapse = "\n")
+
+plot_caption <- paste0("**Data:** Global Power Plant Database | ", "**Graphics:** ", social_caption)
+
+
+g <- ggplot() + 
+  geom_tile(
+    data = india_terrain,
+    aes(
+      x = x,
+      y = y,
+      fill = elevation
+    )
+  ) +
+  geom_sf(
+    data = country_sf,
+    fill = "transparent",
+    col = "#666666FF"
+  ) +
+  geom_sf(
+    data = country_points |> 
+      filter(primary_fuel %in% c(
+        "Coal", "Hydro", "Nuclear"
+      )),
+    mapping = aes(
+      col = primary_fuel,
+      size = capacity_mw),
+    alpha = 0.5, 
+    pch = 19
+    ) +
+  scale_fill_gradient2(
+    low = "white",
+    high = "#996136FF",
+    na.value = "transparent",
+    labels = scales::label_number_si(),
+    guide = guide_colourbar(
+      direction = "horizontal",
+      title.position = "top",
+      barwidth = unit(4, "cm"),
+      barheight = unit(5, "mm")
+    )) +
+  scale_colour_manual(
+    values = cols_vals,
+    guide = guide_legend(
+      direction = "horizontal",
+      title.position = "top",
+      keywidth = unit(3, "mm"),
+      override.aes = list(
+        size = 3
+      )
+    )
+  ) +
+  scale_size(
+    range = c(0.5, 6),
+    labels = scales::label_number_si(),
+    guide = guide_legend(
+      direction = "horizontal",
+      title.position = "top",
+      keywidth = unit(5, "mm"),
+      override.aes = list(
+        col = "#996136FF"
+      )
+    )
+  ) +
+  ggthemes::theme_map() +
+  labs(
+    size = "Capacity (MW)",
+    color = "Fuel",
+    fill  = "Elevation (m)",
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.caption =  element_textbox(family = "caption_font",
+                                    hjust = 0.5,
+                                    colour = text_col,
+                                    size = 2 * ts,
+                                    margin = margin(0,0,0.4,0,
+                                                    unit = "cm")),
+    plot.title   =     element_text(hjust = 0.5,
+                                    size = 11*ts,
+                                    family = "title_font",
+                                    face = "bold",
+                                    colour = text_hil,
+                                    margin = margin(1,0,0,0,
+                                                    unit = "cm")),
+    plot.subtitle    = element_text(hjust = 0.5,
+                                    size = 2.4 * ts,
+                                    family = "body_font",
+                                    colour = text_col,
+                                    margin = margin(5,0,2,0),
+                                    lineheight = 0.35),
+    plot.background =  element_rect(fill = bg_col,
+                                    color = bg_col,
+                                    linewidth = 0),
+    plot.title.position = "plot",
+    legend.text = element_text(size = 2 * ts,
+                               family = "body_font",
+                               colour = text_col,
+                               margin = margin(0,0,0,0),
+                               hjust = 0),
+    legend.title = element_text(size = 63,
+                               family = "body_font",
+                               colour = text_col,
+                               margin = margin(0,0,0,0,
+                                               unit = "mm"),
+                               hjust = 0.5),
+    legend.margin = margin(0, 0.3, 0.5, 0.3, "cm"),
+    legend.spacing.x = unit(1, "mm"),
+    legend.spacing.y = unit(1, "mm"),
+    legend.box = "horizontal",
+    legend.key = element_rect(fill = bg_col,
+                              colour = bg_col),
+    legend.background = element_rect(fill = bg_col)
+  )
+
+ggsave(
+  filename = here::here("docs", "india_powerplants.png"),
+  plot = g,
+  width = 20, 
+  height = 30, 
+  units = "cm",
+  bg = bg_col
+)
+```
+
+![Map of India with a look at Coal, Hydro and Nuclear Power Plants in India, overlaid on the terrain elevation map of India. The coal plants are concentrated in the deccan trap and central India - the site of coal beds. The Hydro-Electric Plants are mostly found in the northern part (Himalayas Mountains) or the southern hills (Western & Eastern Ghats)](/docs/india_powerplants.png){#fig-map2}
+
+# A Work in progress ...
+
+The subsequent Code is credited to [Milos Popovic](https://github.com/milos-agathon) in his tutorial [Learn to Make 3D Maps with Light Bubbles using rayshader in R](https://www.youtube.com/watch?v=nlSu5-Ueuqo) by
+
+```{r}
+#| eval: false
+
+
+
+
+
+
+
+# 6. POWER PLANT WITHIN BORDERS
+
+
+
+# 7. RENDER SCENE
+#----------------
+
+h <- nrow(elmat)
+w <- ncol(elmat)
+
+elmat |>
+    rayshader::height_shade(
+        texture = colorRampPalette(
+            c(
+                "grey90",
+                "grey60"
+            )
+        )(128)
+    ) |>
+    rayshader::plot_3d(
+        elmat,
+        zscale = 5,
+        solid = F,
+        shadow = T,
+        shadow_darkness = 1,
+        background = "white",
+        windowsize = c(w / 2, h / 2),
+        zoom = .65,
+        phi = 85,
+        theta = 0
+    )
+
+# 8. RENDER POINTS
+#-----------------
+
+coords <- sf::st_coordinates(
+    country_points
+)
+
+long <- coords[, "X"]
+lat <- coords[, "Y"]
+
+rayshader::render_points(
+    lat = lat,
+    long = long,
+    extent = elev_lambert,
+    heightmap = elmat,
+    zscale = 1,
+    size = 5,
+    color = "#F59F07"
+)
+
+# 9. RENDER OBJECT
+#-----------------
+
+imgname <- "3d_power_plant_netherlands.png"
+
+rayshader::render_highquality(
+    filename = imgname,
+    preview = T,
+    light = F,
+    point_radius = 7,
+    point_material = rayrender::light,
+    point_material_args = list(
+        color = "#F59F07",
+        intensity = 60,
+        gradient_color = "#F5D014"
+    ),
+    clamp_value = 2,
+    min_variance = 0,
+    sample_method = "sobol", #SAMPLE METHOD
+    interactive = F,
+    parallel = T
+)
+```
