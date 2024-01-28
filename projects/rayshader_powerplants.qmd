@@ -106,11 +106,13 @@ country_power_plant_sf <- country_power_plant_df |>
 
 ### Obtaining Data on India's States and National Borders
 
+Getting the [official map](https://onlinemaps.surveyofindia.gov.in/Digital_Product_Show.aspx) of India by [Survey of India](https://surveyofindia.gov.in/), official Government agency.
+
 ```{r}
 #| label: get-india-map
 
 country_sf <- read_sf(
-  here("data", "india_map", "StateBoundary.shp")
+  here("data", "india_map", "India_State_Boundary.shp")
 ) |> 
   st_simplify(dTolerance = 1000)
 
@@ -128,7 +130,7 @@ ggplot(country_sf) +
 
 elev <- elevatr::get_elev_raster(
     locations = country_sf,
-    z = 2,
+    z = 1,
     clip = "locations"
 )
 
@@ -249,19 +251,23 @@ g <- ggplot() +
     mapping = aes(
       col = primary_fuel,
       size = capacity_mw),
-    alpha = 0.5, 
+    alpha = 0.85, 
     pch = 19
     ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_continuous(expand = expansion(0)) +
   scale_fill_gradient2(
     low = "white",
-    high = "#996136FF",
+    high = "#802a00",
+    mid = "#996136FF",
+    midpoint = 4500,
     na.value = "transparent",
     labels = scales::label_number_si(),
     guide = guide_colourbar(
       direction = "horizontal",
       title.position = "top",
       barwidth = unit(4, "cm"),
-      barheight = unit(5, "mm")
+      barheight = unit(2, "mm")
     )) +
   scale_colour_manual(
     values = cols_vals,
@@ -314,7 +320,8 @@ g <- ggplot() +
                                     size = 2.4 * ts,
                                     family = "body_font",
                                     colour = text_col,
-                                    margin = margin(5,0,2,0),
+                                    margin = margin(0,0,0,0,
+                                                    unit = "cm"),
                                     lineheight = 0.35),
     plot.background =  element_rect(fill = bg_col,
                                     color = bg_col,
@@ -344,7 +351,7 @@ ggsave(
   filename = here::here("docs", "india_powerplants.png"),
   plot = g,
   width = 20, 
-  height = 30, 
+  height = 26, 
   units = "cm",
   bg = bg_col
 )
