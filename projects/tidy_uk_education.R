@@ -199,7 +199,7 @@ g <- ggplot(data = df) +
       label = town_name,
       hjust = case_when(
         town_name == "Outer London" ~ 0,
-        town_name == "Inner London" ~ 1,
+        town_name %in% c("Inner London", "Olney") ~ 1,
         .default = 0.5
       )
     ),
