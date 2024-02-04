@@ -1,0 +1,313 @@
+---
+title: "An interactive map of USA's Groundhogs Day predictors"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "Initially Created for #TidyTuesday"
+categories:
+  - "#TidyTuesday"
+  - "Interactive"
+  - "Data Visualization"
+date: "2024-02-04"
+image: "tidy_groundhog.gif"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/tidy_groundhog.html"
+  description: "Grounghog Day Predictors' locations in USA as a map"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+Using data from [Groundhog predictions](https://groundhog-day.com/predictions/2024) by [groundhog-day.com](https://groundhog-day.com/), first hosted at [*#TidyTuesday*](https://github.com/rfordatascience/tidytuesday/tree/master) [Data](https://groundhog-day.com/api/v1/predictions?year=2024)
+
+# Loading data & libraries
+
+```{r}
+#| label: setup
+
+library(tidyverse)      # Data Wrangling and Plotting
+library(here)           # Files location and loading
+library(showtext)       # Using Fonts More Easily in R Graphs
+library(ggimage)        # Using Images in ggplot2
+library(fontawesome)    # Social Media icons
+library(ggtext)         # Markdown Text in ggplot2
+library(patchwork)      # For compiling plots
+library(magick)         # Work with Images and Logos
+library(scales)         # ggplot2 labels and scaling
+library(sf)             # Maps and converting coordinates
+library(ggiraph)        # Interactive visualization
+library(usmap)          # Easily plot map of USA
+
+# Loading Data
+groundhogs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-01-30/groundhogs.csv')
+
+
+# Using predictions data from 2024 (latest) with the cleaning script given 
+# at https://github.com/rfordatascience/tidytuesday/blob/master/data/2024/2024-01-30/readme.md
+# Credits: @tidytuesday and @jonthegeek 
+
+predictions <- read_csv(here::here("data", "predictions2024.csv"))
+```
+
+# Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# Finding the groundhogs who predicted in year 2024
+relevant_groundhogs <- predictions |> 
+  filter(year == 2024) |> 
+  pull(id) |> 
+  unique()
+
+# Improving tibble to use in plotting
+df1 <- groundhogs |> 
+  filter(id %in% relevant_groundhogs) |> 
+  left_join(predictions |> 
+            filter(year == 2024)) |> 
+  mutate(
+    predict = if_else(
+      shadow,
+      "Groundhog saw its shadow: Extended Winters",
+      "No shadow: An Early Spring!"),
+    predict = if_else(
+      is.na(predict),
+      "No prediction",
+      predict
+    )
+    )
+
+# Retaining only groundhogs within US borders + US Map transforming them
+df2 <- df1 |> 
+  usmap_transform(
+    input_names = c("longitude", "latitude")
+  ) |> 
+  filter(country == "USA")
+
+image1 <- image_read("https://img.freepik.com/free-vector/adorable-groundhog-cartoon-with-groundhog-day-banner_1308-153480.jpg")
+```
+
+### Some optional visualization parameters
+
+```{r}
+#| label: viz-params
+
+# Load fonts
+font_add_google("Freckle Face", 
+                family = "title_font")       # Font for titles
+font_add_google("Saira Extra Condensed", 
+                family = "caption_font")     # Font for the caption
+font_add_google("Barlow Condensed", 
+                family = "body_font")        # Font for plot text
+showtext_auto()
+
+# Icons to use in graph
+# Credits: Used code from
+
+# Creating a Colour Palette for the Visualization
+mypal <- c("#0ab6f0", "grey", "#00990a")
+
+# Define colours
+bg_col <- "white"                     # Background Colour
+text_col <- "#4f2b00"                 # Colour for the text
+text_hil <- "#c46c00"                 # Colour for highlighted text
+
+
+# Define Text Size
+ts = 24      # Text Size
+
+# Caption stuff
+sysfonts::font_add(family = "Font Awesome 6 Brands",
+                   regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf"))
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span> <span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "Groundhog Day: 2024"
+
+subtitle_text <- "Hover on a location to read about Groundhog's prediction."
+plot_subtitle <- paste(strwrap(subtitle_text, 100), collapse = "\n")
+
+plot_caption <- paste0("**Data & Inspiration:** groundhog-day.com | ", "**Graphics:** ", social_caption)
+```
+
+Below, in @fig-int1, I use `ggiraph` package with `usmaps` package to make an interactive map of the Groundhogs in USA, along with their details and predictions.
+
+```{r}
+#| label: fig-int1
+#| fig-cap: "An interactive map of USA with Groundhogs and their locations"
+#| fig-width: 10
+#| fig-height: 10
+
+
+g1 <- plot_usmap(
+  fill = "white",
+  col = "darkgrey",
+  alpha = 0.75,
+  exclude = c("AK", "HI")
+  ) +
+  geom_point_interactive(
+    data = df2,
+    aes(
+      color = predict,
+      x = x,
+      y = y,
+      data_id = id,
+      tooltip = paste0(
+        name, "\n",
+        "(", city, ", ", region, ")\n",
+        "Predictions done so far: ", predictions_count, "\n",
+        "Prediction for 2024: ", predict
+      )
+    ),
+    size = 3,
+    alpha = 0.5
+  ) +
+  scale_colour_manual(
+    name = NULL,
+    values = mypal
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 5,
+        keyheight = 0.5
+      )
+    )
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    size = NULL,
+    color = NULL
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 2 * ts,
+      family = "title_font",
+      face = "bold",
+      colour = text_hil,
+      margin = margin(
+        0.2, 0, 0, 0,
+        unit = "cm"
+      )
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = ts,
+      family = "body_font",
+      colour = text_col,
+      margin = margin(0, 0, 0, 0,
+        unit = "cm"
+      ),
+      lineheight = 0.9
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col,
+      linewidth = 0
+    ),
+    legend.text = element_text(
+      size = 0.7 * ts,
+      family = "body_font",
+      colour = text_col,
+      margin = margin(0, 0, 0, 0),
+      hjust = 0, 
+      lineheight = 0.5
+    ),
+    plot.caption =  element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      colour = text_col,
+      size = 0.5 * ts
+    ),
+    plot.margin = margin(0,0,0,0),
+    legend.key = element_rect(fill = "transparent"),
+    legend.background = element_rect(fill = "transparent"),
+    legend.box = "horizontal",
+    plot.title.position = "plot"
+  )
+
+g2 <- df1 |> 
+  count(predict) |> 
+  as_tibble() |> 
+  mutate(percentage = round(100 * n / sum(n), 1)) |> 
+  mutate(
+    showpred = case_when(
+      predict == "Groundhog saw its shadow: Extended Winters" ~ "Long Winter",
+      predict == "No shadow: An Early Spring!" ~ "Early Spring",
+      .default = "No prediction"
+      )) |> 
+  ggplot(aes(
+    x = "",
+    y = n,
+    fill = showpred,
+    label = showpred,
+    data_id = predict,
+    tooltip = paste0(
+        predict, "\n",
+        "Number of Groundhogs: ", n, "\n",
+        "Percentage: ", percentage, " %"
+      )
+    )
+  ) +
+  geom_bar_interactive(
+    stat = "identity",
+    color = "transparent") +
+  geom_text(
+    position = position_stack(
+      vjust = 0.4
+      ),
+    size = 4.5,
+    family = "body_font",
+    col = text_col
+  ) +
+  coord_polar(theta = "y") +
+  scale_fill_manual(values = c("#00990a", "#0ab6f0", "grey")) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(
+      fill = "transparent",
+      color = "transparent"
+    )
+  )
+
+g <- g1 +
+  inset_element(
+    g2,
+    0, 0, 0.3, 0.3,
+    align_to = "plot",
+    ignore_tag = TRUE
+  ) &
+  theme()
+
+tooltip_css <- "background:white;font-family:Arial, Helvetica, sans-serif;"
+
+girafe(
+  ggobj = g,
+  options = list(
+    opts_hover(css = "fill:yellow;stroke:black;stroke-width:2px;"),
+    opts_tooltip(css = tooltip_css),
+    opts_zoom(max = 5)
+  )
+)
+```
