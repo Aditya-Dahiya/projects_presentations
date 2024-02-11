@@ -108,8 +108,8 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
 plot_title <- "UNESCO Sites: 2004 vs. 2022"
@@ -328,7 +328,7 @@ ggsave(
   filename = here::here("docs", "tidy_nordic_unesco.png"),
   plot = g,
   width = 20,
-  height = 29.5,
+  height = 29.35,
   units = "cm",
   bg = bg_col
 )

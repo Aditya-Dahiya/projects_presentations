@@ -1,0 +1,278 @@
+---
+title: "Data Visualizations from D.I.P."
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "Examples of Visualizations created from the Data Is Plural Newsletter by Jeremy Singer-Vine"
+categories:
+  - "Data Is Plural"
+  - "Data Visualization"
+date: "last-modified"
+image: "dip_uselections.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/dip_viz.html"
+  description: "#TidyTuesday"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+Welcome to this webpage showcasing visualizations created using [ggplot2](https://ggplot2-book.org/index.html), [tidyverse](https://www.tidyverse.org/), and **`R`** programming language, utilizing publicly available datasets from the weekly newsletter [***Data Is Plural***](https://www.data-is-plural.com/) by [Jeremy Singer-Vine](https://www.jsvine.com/). Here, you'll find open-source code detailing every step, from data acquisition to final rendering, with collapsible sections and annotations tailored to assist those new to `ggplot2` and `tidyverse`. Feel free to explore the visualizations and delve into the code.
+
+Your feedback is greatly appreciated and can be shared at my [Twitter](https://twitter.com/AdityaDahiyaIAS)[,](https://twitter.com/AdityaDahiyaIAS,) where these visualizations are periodically posted. Alternatively, you can click on the link provided for "Edit this page" or submit suggestions or pull requests on [Github](https://github.com/Aditya-Dahiya/projects_presentations).
+
+```{r}
+#| eval: false
+
+# Library Load-in-----------------------------------------------------------
+library(tidyverse)      # Load the tidyverse package for data wrangling and plotting
+library(here)           # Load the here package for managing file locations
+library(showtext)       # Load showtext for easier font usage in R graphs
+library(fontawesome)    # Load fontawesome for social media icons
+library(ggtext)         # Load ggtext for Markdown text in ggplot2
+library(ggstream)       # Load ggstream to use geom_stream()
+library(colorspace)     # Load colorspace to manipulate colors
+library(summarytools)   # Load summarytools to view summary information
+
+# Data Load-in-------------------------------------------------------------
+# Load the dataset either from a local file or a URL
+# uselections <- read_csv(here("data", "ledb_candidatelevel.csv"))
+
+url <- "https://osf.io/download/tbwzd/"
+uselections <- read_csv(url)
+
+
+# Exploratory Data Analysis--------------------------------------------------
+
+uselections  # Display the contents of the 'uselections' dataset
+dfSummary(uselections) |>  # Pipe the summary of 'uselections' dataset into 'view()' function for viewing in a nicer format
+  view()
+
+
+# Data Wrangling------------------------------------------------------------
+
+# Perform data wrangling operations on the 'uselections' dataset
+racedf <- uselections |> 
+  mutate(party = case_when(
+    prob_democrat > 0.5 ~ "Democrat",
+    prob_republican > 0.5 ~ "Republican",
+    .default = "Others"
+  )) |> 
+  mutate(
+    race_est = case_when(
+      is.na(race_est) ~ "other",
+      .default = race_est
+    )
+  ) |> 
+  group_by(year, party, race_est) |> 
+  count() |> 
+  mutate(race_est = str_to_title(race_est)) |> 
+  ungroup() |> 
+  group_by(year) |> 
+  mutate(prop = n / sum(n)) |> 
+  mutate(party = fct(
+    party, 
+    levels = c("Republican", "Democrat", "Others")
+  ),
+  race_est = fct(
+    race_est,
+    levels = c("Caucasian", "Black", "Hispanic", 
+               "Asian", "Other")
+  )
+  )
+
+# Options & Visualization Parameters----------------------------------
+
+# Load fonts for the plot
+font_add_google("Fira Sans Extra Condensed", 
+                family = "title_font")       # Add Fira Sans Extra Condensed font for titles
+font_add_google("Saira Extra Condensed", 
+                family = "caption_font")     # Add Saira Extra Condensed font for captions
+font_add_google("Anaheim", 
+                family = "body_font")        # Add Anaheim font for plot text
+showtext_auto()  # Automatically enable showtext functionality
+
+# Define icons for use in the graph
+
+# Define colors
+bg_col <- "white"                   # Define the background color
+text_col <- "#655A5AFF"             # Define the color for the text
+text_hil <- "#655A5AFF"             # Define the color for highlighted text
+
+# Define colors for stream graph
+fill_cols <- paletteer::paletteer_d("fishualize::Anchoviella_lepidentostole",
+                                    direction = -1) |> 
+  colorspace::lighten(0.2)
+
+col_cols <- paletteer::paletteer_d("fishualize::Anchoviella_lepidentostole",
+                                   direction = -1) |> 
+  colorspace::darken(0.4)
+
+# Define text size
+ts = unit(20, units = "cm")                             # Define the text size
+
+# Define caption text and social media icons
+sysfonts::font_add(family = "Font Awesome 6 Brands",
+                   regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf"))
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+# Define plot title, subtitle, and caption
+plot_title <- "Ethnicity of candidates in USA's local elections."
+subtitle_text <- "Percentage of candidates from different ethnicities fielded by the two dominant political parties in USA over last 20 years in local elections for posts of Prosecutor, Sheriff, County Executive, Mayor, School Board, County Legislature and City Council. As we can see, the share of non-Caucasian races has increased, but at different rates in different parties."
+plot_subtitle <- paste(strwrap(subtitle_text, 100), collapse = "\n")
+
+plot_caption <- paste0(
+  "**Data**: Justin de Benedictis-Kessner et al. **|** ", 
+  "**Graphics**:",
+  social_caption_1, 
+  " **|** ",
+  "**Code:**", 
+  social_caption_2
+)
+
+# Data Visualization----------------------------------------------------------
+
+# Create the main plot 'g' using ggplot with aesthetics defined
+g <- racedf |> 
+  ggplot(mapping = aes(
+    x = year,
+    y = prop,
+    fill = race_est,
+    label = race_est,
+    color = race_est
+  )) +
+
+  # Add the stream geom to represent the data
+  geom_stream(
+    type = "proportional",
+    alpha = 0.3) +
+
+  # Add labels to the stream geom
+  geom_stream_label(
+    type = "proportional",
+    hjust = "inward",
+    size = 0.7 * ts,
+    family = "body_font"
+  ) +
+
+  # Add facets to split the data by 'party'
+  facet_wrap(~ party, nrow = 1) +
+
+  # Adjust the x-axis scale
+  scale_x_continuous(
+    expand = expansion(0),
+    breaks = seq(1990, 2020, 5)
+  ) +
+
+  # Adjust the y-axis scale
+  scale_y_continuous(
+    expand = expansion(0),
+    labels = scales::label_percent()
+  ) +
+
+  # Manually set color values for aesthetics
+  scale_color_manual(values = col_cols) +
+
+  # Manually set fill values for aesthetics
+  scale_fill_manual(values = fill_cols) +
+
+  # Add plot titles, subtitle, and caption
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = NULL,
+    y = "Percentage of candidates fielded by the Party"
+  ) +
+
+  # Apply minimal theme to the plot
+  theme_minimal() +
+
+  # Customize theme elements
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_line(
+      linetype = 2
+    ),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.caption =  element_textbox(family = "caption_font",
+                                    hjust = 0.5,
+                                    colour = text_col,
+                                    size = 1.5 * ts,
+                                    margin = margin(1,0,0,0,
+                                                    unit = "cm")),
+    plot.title   =     element_text(hjust = 0.5,
+                                    size = 6 * ts,
+                                    family = "title_font",
+                                    face = "bold",
+                                    colour = text_hil,
+                                    margin = margin(2,0,0.5,0,
+                                                    unit = "cm")),
+    plot.subtitle    = element_text(hjust = 0.5,
+                                    size = 3 * ts,
+                                    family = "body_font",
+                                    colour = text_col,
+                                    margin = margin(5,0,2,0),
+                                    lineheight = 0.35),
+    plot.background =  element_rect(fill = bg_col,
+                                    color = bg_col,
+                                    linewidth = 0),
+    axis.text.y = element_text(size = 2.5 * ts,
+                             family = "title_font",
+                             colour = text_col,
+                             face = "bold",
+                             margin = margin(0,0,0,0)),
+    axis.text.x = element_text(size = 1.5 * ts,
+                               family = "body_font",
+                               colour = text_col,
+                               face = "bold",
+                               margin = margin(0,0,0,0)),
+    axis.title = element_text(size = 3 * ts,
+                              family = "body_font",
+                              colour = text_col,
+                              face = "bold",
+                              margin = margin(0,0,0,0)),
+    strip.text = element_text(hjust = 0.5,
+                              family = "title_font",
+                              face = "bold",
+                              colour = text_col,
+                              size = 5 * ts,
+                              margin = margin(1,0,0,0,
+                                              unit = "cm")),
+    plot.title.position = "plot"
+)
+
+
+# Image Saving----------------------------------------------------------------
+
+# Save the plot as an image file
+ggsave(
+  filename = here::here("docs", "dip_uselections.png"),
+  plot = g,
+  width = 30, 
+  height = 30, 
+  units = "cm",
+  bg = bg_col
+)
+```
+
+![](dip_uselections.png)
