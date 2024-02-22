@@ -232,20 +232,18 @@ g2 <- countries |>
   )) |> 
   ggplot(aes(x = total_current_value,
              y = reorder(country_transfer_to,
-                         total_current_value),
+                         -total_current_value),
              label = country_transfer_to,
              fill = total_current_value)) +
   geom_col(col = "black",
            linewidth = 0.1) +
   geom_text(
-    aes(
-      x = 1e7,
-      colour = country_transfer_to %in% c("Israel", "Morocco", "UAE")
-    ),
+    aes(x = 1e6),
     hjust = 0,
     vjust = 0.5,
-    family = "body_font",
-    size = 1.5 * ts
+    family = "caption_font",
+    size = 1 * ts,
+    color = "white"
   ) +
   scale_x_continuous(
     expand = expansion(0, 0),
@@ -258,21 +256,24 @@ g2 <- countries |>
   ) +
   paletteer::scale_fill_paletteer_c(
     "ggthemes::Orange",
-     labels = scales::label_number(
+    na.value = "white",
+    trans = "log10",
+    labels = scales::label_number(
       prefix = "$",
       scale_cut = cut_short_scale()
-    )) +
-  scale_color_manual(values = c(text_col, "white")) +
-  labs(title = "Countries getting the most sales") +
+    ),
+    limits = c(1, 4e8)
+    ) +
+  labs(title = "Highest sales") +
   theme_void() +
   theme(
     legend.position = "none",
     plot.margin = margin(0,0,0,0),
     plot.title = element_text(
       hjust = 0,
-      size = 5 * ts,
-      family = "body_font",
-      colour = text_col,
+      size = 8 * ts,
+      family = "title_font",
+      colour = text_hil,
       margin = margin(0, 0, 0.2, 0,
                       unit = "cm")
     ),
@@ -290,7 +291,7 @@ g <- g1 +
     g2,
     top = 0.54,
     left = 0,
-    right = 0.22,
+    right = 0.35,
     bottom = 0
   ) +
   plot_annotation(
