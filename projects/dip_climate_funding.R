@@ -139,14 +139,14 @@ df <- bind_rows(
     rename(fill_var = region) |> 
     mutate(
       group_var = " ",
-      table_type = "Usage of funds"
+      table_type = "Destination for funds"
     ),
   finance |> 
     rename(
       fill_var = actors,
       group_var = funding_type
     ) |> 
-    mutate(table_type = "Source of Funds")
+    mutate(table_type = "Source of funds")
   ) |> 
   mutate(year = as.numeric(year))
 
@@ -159,6 +159,11 @@ fill_var_levels <- df |>
 
 plotdf <- df |> 
   mutate(fill_var = fct(fill_var, levels = fill_var_levels)) |> 
+  mutate(table_type = fct(table_type,
+                          levels = c(
+                            "Source of funds",
+                            "Destination for funds"
+                          ))) |> 
   ungroup()
 
 # Some EDA Plots to write the messages in actual plot
@@ -279,14 +284,14 @@ g <- ggplot(plotdf,
       colour = text_col,
       family = "body_font",
       size = 18,
-      margin = margin(10, 0, 10, 0)
+      margin = margin(5, 0, 5, 0)
     ),
     plot.title = element_text(
       hjust = 0.5,
       family = "title_font",
       size = 32,
       colour = text_hil, 
-      margin = margin(25, 0, 10, 0)
+      margin = margin(15, 0, 5, 0)
     ),
     plot.subtitle = element_text(
       hjust = 0.5,
@@ -294,14 +299,14 @@ g <- ggplot(plotdf,
       size = 14,
       colour = text_col,
       lineheight = 1.1,
-      margin = margin(10, 0, 10, 0)
+      margin = margin(5, 0, 5, 0)
     ),
     plot.caption = element_text(
       hjust = 0.5,
       colour = text_hil,
       size = 9,
       family = "caption_font",
-      margin = margin(10, 0, 10, 0)
+      margin = margin(5, 0, 10, 0)
     )
   ) +
   transition_time(as.integer(year)) +
@@ -318,7 +323,7 @@ anim_save(
   duration = 20,
   start_pause = 5,
   end_pause = 10,
-  height = 800,
+  height = 650,
   width = 600,
   units = "px"
 )
