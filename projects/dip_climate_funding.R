@@ -21,6 +21,23 @@
 # and 2017–2018, with earlier coverage on national climate funds 
 # (DIP 2022.02.09) and climate finance projects (DIP 2023.06.14).
 
+# =============================================================================#
+# Findings ---------------------------------------------------------------------
+# =============================================================================#
+
+# Where the money comes from:
+# The share of public and private sources in the funding for climate change 
+# mitigation activities has stayed almost the same. Both have increased 
+# together, in same proportion. Within the various sources of funding, 
+# largest increases in funding have come from “Public Funds” and “State-Owned 
+# Enterprises”. Amongst private sources of funds, Commercial Institutions and 
+# Individual Households provide bulk of the funding.
+
+# Where the money goes:
+# The East Asia and Pacific region continue to get an ever-increasing share of 
+# total funds dedicated to Climate Change. However, importantly, the Western 
+# Europe region has increased its allotment by the maximum, a staggering 152%.
+
 # Global-Landscape-of-Climate-Finance-2023
 # GLCF 2023 – Data Download
 url1 <- "https://www.climatepolicyinitiative.org/wp-content/uploads/2023/11/GLCF-2023-Data-Download.xlsx"
@@ -133,55 +150,91 @@ df <- bind_rows(
   ) |> 
   mutate(year = as.numeric(year))
 
+# Get levels of categories fixed for nicer colours later on
+fill_var_levels <- df |> 
+  group_by(table_type, group_var, fill_var) |> 
+  summarise(total_val = sum(value)) |> 
+  arrange(desc(total_val)) |> 
+  pull(fill_var)
+
+plotdf <- df |> 
+  mutate(fill_var = fct(fill_var, levels = fill_var_levels)) |> 
+  ungroup()
+
+# Some EDA Plots to write the messages in actual plot
+plotdf |> 
+  filter(table_type == "Usage of funds") |> 
+  ggplot(aes(x = year, y = value, col = fill_var)) +
+  geom_line(linewidth = 2) +
+  scale_color_brewer(palette = "Dark2")
+
+plotdf |> 
+  filter(table_type == "Usage of funds") |> 
+  group_by(fill_var) |> 
+  summarise(increase = (100 * (max(value) - min(value)))/min(value))
+
+plotdf |> 
+  filter(table_type != "Usage of funds") |> 
+  group_by(group_var, year) |> 
+  summarise(value = sum(value, na.rm = TRUE)) |> 
+  ggplot(aes(x = year, y = value, col = group_var)) +
+  geom_line(linewidth = 2)
+
+plotdf |> 
+  filter(table_type != "Usage of funds") |> 
+  group_by(group_var, fill_var, year) |>
+  summarise(value = sum(value, na.rm = TRUE)) |> 
+  ggplot(aes(x = year, y = value, 
+             col = fill_var,
+             linetype = group_var)) +
+  geom_line(linewidth = 2) +
+  scale_color_brewer(palette = "Dark2")
+
+plotdf |> 
+  filter(table_type != "Usage of funds") |> 
+  group_by(group_var, fill_var) |> 
+  summarise(increase = (100 * (max(value) - min(value)))/min(value)) |> 
+  group_by(group_var) |> 
+  arrange(desc(increase))
 
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 # =============================================================================#
 
 # Load fonts
-font_add_google("Fredericka the Great",
+# Font for titles
+font_add_google("Fjalla One",
   family = "title_font"
-) # Font for titles
+) 
+
+# Font for the caption
 font_add_google("Saira Extra Condensed",
   family = "caption_font"
-) # Font for the caption
-font_add_google("Fira Sans Extra Condensed",
+) 
+
+# Font for plot text
+font_add_google("Anton",
   family = "body_font"
-) # Font for plot text
+) 
+
 showtext_auto()
 
 # Define colours
 bg_col <- "white"   # Background Colour
-text_col <- "#04225CFF" # Colour for the text
-text_hil <- "#309D96FF" # Colour for higlighted text
-
-# Define Text Size
-ts <- unit(30, units = "cm") # Text Size
-
-# Caption stuff
-sysfonts::font_add(
-  family = "Font Awesome 6 Brands",
-  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
-)
-github <- "&#xf09b"
-github_username <- "aditya-dahiya"
-xtwitter <- "&#xe61b"
-xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+text_col <- "#009270FF" |> darken(0.5) # Colour for the text
+text_hil <- "#009270FF" # Colour for higlighted text
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- ""
-plot_caption <- paste0("**Data:** ", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
-subtitle_text <- ""
-plot_subtitle <- str_wrap(subtitle_text, width = 115)
+plot_title <- "Flow of Global Climate Funds"
+plot_caption <- paste0("Data: Climate Policy Initiative | Code & Graphics: GitHub @aditya-dahiya")
+subtitle_text <- "Exploring the sources of “Climate Funds” – funds for combating climate change, its mitigation, reversal; and, the regions where these go to. From 2017 to 2022, share of public and private sources in the funding has stayed constant. Within the various sources of funding, largest increases in funding have come from “Public Funds” and “State-Owned Enterprises”. Further, the East Asia and Pacific region continue to get an ever-increasing share of total funds dedicated to Climate Change. However, importantly, the Western Europe region has increased its allotment by the maximum, a staggering 152%, from 2017 to 2022."
+plot_subtitle <- str_wrap(subtitle_text, width = 100)
 
 # ==============================================================================#
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-ggplot(
-  df |> filter(year == 2022), 
+g <- ggplot(plotdf, 
   aes(
     label = fill_var,
     area = value,
@@ -191,25 +244,68 @@ ggplot(
   geom_treemap(
     layout = "fixed"
   ) +
-  geom_treemap_text(
-    layout = "fixed", 
-    place = "centre", 
-    grow = TRUE, 
-    colour = "white"
+  geom_treemap_subgroup_border(
+    layout = "fixed",
+    colour = "white",
+    alpha = 0.5
   ) +
   geom_treemap_subgroup_text(
     layout = "fixed", 
-    place = "centre"
+    place = "centre",
+    colour = "white",
+    family = "body_font"
   ) +
-  geom_treemap_subgroup_border(
-    layout = "fixed"
+  geom_treemap_text(
+    layout = "fixed", 
+    place = "center", 
+    grow = FALSE, 
+    colour = text_col,
+    family = "caption_font",
+    reflow = TRUE
   ) +
-  facet_wrap(~ table_type)
-
-
-  transition_time(year) +
-  ease_aes('linear') +
-  labs(title = "Year: {frame_time}")
+  facet_wrap(~ table_type) +
+  scale_fill_manual(
+    values = paletteer::paletteer_d("khroma::stratigraphy")[(115):(115 + 25)]
+  ) +
+  labs(
+    title = paste0(plot_title, ": {frame_time}"),
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(
+      colour = text_col,
+      family = "body_font",
+      size = 18,
+      margin = margin(10, 0, 10, 0)
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      family = "title_font",
+      size = 32,
+      colour = text_hil, 
+      margin = margin(25, 0, 10, 0)
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      family = "caption_font",
+      size = 14,
+      colour = text_col,
+      lineheight = 1.1,
+      margin = margin(10, 0, 10, 0)
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      colour = text_hil,
+      size = 9,
+      family = "caption_font",
+      margin = margin(10, 0, 10, 0)
+    )
+  ) +
+  transition_time(as.integer(year)) +
+  ease_aes('linear')
 
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
@@ -217,7 +313,14 @@ ggplot(
 
 anim_save(
   filename = here::here("docs", "dip_climate_funding.gif"),
-  animation = g
+  animation = g,
+  fps = 10,
+  duration = 20,
+  start_pause = 5,
+  end_pause = 10,
+  height = 800,
+  width = 600,
+  units = "px"
 )
 
 ggview::ggview(
@@ -229,12 +332,3 @@ ggview::ggview(
   bg = bg_col
 )
 
-ggsave(
-  filename = here::here("docs", "dip_climate_funding.png"),
-  device = "png",
-  plot = g,
-  width = 23,
-  height = 30,
-  units = "cm",
-  bg = bg_col
-)
