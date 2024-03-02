@@ -328,12 +328,176 @@ anim_save(
   units = "px"
 )
 
-ggview::ggview(
-  device = "png",
+
+# =============================================================================#
+# An additional static graph----------------------------------------------------
+# =============================================================================#
+
+# Technique Credits: Nicole Rennie
+# https://github.com/nrennie/tidytuesday/blob/main/2024/2024-02-20/20240220.R
+# Package VoronoiPlus by Allan Cameron (X: @Dr_AllanCameron)
+# Install package for first time
+# devtools::install_github("AllanCameron/VoronoiPlus")
+library(VoronoiPlus)
+library(sf)
+
+# Colours
+mypal <- paletteer::paletteer_d("ggsci::alternating_igv")
+text_col <- mypal[1] |> darken(0.5)
+text_hil <- mypal[2] |> darken(0.7)
+
+# Caption Material
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+plot_caption <- paste0("**Data:** Climate Policy Initiative", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
+
+
+
+
+plotdf2 <- finance |> 
+  mutate(year = as.numeric(year)) |> 
+  filter(year == 2022) |> 
+  select(-year)
+
+# Generate a Voronoi TreeMap data
+vor_data <- voronoi_treemap(
+  formula = value ~ funding_type + actors,
+  data = plotdf2
+  ) |> 
+  as_tibble()
+
+# Set a seed for rstricting randomness in each run
+set.seed(1234)
+
+# Select out Main two Groups: Public vs. Private
+groups <- filter(vor_data, level == 1)
+
+# Select out the subgroups for plotting
+subgroups <- filter(vor_data, level == 2) |>
+  group_by(group) |>
+  mutate(alpha = runif(1, 0, 0.9)) |>
+  ungroup()
+
+# Getting positions for Group Labe;ls
+group_labels <- groups |>
+  select(group, x, y) |>
+  st_as_sf(coords = c("x", "y")) |>
+  group_by(group) |>
+  summarise(geometry = st_combine(geometry)) |>
+  st_cast("POLYGON") |>
+  st_centroid() %>%
+  mutate(
+    x = st_coordinates(.)[, 1],
+    y = st_coordinates(.)[, 2]
+  ) |>
+  st_drop_geometry()
+
+subgroup_labels <- subgroups |>
+  as_tibble() |> 
+  select(group, x, y, alpha) |>
+  st_as_sf(coords = c("x", "y")) |>
+  group_by(group, alpha) |>
+  summarise(geometry = st_combine(geometry)) |>
+  ungroup() |> 
+  st_cast("POLYGON") |>
+  st_centroid() %>%
+  mutate(
+    x = st_coordinates(.)[, 1],
+    y = st_coordinates(.)[, 2]
+  ) |>
+  st_drop_geometry()
+  
+  
+  
+g <- ggplot() +
+  geom_polygon(
+    data = groups,
+    mapping = aes(
+      x = x, 
+      y = y, 
+      group = group, 
+      fill = group
+      ),
+    linewidth = 0.9,
+    colour = "white"
+  ) +
+  geom_polygon(
+    data = subgroups,
+    mapping = aes(
+      x = x, 
+      y = y, 
+      group = group, 
+      alpha = alpha
+      ),
+    fill = bg_col,
+    linewidth = 0.3,
+    colour = "white"
+  ) +
+  geom_text(
+    data = group_labels,
+    mapping = aes(
+      x = x, 
+      y = y, 
+      label = group
+      ),
+    family = "title_font",
+    fontface = "bold",
+    size = 120,
+    colour = "black",
+    alpha = 0.3
+  ) +
+  geom_text(
+    data = subgroup_labels,
+    mapping = aes(
+      x = x, 
+      y = y, 
+      label = group
+      ),
+    family = "caption_font",
+    size = 30,
+    colour = text_col
+  ) +
+  scale_alpha_identity() +
+  scale_fill_manual(values = mypal) +
+  labs(
+    title = "Sources of Climate Funds (2022)",
+    caption = plot_caption
+  ) +
+  coord_equal() +
+  theme_void(base_size = 24, base_family = "caption_font") +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0, 0, 0, 0),
+    plot.title = element_text(
+      hjust = 0.5,
+      colour = text_col,
+      family = "title_font",
+      margin = margin(5,0,0,0, unit = "cm"),
+      size = 240
+      ),
+    plot.caption = element_textbox(
+      colour = text_col,
+      size = 80,
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,5,0, unit = "cm")
+    )
+  )
+
+
+ggsave(
+  filename = here::here("docs", "dip_climate_funds.png"),
   plot = g,
-  width = 23,
-  height = 30,
+  width = 40,
+  height = 45,
   units = "cm",
   bg = bg_col
 )
-
