@@ -26,6 +26,9 @@
 # Findings ---------------------------------------------------------------------
 # =============================================================================#
 
+# Most people killed are White, Black and driver/passengers. 
+# Most victims are in the age group 20-30 years
+# Accidents
 
 # =============================================================================#
 # Library Load-in---------------------------------------------------------------
@@ -44,6 +47,7 @@ library(showtext)
 library(colorspace)
 library(usmap)
 library(usmapdata)
+library(patchwork)
 
 # =============================================================================#
 # Data Load-in, EDA & Data Wrangling--------------------------------------------
@@ -85,6 +89,17 @@ plotdf <- police |>
     into = c('x', 'y'), 
     regex = "\\((.*), (.*)\\)", 
     convert = TRUE) 
+
+plotdf2 <- bind_rows(
+  plotdf |> 
+    count(race) |>
+    rename(var = race) |> 
+    mutate(type = "Race of Person(s) killed"),
+  plotdf |> 
+    count(person_role) |> 
+    rename(var = person_role) |> 
+    mutate(type = "Role of Person(s) killed")
+)
 
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
@@ -139,7 +154,7 @@ plot_subtitle <- str_wrap(subtitle_text, width = 70)
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-g <- plot_usmap(
+g1 <- plot_usmap(
   "states",
   col = "darkgrey",
   fill = "white",
@@ -178,7 +193,7 @@ g <- plot_usmap(
       family = "title_font",
       size = 12.5 * ts,
       colour = text_hil, 
-      margin = margin(15, 0, 5, 0, unit = "mm")
+      margin = margin(15, 0, 0, 0, unit = "mm")
     ),
     plot.subtitle = element_text(
       hjust = 0.5,
@@ -186,17 +201,18 @@ g <- plot_usmap(
       size = 6 * ts,
       colour = text_col,
       lineheight = 0.3,
-      margin = margin(5, 0, 0, 0, unit = "mm")
+      margin = margin(0, 0, 0, 0, unit = "mm")
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
       colour = text_hil,
-      size = 1.5 * ts,
+      size = 3 * ts,
       family = "caption_font",
-      margin = margin(5, 0, 0, 0, unit = "mm")
+      margin = margin(11, 0, 0, 0, unit = "cm")
     ),
-    legend.position = c(0.4, 0.05),
+    legend.position.inside = c(0.4, 0.),
     legend.direction = "horizontal",
+    legend.spacing = unit(0, "cm"),
     legend.title = element_text(
       hjust = 1,
       family = "caption_font",
@@ -215,6 +231,122 @@ g <- plot_usmap(
     )
   )
 
+g2 <- plotdf2 |> 
+  ggplot(aes(y = reorder(var, n), x = n, fill = type)) +
+  geom_col(
+    colour = "black",
+    fill = "lightgrey"
+  ) +
+  facet_wrap(~ type, scales = "free") +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_discrete(expand = expansion(0)) +
+  theme_minimal(
+    base_family = "body_font"
+  ) +
+  labs(x = NULL, y = NULL) +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 2,
+      colour = "lightgrey"
+    ),
+    legend.position = "none",
+    strip.text = element_text(
+      hjust = 0,
+      family = "body_font",
+      size = 3.5 * ts,
+      colour = text_col,
+      lineheight = 0.35,
+      margin = margin(0, 0, 5, 0, unit = "mm")
+    ),
+    axis.text.x = element_text(
+      hjust = 0.5,
+      vjust = 0.5,
+      family = "body_font",
+      size = 3.5 * ts,
+      colour = text_col,
+      lineheight = 0.35,
+      margin = margin(0, 0, 0, 0, unit = "mm")
+    ),
+    axis.text.y = element_text(
+      hjust = 1,
+      vjust = 0.5,
+      family = "caption_font",
+      size = 4 * ts,
+      colour = text_col,
+      lineheight = 0.35,
+      margin = margin(0, 0, 0, 0, unit = "mm")
+    ),
+    plot.title.position = "plot"
+  )
+
+g3 <- ggplot(plotdf, aes(age)) +
+  geom_histogram(
+    fill = "lightgrey",
+    colour = "black",
+    binwidth = 5
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    breaks = c(100, 300, 500)
+    ) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    x = NULL, 
+    y = NULL,
+    subtitle = "Age Distribution of Victims"
+    ) +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 2,
+      colour = "lightgrey"
+    ),
+    legend.position = "none",
+    axis.text = element_text(
+      hjust = 0.5,
+      family = "body_font",
+      size = 3.5 * ts,
+      colour = text_col,
+      lineheight = 0.35,
+      margin = margin(0, 5, 0, 0, unit = "mm")
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      family = "body_font",
+      size = 3.5 * ts,
+      colour = text_col,
+      lineheight = 0.35,
+      margin = margin(2, 0, 0, 0, unit = "mm")
+    )
+  )
+
+g <- g1 +
+  patchwork::inset_element(
+    g2,
+    left = 0,
+    bottom = 0.02,
+    right = 0.67,
+    top = 0.25,
+    align_to = "full",
+    clip = FALSE,
+    on_top = TRUE
+  ) +
+  patchwork::inset_element(
+    g3,
+    left = 0.67,
+    bottom = 0.02,
+    right = 1,
+    top = 0.25,
+    align_to = "full",
+    clip = FALSE,
+    on_top = TRUE
+  ) 
+
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
 # =============================================================================#
@@ -223,7 +355,7 @@ ggsave(
   filename = here::here("docs", "dip_fatal_police_pursuits.png"),
   plot = g,
   width = 40,
-  height = 50,
+  height = 45,
   units = "cm",
   bg = bg_col
 )
