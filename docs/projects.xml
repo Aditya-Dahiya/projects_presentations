@@ -10,7 +10,7 @@
 <atom:link href="https://aditya-dahiya.github.io/projects_presentations/projects.html/projects.xml" rel="self" type="application/rss+xml"/>
 <description>Data Viz Projects by Aditya Dahiya</description>
 <generator>quarto-1.4.549</generator>
-<lastBuildDate>Fri, 08 Mar 2024 14:22:41 GMT</lastBuildDate>
+<lastBuildDate>Sat, 09 Mar 2024 08:33:38 GMT</lastBuildDate>
 <item>
   <title>Data Visualizations from D.I.P.</title>
   <dc:creator>Aditya Dahiya</dc:creator>
@@ -9529,15 +9529,1468 @@ Figure&nbsp;5: Geographical distribution, race, age and role of persons killed i
 </figcaption>
 </figure>
 </div>
+<p>Another map in Figure&nbsp;6 shows the distribution of fatal police chases in California overlaid on major highways drawn from Open Street Maps <span class="citation" data-cites="osmdata">( et al. 2017)</span>.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Load additional libraries</span></span>
+<span id="cb6-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(osmdata)      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># wrapper for Overpass API from Open Street Maps</span></span>
+<span id="cb6-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(sf)           <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># library for manipulating Simple features objects</span></span>
+<span id="cb6-4"></span>
+<span id="cb6-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get California sf geomtetry map</span></span>
+<span id="cb6-6">cal_map <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> usmapdata<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">us_map</span>(</span>
+<span id="cb6-7">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">include =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CA"</span>,</span>
+<span id="cb6-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">regions =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"counties"</span>)</span>
+<span id="cb6-9">)</span>
+<span id="cb6-10"></span>
+<span id="cb6-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get California Highway Data: Open Street Maps</span></span>
+<span id="cb6-12">cal <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">opq</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"California"</span>)</span>
+<span id="cb6-13"></span>
+<span id="cb6-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get California Motorways</span></span>
+<span id="cb6-15">cal_roads <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cal <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-16">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">add_osm_feature</span>(</span>
+<span id="cb6-17">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">key =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"highway"</span>,</span>
+<span id="cb6-18">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">value =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"motorway"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-19">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">osmdata_sf</span>()</span>
+<span id="cb6-20"></span>
+<span id="cb6-21">main_roads <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cal_roads<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>osm_lines <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-22">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_transform</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">crs =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_crs</span>(cal_map)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-23">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_intersection</span>(cal_map)</span>
+<span id="cb6-24"></span>
+<span id="cb6-25"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Get California Trunk Roads</span></span>
+<span id="cb6-26">cal_trunk_roads <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cal <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-27">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">add_osm_feature</span>(</span>
+<span id="cb6-28">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">key =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"highway"</span>,</span>
+<span id="cb6-29">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">value =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"trunk"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-30">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">osmdata_sf</span>()</span>
+<span id="cb6-31"></span>
+<span id="cb6-32">trunk_roads <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> cal_trunk_roads<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">$</span>osm_lines <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-33">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_transform</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">crs =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_crs</span>(cal_map)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-34">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">st_intersection</span>(cal_map)</span>
+<span id="cb6-35"></span>
+<span id="cb6-36"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Getting Fatal Police Chase Crashes data for California</span></span>
+<span id="cb6-37">cal_crashes <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> police <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-38">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">filter</span>(state <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"CA"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-39">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">filter</span>(centroid_geo <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-40">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">usmap_transform</span>(</span>
+<span id="cb6-41">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">input_names =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"long"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"lat"</span>)</span>
+<span id="cb6-42">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-43">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as_tibble</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-44">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">extract</span>(</span>
+<span id="cb6-45">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">col =</span> geometry, </span>
+<span id="cb6-46">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">into =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'x'</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'y'</span>), </span>
+<span id="cb6-47">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">regex =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\\</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">((.*), (.*)</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\\</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)"</span>, </span>
+<span id="cb6-48">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">convert =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-49">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(</span>
+<span id="cb6-50">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">race =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">case_when</span>(</span>
+<span id="cb6-51">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str_detect</span>(race, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"unknown"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Unknown"</span>,</span>
+<span id="cb6-52">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str_detect</span>(race, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Black"</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Disclaimer: a little bias introduced by data cleaning as data-rows with any one entry as black will be treated as "Black"</span></span>
+<span id="cb6-53">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str_detect</span>(race, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"white"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"White"</span>, <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Dislcaimer: Similar data bias</span></span>
+<span id="cb6-54">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str_detect</span>(race, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"latino"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Latino"</span>,</span>
+<span id="cb6-55">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.default =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Others"</span></span>
+<span id="cb6-56">    ),</span>
+<span id="cb6-57">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">race =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fct</span>(race, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">levels =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Black"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"White"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Latino"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Others"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Unknown"</span>)),</span>
+<span id="cb6-58">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">person_role =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">case_when</span>(</span>
+<span id="cb6-59">      person_role <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%in%</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"driver"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Driver"</span>,</span>
+<span id="cb6-60">      person_role <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"bystander"</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Bystander"</span>,</span>
+<span id="cb6-61">      person_role <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"passenger"</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Passenger"</span>,</span>
+<span id="cb6-62">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.default =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Unknown"</span></span>
+<span id="cb6-63">    ),</span>
+<span id="cb6-64">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">person_role =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">fct</span>(</span>
+<span id="cb6-65">      person_role,</span>
+<span id="cb6-66">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">levels =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Driver"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Bystander"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Passenger"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Unknown"</span>)</span>
+<span id="cb6-67">    )</span>
+<span id="cb6-68">  )</span>
+<span id="cb6-69"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Ready some data for inset plot</span></span>
+<span id="cb6-70"></span>
+<span id="cb6-71">sideplotdf <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">bind_rows</span>(</span>
+<span id="cb6-72">  cal_crashes <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-73">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(person_role) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-74">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">type =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Role of Victim"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.before =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">everything</span>()) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-75">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rename</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">variable =</span> person_role),</span>
+<span id="cb6-76">  </span>
+<span id="cb6-77">  cal_crashes <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-78">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">initial_reason =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">case_when</span>(</span>
+<span id="cb6-79">      initial_reason <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"suspected nonviolent"</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Suspected</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Non-Violent"</span>,</span>
+<span id="cb6-80">      initial_reason <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"suspected violent"</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Suspected</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Violent"</span>,</span>
+<span id="cb6-81">      initial_reason <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"traffic stop"</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Traffic Stop"</span>,</span>
+<span id="cb6-82">      <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">is.na</span>(initial_reason) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Not Known"</span>,</span>
+<span id="cb6-83">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.default =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Others"</span></span>
+<span id="cb6-84">    )) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-85">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(initial_reason) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-86">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">type =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Reason of Police Chase"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.before =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">everything</span>()) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-87">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rename</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">variable =</span> initial_reason),</span>
+<span id="cb6-88">  </span>
+<span id="cb6-89">  cal_crashes <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-90">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(race) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-91">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">type =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Race of Victim"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.before =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">everything</span>()) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-92">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rename</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">variable =</span> race)</span>
+<span id="cb6-93">)</span>
+<span id="cb6-94"></span>
+<span id="cb6-95"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Changing some colours for caption</span></span>
+<span id="cb6-96">social_caption_1 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> glue<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">glue</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"&lt;span style='font-family:</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\"</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Font Awesome 6 Brands</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\"</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">;'&gt;{github};&lt;/span&gt; &lt;span style='color: {text_col}'&gt;{github_username}  &lt;/span&gt;"</span>)</span>
+<span id="cb6-97">social_caption_2 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> glue<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">glue</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"&lt;span style='font-family:</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\"</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Font Awesome 6 Brands</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">\"</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">;'&gt;{xtwitter};&lt;/span&gt; &lt;span style='color: {text_col}'&gt;{xtwitter_username}&lt;/span&gt;"</span>)</span>
+<span id="cb6-98">plot_caption <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">paste0</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"**Data:** The San Francisco Chronicle"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" | "</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" **Code:** "</span>, social_caption_1, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" | "</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">" **Graphics:** "</span>, social_caption_2)</span>
+<span id="cb6-99"></span>
+<span id="cb6-100">p1 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-101">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_sf</span>(</span>
+<span id="cb6-102">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> cal_map,</span>
+<span id="cb6-103">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"white"</span>,</span>
+<span id="cb6-104">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#e8e8e8"</span></span>
+<span id="cb6-105">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-106">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_sf</span>(</span>
+<span id="cb6-107">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> trunk_roads,</span>
+<span id="cb6-108">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linewidth =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span>,</span>
+<span id="cb6-109">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span></span>
+<span id="cb6-110">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-111">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_sf</span>(</span>
+<span id="cb6-112">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> main_roads,</span>
+<span id="cb6-113">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linewidth =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>,</span>
+<span id="cb6-114">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span></span>
+<span id="cb6-115">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-116">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_point</span>(</span>
+<span id="cb6-117">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">data =</span> cal_crashes,</span>
+<span id="cb6-118">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(</span>
+<span id="cb6-119">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> x,</span>
+<span id="cb6-120">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> y,</span>
+<span id="cb6-121">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> number_killed,</span>
+<span id="cb6-122">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> race</span>
+<span id="cb6-123">    ),</span>
+<span id="cb6-124">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span>,</span>
+<span id="cb6-125">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>,</span>
+<span id="cb6-126">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">pch =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">21</span></span>
+<span id="cb6-127">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-128">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_x_continuous</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">expand =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">expansion</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>))) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-129">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_fill_manual</span>(</span>
+<span id="cb6-130">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"orange"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"darkgreen"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#949494"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#bfbfbf"</span>)</span>
+<span id="cb6-131">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-132">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_size</span>(</span>
+<span id="cb6-133">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">range =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>)</span>
+<span id="cb6-134">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-135">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guides</span>(</span>
+<span id="cb6-136">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(</span>
+<span id="cb6-137">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(</span>
+<span id="cb6-138">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span></span>
+<span id="cb6-139">      )</span>
+<span id="cb6-140">    ),</span>
+<span id="cb6-141">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">guide_legend</span>(</span>
+<span id="cb6-142">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">override.aes =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">list</span>(</span>
+<span id="cb6-143">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"black"</span>,</span>
+<span id="cb6-144">        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb6-145">      )</span>
+<span id="cb6-146">    )</span>
+<span id="cb6-147">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-148">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(</span>
+<span id="cb6-149">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Fatal Police Chases"</span>,</span>
+<span id="cb6-150">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">caption =</span> plot_caption,</span>
+<span id="cb6-151">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Race of Victim"</span>,</span>
+<span id="cb6-152">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Fatalities"</span></span>
+<span id="cb6-153">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-154">  ggthemes<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_map</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-155">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(</span>
+<span id="cb6-156">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.position.inside =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.08</span>),</span>
+<span id="cb6-157">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.direction =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"vertical"</span>,</span>
+<span id="cb6-158">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.box =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"vertical"</span>,</span>
+<span id="cb6-159">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.title =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-160">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_hil,</span>
+<span id="cb6-161">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-162">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"title_font"</span>,</span>
+<span id="cb6-163">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-164">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cm"</span>)</span>
+<span id="cb6-165">    ),</span>
+<span id="cb6-166">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.subtitle =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-167">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-168">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-169">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-170">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-171">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lineheight =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.35</span></span>
+<span id="cb6-172">    ),</span>
+<span id="cb6-173">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.caption =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_textbox</span>(</span>
+<span id="cb6-174">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-175">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-176">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"caption_font"</span>,</span>
+<span id="cb6-177">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts</span>
+<span id="cb6-178">    ),</span>
+<span id="cb6-179">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.title =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-180">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-181">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,</span>
+<span id="cb6-182">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-183">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-184">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>)</span>
+<span id="cb6-185">    ),</span>
+<span id="cb6-186">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.text =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-187">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-188">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,</span>
+<span id="cb6-189">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-190">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-191">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>)</span>
+<span id="cb6-192">    ),</span>
+<span id="cb6-193">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.background =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_rect</span>(</span>
+<span id="cb6-194">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"transparent"</span></span>
+<span id="cb6-195">    )</span>
+<span id="cb6-196">  )</span>
+<span id="cb6-197"></span>
+<span id="cb6-198"></span>
+<span id="cb6-199">p2 <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> sideplotdf <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span> </span>
+<span id="cb6-200">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> n, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">reorder</span>(variable, n))) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-201">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_col</span>(</span>
+<span id="cb6-202">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#525252"</span>,</span>
+<span id="cb6-203">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"grey"</span>,</span>
+<span id="cb6-204">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">alpha =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.4</span></span>
+<span id="cb6-205">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-206">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">facet_wrap</span>(<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">~</span> type, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">scales =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"free_y"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">ncol =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-207">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_x_reverse</span>(</span>
+<span id="cb6-208">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">expand =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">expansion</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>),</span>
+<span id="cb6-209">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">breaks =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)</span>
+<span id="cb6-210">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-211">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_y_discrete</span>(</span>
+<span id="cb6-212">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">position =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"right"</span></span>
+<span id="cb6-213">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-214">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(</span>
+<span id="cb6-215">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>, </span>
+<span id="cb6-216">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>,</span>
+<span id="cb6-217">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">subtitle =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">str_wrap</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Most deaths in police car chases in California occurred on Highways in and around major cities. The race, role and reasons for deaths are:"</span>,  <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">40</span>),</span>
+<span id="cb6-218">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">title =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span></span>
+<span id="cb6-219">  ) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-220">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_minimal</span>() <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-221">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(</span>
+<span id="cb6-222">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.subtitle =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-223">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-224">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5.5</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-225">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-226">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,</span>
+<span id="cb6-227">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lineheight =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span>,</span>
+<span id="cb6-228">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>)</span>
+<span id="cb6-229">    ),</span>
+<span id="cb6-230">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">strip.text =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-231">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-232">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-233">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-234">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-235">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>)</span>
+<span id="cb6-236">    ),</span>
+<span id="cb6-237">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">axis.text.y =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-238">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-239">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,</span>
+<span id="cb6-240">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-241">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"caption_font"</span>,</span>
+<span id="cb6-242">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>),</span>
+<span id="cb6-243">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lineheight =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.19</span></span>
+<span id="cb6-244">    ),</span>
+<span id="cb6-245">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">axis.text.x =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_text</span>(</span>
+<span id="cb6-246">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-247">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hjust =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-248">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> ts,</span>
+<span id="cb6-249">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">family =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"body_font"</span>,</span>
+<span id="cb6-250">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">margin =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">margin</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">unit =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mm"</span>),</span>
+<span id="cb6-251">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">lineheight =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.18</span></span>
+<span id="cb6-252">    ),</span>
+<span id="cb6-253">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">panel.grid =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_blank</span>(),</span>
+<span id="cb6-254">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">panel.grid.major.x =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">element_line</span>(</span>
+<span id="cb6-255">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linetype =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb6-256">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> text_col,</span>
+<span id="cb6-257">      <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linewidth =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span></span>
+<span id="cb6-258">    ),</span>
+<span id="cb6-259">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot.title.position =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"plot"</span></span>
+<span id="cb6-260">  )</span>
+<span id="cb6-261"></span>
+<span id="cb6-262"></span>
+<span id="cb6-263">p <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> p1 <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb6-264">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">inset_element</span>(</span>
+<span id="cb6-265">    p2, </span>
+<span id="cb6-266">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">left =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>,</span>
+<span id="cb6-267">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">top =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,</span>
+<span id="cb6-268">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">bottom =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.25</span>,</span>
+<span id="cb6-269">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">right =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>,</span>
+<span id="cb6-270">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">align_to =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"panel"</span></span>
+<span id="cb6-271">  )</span>
+<span id="cb6-272"></span>
+<span id="cb6-273"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggsave</span>(</span>
+<span id="cb6-274">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">filename =</span> here<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">here</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"docs"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"dip_fpp_cal.png"</span>),</span>
+<span id="cb6-275">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">plot =</span> p,</span>
+<span id="cb6-276">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">width =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">38</span>,</span>
+<span id="cb6-277">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">height =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">45</span>,</span>
+<span id="cb6-278">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">units =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cm"</span>,</span>
+<span id="cb6-279">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">bg =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"white"</span></span>
+<span id="cb6-280">)</span></code></pre></div>
+</details>
+</div>
+<div id="fig-cal-fpc" class="quarto-figure quarto-figure-center quarto-float anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cal-fpc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://aditya-dahiya.github.io/projects_presentations/projects.html/docs/dip_fpp_cal.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cal-fpc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Most deaths in police car chases in California occurred on Highways in and around major cities. The bar-plots on the right show distribution of race, role and reasons for the victims. We conclude that most commonly victims are white, drivers and reasons are not known. An important insight is that Blacks (and, to some extent, whites) are disproportionately high in victims of police car chase crashes compared to their population.
+</figcaption>
+</figure>
+</div>
+
 
 
 </section>
 
- ]]></description>
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0">
+<div id="ref-osmdata" class="csl-entry">
+Mark Padgham, Bob Rudis, Robin Lovelace, and Maëlle Salmon. 2017. <span>“Osmdata”</span> 2: 305. <a href="https://doi.org/10.21105/joss.00305">https://doi.org/10.21105/joss.00305</a>.
+</div>
+</div></section></div> ]]></description>
   <category>Data Is Plural</category>
   <category>Data Visualization</category>
   <guid>https://aditya-dahiya.github.io/projects_presentations/projects.html/projects/dip_viz.html</guid>
-  <pubDate>Fri, 08 Mar 2024 14:22:41 GMT</pubDate>
+  <pubDate>Sat, 09 Mar 2024 08:33:38 GMT</pubDate>
   <media:content url="https://aditya-dahiya.github.io/projects_presentations/projects.html/projects/dip_uselections.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 <item>
