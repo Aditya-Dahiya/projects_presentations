@@ -498,7 +498,9 @@ p1 <- ggplot() +
     colour = "black",
     pch = 21
   ) +
-  scale_x_continuous(expand = expansion(c(0.05, 0.5))) +
+  scale_x_continuous(
+    expand = expansion(c(0.05, 0.5))
+  ) +
   scale_fill_manual(
     values = c("black", "orange", "darkgreen", "#949494", "#bfbfbf")
   ) +
@@ -687,4 +689,446 @@ ggsave(
 )
 
 
+# =============================================================================#
+# Analysis 3: Picking up from previous section ---------------------------------
+# =============================================================================#
+
+tb1 <- police |> 
+  select(-c(unique_id, year, news_urls)) |> 
+  mutate(
+    date = mdy(date),
+    month = month(date, label = TRUE),
+    year = year(date)
+  ) |> 
+  mutate(
+    race = case_when(
+      str_detect(race, "unknown") ~ "Unknown",
+      str_detect(race, "black") ~ "Black", # Disclaimer: a little bias introduced by data cleaning as data-rows with any one entry as black will be treated as "Black"
+      str_detect(race, "white") ~ "White", # Dislcaimer: Similar data bias
+      str_detect(race, "latino") ~ "Latino",
+      .default = "Others"
+    ),
+    race = fct(race, levels = c("Black", "White", "Latino", "Others", "Unknown")),
+    person_role = case_when(
+      person_role %in% c("driver") ~ "Driver",
+      person_role == "bystander" ~ "Bystander",
+      person_role == "passenger" ~ "Passenger",
+      person_role == "officer" ~ "Officer",
+      .default = "Unknown"
+    ),
+    person_role = fct(
+      person_role,
+      levels = c("Driver", "Bystander", "Passenger", "Officer", "Unknown")
+    )
+  )
+
+# Doing some exploratory data analysis to get trends
+tb1 |> 
+  group_by(month) |> 
+  count(race, wt = number_killed) |> 
+  ggplot(aes(x = month, y = n, fill = race)) +
+  geom_col()
+
+tb1 |> 
+  group_by(race_source) |> 
+  count(race) |> 
+  ggplot(aes(x = race_source, y = n, fill = race)) +
+  geom_col()
+
+tb1 |> 
+  group_by(state) |> 
+  count(race) |> 
+  mutate(total = sum(n)) |> 
+  filter(total >= 100) |> 
+  ggplot(aes(x = state, y = n, fill = race)) +
+  geom_col(position = "fill")
+
+tb1 |> 
+  group_by(state) |> 
+  count(person_role, wt = number_killed) |> 
+  mutate(total = sum(n)) |> 
+  filter(total > 50) |> 
+  filter(person_role != "Unknown") |> 
+  ggplot(aes(x = state, y = n, fill = person_role)) +
+  geom_col(position = "fill")
+
+tb1 |> 
+  group_by(year) |> 
+  count(gender, wt = number_killed) |> 
+  mutate(total = sum(n)) |> 
+  filter(total > 50) |> 
+  ggplot(aes(x = year, y = n, fill = gender)) +
+  geom_col(position = "fill")
+
+
+# Load additional libraries
+library(osmdata)      # wrapper for Overpass API from Open Street Maps
+library(sf)           # library for manipulating Simple features objects
+
+# Get California sf geomtetry map
+tx_map <- usmapdata::us_map(
+  include = "TX",
+  regions = c("counties")
+)
+
+# Get California Highway Data: Open Street Maps
+cal <- opq("Texas")
+
+# Get California Motorways
+tx_roads <- cal |>
+  add_osm_feature(
+    key = "highway",
+    value = "motorway") |>
+  osmdata_sf()
+
+main_roads <- tx_roads$osm_lines |>
+  st_transform(crs = st_crs(tx_map)) |> 
+  st_intersection(tx_map)
+
+# Get California Trunk Roads
+tx_trunk_roads <- cal |>
+  add_osm_feature(
+    key = "highway",
+    value = "trunk") |>
+  osmdata_sf()
+
+trunk_roads <- tx_trunk_roads$osm_lines |>
+  st_transform(crs = st_crs(tx_map)) |> 
+  st_intersection(tx_map)
+
+# Getting Fatal Police Chase Crashes data for California
+tx_crashes <- police |>
+  filter(state == "TX") |> 
+  filter(centroid_geo == 0) |> 
+  usmap_transform(
+    input_names = c("long", "lat")
+  ) |> 
+  as_tibble() |> 
+  extract(
+    col = geometry, 
+    into = c('x', 'y'), 
+    regex = "\\((.*), (.*)\\)", 
+    convert = TRUE) |> 
+  mutate(
+    race = case_when(
+      str_detect(race, "unknown") ~ "Unknown",
+      str_detect(race, "black") ~ "Black", # Disclaimer: a little bias introduced by data cleaning as data-rows with any one entry as black will be treated as "Black"
+      str_detect(race, "white") ~ "White", # Dislcaimer: Similar data bias
+      str_detect(race, "latino") ~ "Latino",
+      .default = "Others"
+    ),
+    race = fct(race, levels = c("Black", "White", "Latino", "Others", "Unknown")),
+    person_role = case_when(
+      person_role %in% c("driver") ~ "Driver",
+      person_role == "bystander" ~ "Bystander",
+      person_role == "passenger" ~ "Passenger",
+      .default = "Unknown"
+    ),
+    person_role = fct(
+      person_role,
+      levels = c("Driver", "Bystander", "Passenger", "Unknown")
+    )
+  )
+# Ready some data for inset plot
+
+sideplotdf <- bind_rows(
+  tx_crashes |> 
+    count(person_role) |> 
+    mutate(type = "Role of Victim", .before = everything()) |> 
+    rename(variable = person_role),
+  
+  tx_crashes |> 
+    mutate(initial_reason = case_when(
+      initial_reason == "suspected nonviolent" ~ "Suspected\nNon-Violent",
+      initial_reason == "suspected violent" ~ "Suspected\nViolent",
+      initial_reason == "traffic stop" ~ "Traffic Stop",
+      is.na(initial_reason) ~ "Not Known",
+      .default = "Not Known"
+    )) |> 
+    count(initial_reason) |> 
+    mutate(type = "Reason of Police Chase", .before = everything()) |> 
+    rename(variable = initial_reason),
+  
+  tx_crashes |> 
+    count(race) |> 
+    mutate(type = "Race of Victim", .before = everything()) |> 
+    rename(variable = race)
+) |> 
+  group_by(type) |> 
+  mutate(n = n / sum(n)) |> 
+  ungroup() |> 
+  mutate(per_pop = c(rep(NA, 9), 0.12, 0.40, 0.40, 0.08, 0.0))
+
+# Changing some colours for caption
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+plot_caption <- paste0("**Data:** The San Francisco Chronicle", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
+
+# Changing some colours
+bg_col = "black"
+text_col = "#ffe6e3"
+text_hil <- "#ff6a59"
+
+p1 <- ggplot() +
+  geom_sf(
+    data = tx_map,
+    colour = "#636363",
+    fill = "#404040"
+  ) +
+  geom_sf(
+    data = trunk_roads,
+    linewidth = 0.3,
+    alpha = 0.5,
+    colour = "white"
+  ) +
+  geom_sf(
+    data = main_roads,
+    linewidth = 0.6,
+    alpha = 0.6,
+    colour = "white"
+  ) +
+  geom_point(
+    data = tx_crashes,
+    aes(
+      x = x,
+      y = y,
+      size = number_killed,
+      fill = race
+    ),
+    alpha = 0.3,
+    colour = "white",
+    pch = 21
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0.05, 0.55))
+  ) +
+  scale_y_continuous(
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_fill_manual(
+    values = c("#F5433FFF","#F8DE02FF", "#579CE9FF", "#CAC7BBFF", "#CAC7BBFF")
+  ) +
+  scale_size(
+    range = c(5, 8)
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        size = 8,
+        alpha = 1
+      )
+    ),
+    size = guide_legend(
+      override.aes = list(
+        colour = "white",
+        alpha = 1
+      )
+    )
+  ) +
+  labs(
+    title = "Police Chase Deaths",
+    caption = plot_caption,
+    fill = "Race of Victim",
+    size = "Fatalities"
+  ) +
+  ggthemes::theme_map() +
+  theme(
+    legend.position.inside = c(0, 0),
+    legend.direction = "vertical",
+    legend.box = "horizontal",
+    plot.title = element_text(
+      colour = text_hil,
+      size = 15 * ts,
+      family = "title_font",
+      hjust = 0.5,
+      margin = margin(1, 0, 0, 0, unit = "cm")
+    ),
+    plot.subtitle = element_text(
+      colour = text_col,
+      size = 4 * ts,
+      family = "body_font",
+      hjust = 0.5,
+      lineheight = 0.35
+    ),
+    plot.caption = element_textbox(
+      colour = text_col,
+      hjust = 0.5,
+      family = "caption_font",
+      size = 3 * ts
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      hjust = 0,
+      size = 4 * ts,
+      family = "body_font",
+      margin = margin(0,0,0,2, unit = "mm")
+    ),
+    legend.text = element_text(
+      colour = text_col,
+      hjust = 0,
+      size = 3 * ts,
+      family = "body_font",
+      margin = margin(0,0,0,2, unit = "mm")
+    ),
+    legend.background = element_rect(
+      fill = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    )
+  )
+
+p2 <- sideplotdf |> 
+  ggplot(aes(
+    x = n, 
+    y = reorder(variable, n))) +
+  geom_col(
+    colour = "white",
+    fill = "grey",
+    alpha = 0.5
+  ) +
+  ungeviz::geom_vpline(
+    aes(
+      x = per_pop
+    ),
+    height = 0.8,
+    size = 2,
+    col = "white"
+  ) +
+  facet_wrap(~ type, scales = "free_y", ncol = 1) +
+  scale_x_reverse(
+    label = label_percent(),
+    breaks = c(0, 0.25, 0.5),
+    expand = expansion(c(0.5, 0))
+  ) +
+  scale_y_discrete(
+    position = "right"
+  ) +
+  labs(
+    x = NULL, 
+    y = NULL,
+    subtitle = str_wrap("Most deaths in police car chases in Texas occurred on Highways and near major cities. Fatalities involving blacks were mostly concentrated in urban areas.",  55),
+    title = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    plot.subtitle = element_text(
+      colour = text_col,
+      size = 4 * ts,
+      family = "body_font",
+      hjust = 1,
+      lineheight = 0.3,
+      margin = margin(10, 25, 0, 0, unit = "mm")
+    ),
+    strip.text = element_text(
+      colour = text_col,
+      hjust = 1,
+      size = 4.5 * ts,
+      family = "body_font",
+      margin = margin(3,0,0,0, unit = "mm")
+    ),
+    axis.text.y = element_text(
+      colour = text_col,
+      hjust = 0,
+      size = 3 * ts,
+      family = "caption_font",
+      margin = margin(3,0,0,0, unit = "mm"),
+      lineheight = 0.19
+    ),
+    axis.text.x = element_text(
+      colour = text_col,
+      hjust = 0.5,
+      size = 4 * ts,
+      family = "body_font",
+      margin = margin(3,0,0,0, unit = "mm"),
+      lineheight = 0.18
+    ),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 2,
+      colour = text_col,
+      linewidth = 0.3
+    ),
+    plot.title.position = "plot"
+  )
+
+# A Third Annotation plot
+p3 <- tibble(
+  label = "This White bar shows the % Population\nof each race in Texas (2022)"
+) |> 
+  ggplot(aes(x = 1, y = 1, label = label)) +
+  geom_text(
+    colour = "white",
+    hjust = 0.5,
+    family = "caption_font",
+    size = ts,
+    lineheight = 0.25
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent",
+    colour = "transparent"
+  ))
+
+# A fourth plot to Label Texas
+p4 <- tibble(
+  label = "Texas"
+) |> 
+  ggplot(aes(x = 1, y = 1, label = label)) +
+  geom_text(
+    colour = text_hil,
+    hjust = 0.5,
+    family = "title_font",
+    size = 3.5 * ts,
+    lineheight = 0.25
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent",
+    colour = "transparent"
+  ))
+
+p <- p1 +
+  inset_element(
+    p2, 
+    left = 0.55,
+    top = 1,
+    bottom = 0.0,
+    right = 1,
+    align_to = "panel"
+  ) +
+  inset_element(
+    p3, 
+    left = 0.66,
+    right = 0.89,
+    top = 0.63,
+    bottom = 0.59,
+    align_to = "panel"
+  ) +
+  inset_element(
+    p4, 
+    left = 0,
+    right = 0.2,
+    top = 1,
+    bottom = 0.8,
+    align_to = "panel"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "black"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("docs", "dip_fpp_tx.png"),
+  plot = p,
+  width = 45,
+  height = 35,
+  units = "cm",
+  bg = "black"
+)
 
