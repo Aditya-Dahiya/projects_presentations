@@ -9,9 +9,10 @@
 # the preapproved grant relationship.
 
 # The 380 sponsors featured in the Fiscal Sponsor Directory provided detailed 
-# information after participating in a survey about their experience, eligibility 
-# requirements, fee structure, services, and philosophy. This allows 
-# prospective projects to better gauge which fiscal sponsors might suit their needs.
+# information after participating in a survey about their experience, 
+# eligibility requirements, fee structure, services, and philosophy. This 
+# allows prospective projects to better gauge which fiscal sponsors might 
+# suit their needs.
 
 # Launched in November 2008, the Directory has become the most extensive 
 # database of essential information about individual fiscal sponsors. It 
@@ -42,6 +43,7 @@ library(ggtext) # Markdown Text in ggplot2
 library(scales) # Labeling the axes
 library(colorspace) # Lighten and Darken Colours
 library(patchwork) # For compiling plots
+library(ggstream) # Stream plots
 
 # ==============================================================================#
 # Data Load-in------------------------------------------------------------------
@@ -66,27 +68,12 @@ visdat::vis_dat(fsd)
 # Data Wrangling----------------------------------------------------------------
 # ==============================================================================#
 
-# A long format of the data with separated out individual components of 4 columns
+# A long format of the data with separated out individual components of 2 
+# columns that we are interested in: Model Types and Project types
 fsd_long <- fsd |> 
   mutate(id = row_number(), .before = everything()) |> 
-  separate_longer_delim(
-    cols = c(eligibility_criteria),
-    delim = "|"
-  ) |> 
-  mutate(
-    eligibility_criteria = if_else(
-      eligibility_criteria == "Aligned mission/values",
-      "Aligned mission values",
-      eligibility_criteria
-    )
-  ) |> 
   separate_longer_delim(project_types, "|") |> 
   separate_longer_delim(fiscal_sponsorship_model, "|") |> 
-  separate_longer_delim(services, "|")
-
-# Looking closely at Financial Sponsorship Models
-fsd_model <- fsd |> 
-  separate_longer_delim(fiscal_sponsorship_model, "|") |>
   filter(!is.na(fiscal_sponsorship_model)) |> 
   separate_wider_delim(
     cols = fiscal_sponsorship_model,
@@ -97,12 +84,14 @@ fsd_model <- fsd |>
   ) |> 
   filter(str_detect(model_type, "Model "))
 
-model_descrp <- fsd_model |> 
+# A description of Common Sponsorship Models
+model_descrp <- fsd_long |> 
   count(model_type, model_description, sort = T) |> 
-  slice_head(n = 8) |> 
+  slice_head(n = 7) |> 
   select(-n)
 
-plotdf <- fsd_model |> 
+# The long data-frame to use for getting subsets 
+df <- fsd_long |> 
   select(-model_description) |> 
   left_join(model_descrp, relationship = "many-to-many") |> 
   mutate(
@@ -112,8 +101,77 @@ plotdf <- fsd_model |>
       str_detect(model_type, "Most of our") ~ "Model A",
       .default = model_type
     )
-  )
+  ) |> 
+  rename(year = year_fiscal_sponsor)
 
+# Checking most common project types
+df |> 
+  count(project_types, sort = T)
+
+# Combining data on 4 important project types I wish to plot as stream graph
+plotdf <- bind_rows(
+  df |> 
+    filter(str_detect(project_types, "(?i)Children|(?i)Youth")) |> 
+    count(year, model_type) |> 
+    mutate(project_category = "Children / Youth Development"),
+  
+  df |> 
+    filter(str_detect(project_types, "(?i)Arts and culture")) |> 
+    count(year, model_type) |> 
+    mutate(project_category = "Arts and Culture"),
+  
+  df |> 
+    filter(str_detect(project_types, "(?i)Environment")) |> 
+    count(year, model_type) |> 
+    mutate(project_category = "Environment"),
+  
+  df |> 
+    filter(str_detect(project_types, "(?i)Economic Development")) |> 
+    count(year, model_type) |> 
+    mutate(project_category = "Economic Development")
+) |> 
+  filter(year >= 1990)
+
+pc_levels <- plotdf |> 
+  distinct(project_category) |> 
+  arrange(project_category) |> 
+  pull(project_category)
+
+model_levels <- plotdf |> 
+  distinct(model_type) |> 
+  arrange(model_type) |> 
+  pull(model_type)
+
+# Adding zero values before and after years to smoothen the stream plot
+plotdf2 <- plotdf |> 
+  mutate(
+    project_category = fct(project_category, levels = pc_levels),
+    model_type = fct(model_type, levels = model_levels)
+  ) |> 
+  bind_rows(
+    expand.grid(pc_levels, model_levels) |> 
+      as_tibble() |> 
+      rename(
+        project_category = Var1,
+        model_type = Var2
+      ) |> 
+      mutate(
+        year = 1987,
+        n = 0
+      )
+  ) |> 
+  bind_rows(
+    expand.grid(pc_levels, model_levels) |> 
+      as_tibble() |> 
+      rename(
+        project_category = Var1,
+        model_type = Var2
+      ) |> 
+      mutate(
+        year = 2026,
+        n = 0
+      )
+  )
 
 # ==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
@@ -164,8 +222,23 @@ plot_subtitle <- str_wrap(
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-g <- 
+plotdf2 |> 
+  ggplot(aes(x = year, y = n)) +
+  geom_stream(
+    aes(fill = model_type)
+  ) +
+  geom_text(
+    data = tibble(year = 1990, 
+                  n = 20, 
+                  project_category = pc_levels),
+    aes(label = project_category)) +
+  facet_wrap(~ project_category, ncol = 1) +
+  scale_colour_manual(
+    breaks = model_levels
+  )
   
+  
+
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
 # =============================================================================#
@@ -178,4 +251,6 @@ ggsave(
   units = "cm",
   bg = bg_col
   )
+
+
 
