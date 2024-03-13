@@ -1,12 +1,11 @@
-# TidyTuesday: TidyTuesday, facilitated by the R4DS Online Learning Community, 
-# is currently in search of a new fiscal sponsor (as of March 2024). This week's 
+# TidyTuesday: This week's 
 # dataset is sourced from the Fiscal Sponsor Directory. The Fiscal Sponsor 
 # Directory conducted an analysis of their listings in March 2023. 
 # Here are some key facts and statistics about fiscal sponsors from the 
 # Fiscal Sponsor Directory:
 
 # 60% (227) of the sponsors in the Directory operate under Model C, 
-# the preapproved grant relationship.
+# the pre-approved grant relationship.
 
 # The 380 sponsors featured in the Fiscal Sponsor Directory provided detailed 
 # information after participating in a survey about their experience, 
@@ -173,29 +172,36 @@ plotdf2 <- plotdf |>
       )
   )
 
+plot_labels <- model_descrp |> 
+  arrange(model_type) |> 
+  mutate(label = paste0(model_type,"\n",model_description)) |> 
+  pull(label)
+
 # ==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 # ==============================================================================#
 
 # Load fonts
-font_add_google("Cabin Sketch",
+font_add_google("Felipa",
   family = "title_font"
 ) # Font for titles
-font_add_google("Oswald",
+font_add_google("Tulpen One",
   family = "caption_font"
 ) # Font for the caption
-font_add_google("Abel",
+font_add_google("Ruluko",
   family = "body_font"
 ) # Font for plot text
 showtext_auto()
 
 # Define colours
-bg_col <-    # Background Colour
-text_col <-  # Colour for the text
-text_hil <-  # Colour for highlighted text
+mypal <- paletteer::paletteer_d("ghibli::PonyoLight")
+
+bg_col <- "#f5f5f5" # Background Colour
+text_col <- mypal[3] |> darken(0.7) # Colour for the text
+text_hil <- mypal[3] |> darken(0.4) # Colour for highlighted text
 
 # Define Text Size
-ts <- unit(20, units = "cm") # Text Size
+ts <- unit(40, units = "cm") # Text Size
 
 # Plot Title, Subtitle and Caption
 sysfonts::font_add(
@@ -208,13 +214,12 @@ xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-plot_caption <- paste0("**Data:** ", " | ", " #TidyTuesday | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
-rm(c(social_caption_1, social_caption_2, xtwitter_username, xtwitter, github_username, github))
+plot_caption <- paste0("**Data:** Fiscal Sponsor Directory (fiscalsponsordirectory.org) ", " | ", " #TidyTuesday | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
 
-plot_title <- ""
+plot_title <- "Fiscal Sponsorship Models"
 
 plot_subtitle <- str_wrap(
-  "...", 
+  "The fiscalsponsordirectory.org lists various sponsor organizations that funds projects in different areas of work. The graphic shows the evolution of sponsorship models (from the book Fiscal Sponsorship: 6 Ways To Do It Right, 3rd Edition) over time in the 4 major fields of work.\nModel C has become the most popular model over time!", 
   width = 100
   )
 
@@ -222,22 +227,112 @@ plot_subtitle <- str_wrap(
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-plotdf2 |> 
+g <- plotdf2 |> 
   ggplot(aes(x = year, y = n)) +
   geom_stream(
-    aes(fill = model_type)
+    aes(fill = model_type),
+    colour = "white",
+    linewidth = 0.5
   ) +
   geom_text(
     data = tibble(year = 1990, 
-                  n = 20, 
+                  n = 15, 
                   project_category = pc_levels),
-    aes(label = project_category)) +
+    aes(label = project_category),
+    hjust = 0,
+    family = "title_font",
+    fontface = "bold",
+    size = ts,
+    colour = text_hil) +
   facet_wrap(~ project_category, ncol = 1) +
-  scale_colour_manual(
-    breaks = model_levels
+  scale_x_continuous(
+    expand = expansion(0),
+    position = "top",
+    breaks = seq(1990, 2020, 5)
+  ) +
+  paletteer::scale_fill_paletteer_d(
+    "ghibli::PonyoLight",
+    labels = plot_labels
+  ) +
+  guides(
+    fill = guide_legend(
+      title = "Fiscal Sponsorship Model",
+      position = "bottom",
+      direction = "horizontal",
+      override.aes = list(),
+      nrow = 1
+    )
+  ) +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_blank(),
+    panel.grid = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "bottom",
+    legend.text.position = "bottom",
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.direction = "horizontal",
+    plot.title = element_text(
+      family = "title_font",
+      hjust = 0.5,
+      size = 8 * ts,
+      face = "bold",
+      colour = text_hil,
+      margin = margin(1, 0, 1, 0, unit = "cm")
+    ),
+    plot.subtitle = element_text(
+      family = "body_font",
+      hjust = 0.5,
+      size = 2 * ts,
+      lineheight = 0.3,
+      margin = margin(0, 0, 0, 0, unit = "cm"),
+      colour = text_col
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      size = 2 * ts,
+      hjust = 0.5,
+      colour = text_hil
+    ),
+    axis.text.x = element_text(
+      family = "body_font",
+      hjust = 0.5,
+      size = 3 * ts,
+      margin = margin(0, 0, 0, 0, unit = "cm"),
+      colour = text_col
+    ),
+    legend.title = element_text(
+      family = "caption_font",
+      hjust = 0.5,
+      vjust = 1,
+      size = 4 * ts,
+      lineheight = 0.3,
+      margin = margin(0, 0.5, 0, 0, unit = "cm"),
+      colour = text_col
+    ),
+    legend.text = element_text(
+      family = "caption_font",
+      hjust = 0.5,
+      size = 2 * ts,
+      lineheight = 0.2,
+      margin = margin(0.3, 0, 0, 0, unit = "cm"),
+      colour = text_col
+    ),
+    legend.key.height = unit(1, "cm"),
+    legend.key.width = unit(3.5, "cm")
   )
-  
-  
+
 
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
@@ -247,7 +342,7 @@ ggsave(
   filename = here::here("docs", "tidy_fiscal_sponsor.png"),
   plot = g,
   width = 40,
-  height = 45,
+  height = 50,
   units = "cm",
   bg = bg_col
   )
