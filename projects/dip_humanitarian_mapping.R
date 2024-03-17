@@ -22,7 +22,8 @@
 # Findings ---------------------------------------------------------------------
 # =============================================================================#
 
-
+# Most damage is concentrated around two major cities: Gaza City and Khan 
+# Younis; and in the agricultural fields surrounding it.
 
 # =============================================================================#
 # Library Load-in---------------------------------------------------------------
@@ -66,7 +67,7 @@ gaza_b <- read_sf(here("data", "gazastrip_municipalboundaries", "GazaStrip_Munic
 
 # Load fonts
 # Font for titles
-font_add_google("Faster One",
+font_add_google("Road Rage",
   family = "title_font"
 ) 
 
@@ -76,16 +77,19 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Iceberg",
+font_add_google("Bubbler One",
   family = "body_font"
 ) 
 
 showtext_auto()
 
 # Define colours
-bg_col <- "white" # Background Colour
-text_col <- "#012169FF" # Colour for the text
-text_hil <- "#C8102EFF" # Colour for highlighted text
+mypal <- paletteer::paletteer_d("lisa::FridaKahlo")
+mypal2 <- c("#121510FF", "#6D8325FF", "#D6CFB7FF", "#E5AD4FFF", "#BD5630FF")
+
+bg_col <- mypal[3] # Background Colour
+text_col <- mypal[1] # Colour for the text
+text_hil <- mypal[5] |> darken(0.3) # Colour for highlighted text
 
 # Define Text Size
 ts <- unit(20, units = "cm") # Text Size
@@ -104,10 +108,10 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- "Deadly police chases"
-plot_caption <- paste0("**Data:** The San Francisco Chronicle", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
-subtitle_text <- "Geographical distribution, race, age and role of persons killed in Police Chases in the United States (2017 - 2022)"
-plot_subtitle <- str_wrap(subtitle_text, width = 70)
+plot_title <- "Gaza's Shattered Spaces"
+plot_caption <- paste0("**Data:** UNOSAT by United Nations Institute for Training and Research (UNITAR)", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
+subtitle_text <- "Utilizing R, ggplot2, and sf packages, we depict\nextensive building damage in Gaza Strip\nusing satellite data from UNOSAT and\nUNITAR. Significant agricultural field\ndevastation,especially in\nnorthern Gaza Strip,\nis also highlighted."
+plot_subtitle <- subtitle_text
 
 # ==============================================================================#
 # Data Visualization------------------------------------------------------------
@@ -117,26 +121,123 @@ g <- ggplot() +
   geom_sf(
     data = gaza1,
     aes(fill = Classname),
-    colour = "#dfffd4"
+    colour = bg_col
   ) +
-  scale_fill_manual(values = c("blue", "#dfffd4")) +
+  scale_fill_manual(
+    values = c(mypal[1], mypal[2]),
+    labels = c(
+      "Damaged agricultural land",
+      "Unaffected agricultural land"
+    )
+    ) +
   geom_sf(
     data = gaza2,
     aes(colour = factor(Damage_Status_4)),
     alpha = 0.5,
-    size = 0.5
+    size = 0.9,
+    pch = 20
   ) +
   scale_colour_manual(
-    values = c("#2e5c00", "red")
+    values = c(mypal[4], mypal[5]),
+    labels = c("Partial Building Damage", "Severe Building Damage")
   ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_continuous(expand = expansion(0)) +
+  labs(
+    x = NULL, 
+    y = NULL,
+    fill = "Agricultural land status",
+    colour = "Buildings' damage status",
+    caption = plot_caption) +
   geom_sf(
     data = gaza_b,
-    colour = "black",
-    fill = "transparent"
+    colour = mypal[1],
+    fill = "transparent",
+    linewidth = 0.5
+  ) +
+  geom_sf_label(
+    data = gaza_b,
+    aes(label = NAME),
+    size = ts,
+    colour = text_col,
+    hjust = 0.5,
+    family = "body_font",
+    fill = bg_col,
+    alpha = 0.7,
+    na.rm = TRUE,
+    label.padding = unit(0.1, "lines")
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        size = 10
+      )
+    ),
+    colour = guide_legend(
+      override.aes = list(
+        size = 20,
+        alpha = 1
+      )
+    )
+  ) +
+  annotate(
+    geom = "text",
+    x = 34.20, y = 31.57,
+    label = plot_title,
+    family = "title_font",
+    size = 6 * ts,
+    colour = text_hil,
+    hjust = 0,
+    vjust = 1
+  ) +
+  annotate(
+    geom = "text",
+    x = 34.20, y = 31.53,
+    label = plot_subtitle,
+    family = "body_font",
+    size = 2 * ts,
+    colour = text_col,
+    hjust = 0,
+    vjust = 1,
+    lineheight = 0.4
   ) +
   theme_map() +
   theme(
-    legend.position.inside = c(0.8, 0.2)
+    legend.position.inside = c(0.6, 0.2),
+    plot.background = element_rect(
+      fill = mypal[3],
+      colour = mypal[3]
+    ),
+    legend.title = element_text(
+      family = "body_font",
+      size = 7 * ts,
+      hjust = 0,
+      colour = text_col,
+      margin = margin(5, 0, 5, 0, unit = "mm")
+    ),
+    legend.text = element_text(
+      family = "body_font",
+      size = 5 * ts,
+      hjust = 0,
+      vjust = 0.5,
+      colour = text_col,
+      margin = margin(5, 0, 5, 5, unit = "mm")
+    ),
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.box.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.box.spacing = unit(4, "cm"),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      size = 3 * ts,
+      hjust = 0.5,
+      colour = text_hil
+    )
   )
 
 # =============================================================================#
@@ -149,5 +250,5 @@ ggsave(
   width = 40,
   height = 45,
   units = "cm",
-  bg = "white"
+  bg = mypal[3]
 )
