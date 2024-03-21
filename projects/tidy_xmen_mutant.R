@@ -18,6 +18,7 @@ library(patchwork)      # For compiling plots
 library(figpatch)       # Images in patchwork
 library(magick)         # Work with Images and Logos
 library(colorspace)     # Lighten and darken Colours
+library(scales)         # Scale Labels in ggplot2
 
 #==============================================================================#
 # Data Load-in------------------------------------------------------------------
@@ -25,16 +26,53 @@ library(colorspace)     # Lighten and darken Colours
 
 # Option 2: Read directly from GitHub
 
-mutant_moneyball <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-03-19/mutant_moneyball.csv')
+mutant_moneyball <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-03-19/mutant_moneyball.csv') |> 
+  clean_names()
 
 #==============================================================================#
 # Exploratory Data Analysis-----------------------------------------------------
 #==============================================================================#
 
-library(summarytools)
+# library(summarytools)
+# dfSummary(mutant_moneyball) |> view()
 
-dfSummary(mutant_moneyball) |> view()
+mutant_moneyball |> 
+  select(member, total_issues) |> 
+  arrange(desc(total_issues)) |> 
+  print(n = Inf)
 
+xmen_names <- tibble(
+  member = c("scottSummers", "jeanGrey", "charlesXavier", "hankMcCoy",
+             "ericMagnus", "loganHowlett", "ororoMunroe", "kurtWagner"),
+  full_name = c("Scott Summers", "Jean Grey", "Charles Xavier", "Hank McCoy",
+                "Erik Lehnsherr", "Logan Howlett", "Ororo Munroe", "Kurt Wagner"),
+  superhero_name = c("Cyclops", "Phoenix", "Professor X", "Beast",
+                     "Magneto", "Wolverine", "Storm", "Nightcrawler"),
+  url = c(
+    "https://upload.wikimedia.org/wikipedia/en/e/e9/Cyclops_%28Scott_Summers_circa_2019%29.png",
+    "https://static.wikia.nocookie.net/mua/images/2/2c/Dlc_img_08.png/revision/latest?cb=20191216041152",
+    "https://upload.wikimedia.org/wikipedia/en/9/9e/Charles_Xavier_%28Patrick_Stewart%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/en/0/0b/Beast_%28Hank_McCoy_-_circa_2019%29.png",
+    "https://upload.wikimedia.org/wikipedia/en/e/e9/Magneto_%28Marvel_Comics_character%29.jpg",
+    "https://upload.wikimedia.org/wikipedia/en/5/5d/Wolverine_%28James_%27Logan%27_Howlett%29.png",
+    "https://upload.wikimedia.org/wikipedia/en/3/34/Storm_%28Ororo_Munroe%29.png",
+    "https://upload.wikimedia.org/wikipedia/en/7/7b/Nightcrawler_%28Kurt_Wagner_circa_2018%29.png"
+  )
+)
+
+df1 <- mutant_moneyball |> 
+  filter(member %in% xmen_names$member) |> 
+  select(member, total_issues, total_value_heritage,
+         total_value_ebay) |> 
+  pivot_longer(
+    cols = -member,
+    names_to = "facet_var",
+    values_to = "value"
+  ) |> 
+  left_join(xmen_names) |> 
+  select(-member) |> 
+  mutate(names = paste0(full_name, "\n", superhero_name)) |> 
+  select(names, facet_var, value, url)
 
 
 #==============================================================================#
@@ -89,14 +127,35 @@ subtitle_text <- ""
 subtitle_text <- ""
 plot_subtitle <- paste(strwrap(subtitle_text, 150), collapse = "\n")
 
-plot_caption <- paste0("**Data & Inspiration:** JLaw's R Blog | ", "**Graphics:** ", social_caption)
+plot_caption <- paste0("**Data & Inspiration:** | ", "**Graphics:** ", social_caption_1, "**Code:**", social_caption_2)
 
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
-
-
+ggplot(
+  data = df1,
+  mapping = aes(
+    x = reorder(names, -value),
+    y = value
+  )
+) +
+  geom_col() +
+  facet_wrap(
+    ~ facet_var,
+    scales = "free_y",
+    ncol = 1
+  ) +
+  scale_y_continuous(
+    labels = label_number(scale_cut = cut_short_scale())
+  ) +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  )
 
   theme_minimal() +
   theme(
