@@ -5,7 +5,7 @@
 #==============================================================================#
 
 # Data Wrangling Libraries
-library(tidyverse)      # Data Wrangling and Plotting
+library(tidyverse) # Data Wrangling and Plotting
 library(here)           # Files location and loading
 library(janitor)
 
@@ -35,6 +35,12 @@ mutant_moneyball <- readr::read_csv('https://raw.githubusercontent.com/rfordatas
 
 # library(summarytools)
 # dfSummary(mutant_moneyball) |> view()
+
+
+#==============================================================================#
+# Data Wrangling----------------------------------------------------------------
+#==============================================================================#
+
 
 mutant_moneyball |> 
   select(member, total_issues) |> 
@@ -74,23 +80,16 @@ df1 <- mutant_moneyball |>
   mutate(names = paste0(full_name, "\n", superhero_name)) |> 
   select(names, facet_var, value, url)
 
-
-#==============================================================================#
-# Data Wrangling----------------------------------------------------------------
-#==============================================================================#
-
-
-
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
 
 # Load fonts
-font_add_google("Graduate", 
+font_add_google("Trade Winds", 
                 family = "title_font")       # Font for titles
 font_add_google("Saira Extra Condensed", 
                 family = "caption_font")     # Font for the caption
-font_add_google("Oswald", 
+font_add_google("Zen Dots", 
                 family = "body_font")        # Font for plot text
 showtext_auto()
 
@@ -98,18 +97,16 @@ showtext_auto()
 # Credits: Used code from
 
 # Creating a Colour Palette for the Visualization
-mypal <- paletteer::paletteer_d("nord::victory_bonds")
+mypal <- paletteer::paletteer_d("MoMAColors::Dali")
 mypal
 
 # Define colours
-low_col <- "#fa0000"                  # Heat map: low colour
-hi_col <- "#0800fa"                   # Heat map: high colour
-bg_col <- "#e8e8e8"                   # Background Colour
-text_col <- "#00004d"                 # Colour for the text
-text_hil <- "#700000"                 # Colour for highlighted text
+text_col <- "#700000"                 # Colour for the text
+text_hil <- "#DC3B34FF"               # Colour for highlighted text
+bg_col <- "black"                     # Background Colour
 
 # Define Text Size
-ts = unit(20, units = "cm")                             # Text Size
+ts = unit(40, units = "cm")                             # Text Size
 
 # Caption stuff
 sysfonts::font_add(family = "Font Awesome 6 Brands",
@@ -122,22 +119,22 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- ""
-subtitle_text <- ""
-subtitle_text <- ""
-plot_subtitle <- paste(strwrap(subtitle_text, 150), collapse = "\n")
+plot_title <- "X-Men Mutant Moneyball"
+subtitle_text <- "Comparison of the main characters in X-Men Mutant comic-books from 1960s to 1990s"
+plot_subtitle <- paste(strwrap(subtitle_text, 50), collapse = "\n")
 
-plot_caption <- paste0("**Data & Inspiration:** | ", "**Graphics:** ", social_caption_1, "**Code:**", social_caption_2)
+plot_caption <- paste0("**Data & Inspiration:** X-Men Mutant Moneyball by Anderson Evans |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
-ggplot(
+g <- ggplot(
   data = df1,
   mapping = aes(
     x = reorder(names, -value),
-    y = value
+    y = value,
+    fill = names
   )
 ) +
   geom_col() +
@@ -155,43 +152,50 @@ ggplot(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption
-  )
-
+  ) +
+  scale_fill_manual(values = mypal) +
   theme_minimal() +
   theme(
-  panel.grid = element_blank(),
-  plot.caption =  element_textbox(family = "caption_font",
-                                  hjust = 0.5,
-                                  colour = text_col,
-                                  size = 1.5 * ts),
-  plot.title   =     element_text(hjust = 0.5,
-                                  size = 3*ts,
-                                  family = "title_font",
-                                  face = "bold",
-                                  colour = text_hil,
-                                  margin = margin(4,0,2,0)),
-  plot.subtitle    = element_text(hjust = 0,
-                                  size = 1.6 * ts,
-                                  family = "body_font",
-                                  colour = text_col,
-                                  margin = margin(5,0,2,0),
-                                  lineheight = 0.35),
-  plot.background =  element_rect(fill = bg_col,
-                                  color = bg_col,
-                                  linewidth = 0),
-  axis.text = element_text(size = 1.5 * ts,
-                           family = "body_font",
-                           colour = text_col,
-                           face = "bold",
-                           margin = margin(0,0,0,0)),
-  axis.title.x = element_text(size = 2 * ts,
-                           family = "body_font",
-                           colour = text_col,
-                           margin = margin(0,0,0,0),
-                           hjust = 1),
-  axis.line.x = element_line(color = "grey",
-                             arrow = arrow(length = unit(3, "mm"))),
-  plot.title.position = "plot"
+    panel.grid = element_blank(),
+    plot.caption =  element_textbox(family = "caption_font",
+                                    hjust = 0.5,
+                                    colour = text_col,
+                                    size = 1.8 * ts),
+    plot.title   =     element_text(hjust = 0.5,
+                                    size = 6 * ts,
+                                    family = "title_font",
+                                    face = "bold",
+                                    colour = text_hil,
+                                    margin = margin(2, 0, 0, 0, "cm")),
+    plot.subtitle    = element_text(size = 3 * ts,
+                                    family = "body_font",
+                                    colour = text_col,
+                                    margin = margin(1, 0, 1, 0, "cm"),
+                                    lineheight = 0.35,
+                                    hjust = 0.5),
+    plot.background =  element_rect(fill = bg_col,
+                                    color = bg_col,
+                                    linewidth = 0),
+    axis.text.y = element_text(size = 1.5 * ts,
+                             family = "body_font",
+                             colour = text_col,
+                             face = "bold",
+                             margin = margin(0, 0, 0, 0, "cm")),
+    axis.text.x = element_text(size = 2 * ts,
+                               family = "caption_font",
+                               lineheight = 0.25,
+                               colour = text_col,
+                               hjust = 1,
+                               angle = 90,
+                               margin = margin(0, 0, 0, 0),
+                               vjust = 0.5),
+    strip.text = element_text(size = 2 * ts,
+                              family = "body_font",
+                              colour = text_hil,
+                              margin = margin(1,0,0,0, "cm"),
+                              hjust = 0.5),
+    plot.title.position = "plot",
+    legend.position = "none"
 )
 
 #=============================================================================#
@@ -201,8 +205,8 @@ ggplot(
 ggsave(
   filename = here::here("docs", "tidy_xmen_mutant.png"),
   plot = g,
-  width = 20, 
-  height = 20, 
+  width = 40, 
+  height = 45, 
   units = "cm",
   bg = bg_col
 )
