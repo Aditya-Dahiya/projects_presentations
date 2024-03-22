@@ -137,7 +137,11 @@ g <- ggplot(
     fill = names
   )
 ) +
-  geom_col() +
+  ggfx::with_outer_glow(
+    geom_col(),
+    colour = "white",
+    sigma = 15
+  )  +
   facet_wrap(
     ~ facet_var,
     scales = "free_y",
