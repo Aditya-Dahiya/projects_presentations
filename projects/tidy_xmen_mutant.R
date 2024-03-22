@@ -59,11 +59,11 @@ xmen_names <- tibble(
   url = c(
     "https://upload.wikimedia.org/wikipedia/en/e/e9/Cyclops_%28Scott_Summers_circa_2019%29.png",
     "https://static.wikia.nocookie.net/mua/images/2/2c/Dlc_img_08.png/revision/latest?cb=20191216041152",
-    "https://upload.wikimedia.org/wikipedia/en/9/9e/Charles_Xavier_%28Patrick_Stewart%29.jpg",
+    "https://cafans.b-cdn.net/images/Category_90395/subcat_218554/k0TVnplR_0506231109211gpadd.jpg",
     "https://upload.wikimedia.org/wikipedia/en/0/0b/Beast_%28Hank_McCoy_-_circa_2019%29.png",
-    "https://upload.wikimedia.org/wikipedia/en/e/e9/Magneto_%28Marvel_Comics_character%29.jpg",
-    "https://upload.wikimedia.org/wikipedia/en/5/5d/Wolverine_%28James_%27Logan%27_Howlett%29.png",
-    "https://upload.wikimedia.org/wikipedia/en/3/34/Storm_%28Ororo_Munroe%29.png",
+    "https://i.etsystatic.com/5581993/r/il/981cf7/1705574798/il_570xN.1705574798_kn5a.jpg",
+    "https://m.media-amazon.com/images/I/91xyw0E8ZaL._AC_UF1000,1000_QL80_.jpg",
+    "https://i.redd.it/ghqjtd7wgar91.png",
     "https://upload.wikimedia.org/wikipedia/en/7/7b/Nightcrawler_%28Kurt_Wagner_circa_2018%29.png"
   )
 )
@@ -79,11 +79,15 @@ df1 <- mutant_moneyball |>
   ) |> 
   left_join(xmen_names) |> 
   select(-member) |> 
-  mutate(names = paste0(full_name, "\n", superhero_name)) |> 
-  select(names, facet_var, value, url, superhero_name)
+  mutate(superhero_name = fct(
+    superhero_name, 
+    levels = c("Cyclops", "Phoenix", "Professor X", "Beast",
+               "Magneto", "Wolverine", "Storm", "Nightcrawler")
+  ))
 
+# Creating facet labels
 f2 <- c(
-  "Total Number of Issues each character appeared in",
+  "Total Number of Issues the character appeared in",
   "Total value of character's issues (Heritage highest sale, in US Dollars)",
   "Total value of character's issues eBay sales (2022) in US Dollars"
 )
@@ -93,27 +97,35 @@ names(f2) <- df1 |>
   pull(facet_var)
 
 # Making logos for characters to display on the x-axis
-mk_logo <- function(url){
+mk_logo <- function(url, filename){
   image_read(url) |> 
     image_resize("x300") |> 
     circle_crop(border_size = 2, 
                 border_colour = text_col) |> 
-    image_read()
+    image_read() |> 
+    image_write(path = filename)
 }
-df1 |> distinct(superhero_name)
 
-xaxis_labels <- c(
-  Beast = "<img src = {mk_logo(df1$url[1])} width = '100' /> <br> {df1$names[1]}",
-  Cyclops = "<img src = {mk_logo(df1$url[2])} width = '100' /> <br> {df1$names[2]}",
-  Phoenix = "<img src = {mk_logo(df1$url[3])} width = '100' /> <br> {df1$names[3]}",
-  Storm = "<img src = {mk_logo(df1$url[4])} width = '100' /> <br> {df1$names[4]}",
-  Nightcrawler = "<img src = {mk_logo(df1$url[5])} width = '100' /> <br> {df1$names[5]}",
-  Wolverine = "<img src = {mk_logo(df1$url[6])} width = '100' /> <br> {df1$names[6]}",
-  Magneto = "<img src = {mk_logo(df1$url[7])} width = '100' /> <br> {df1$names[7]}",
-  `Professor X` = "<img src = {mk_logo(df1$url[8])} width = '100' /> <br> {df1$names[8]}"
-)
-  
-  
+# A data-frame tibble for characters to geenrate x-axis images
+df2 <- df1 |> 
+  group_by(superhero_name) |> 
+  slice_head(n = 1) |> 
+  select(-facet_var, - value)
+
+# Saving logo files
+for (i in 1:8) {
+  mk_logo(df2$url[i], paste0("xmenimage", i, ".png"))
+}
+
+# Creating a labels vector
+xaxis_labels <- c()
+
+for (i in 1:8) {
+  xaxis_labels[i] = paste0("<img src='xmenimage", i, ".png' width='100' /><br>", df2$full_name[i], "<br>", df2$superhero_name[i] )
+}  
+
+names(xaxis_labels) <- df2$superhero_name
+
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
@@ -131,7 +143,7 @@ showtext_auto()
 # Credits: Used code from
 
 # Creating a Colour Palette for the Visualization
-mypal <- paletteer::paletteer_d("MoMAColors::Dali")
+mypal <- paletteer::paletteer_d("MetBrewer::Nizami")
 mypal
 
 # Define colours
@@ -166,7 +178,7 @@ plot_caption <- paste0("**Data & Inspiration:** X-Men Mutant Moneyball by Anders
 g <- ggplot(
     data = df1,
     mapping = aes(
-      x = reorder(superhero_name, -value),
+      x = superhero_name,
       y = value,
       fill = superhero_name
     )
@@ -198,7 +210,8 @@ g <- ggplot(
     plot.caption =  element_textbox(family = "caption_font",
                                     hjust = 0.5,
                                     colour = text_col,
-                                    size = 1.8 * ts),
+                                    size = 1.8 * ts,
+                                    margin = margin(1.5, 0, 0, 0, "cm")),
     plot.title   =     element_text(hjust = 0.5,
                                     size = 6 * ts,
                                     family = "title_font",
@@ -223,10 +236,9 @@ g <- ggplot(
                                family = "caption_font",
                                lineheight = 0.25,
                                colour = text_col,
-                               hjust = 1,
+                               hjust = 0.5,
                                margin = margin(0, 0, 0, 0),
-                               vjust = 0.5,
-                               face = "bold"),
+                               vjust = 0.5),
     strip.text = element_text(size = 4 * ts,
                               family = "caption_font",
                               colour = text_hil,
@@ -249,38 +261,9 @@ ggsave(
   bg = bg_col
 )
 
+# Housecleaning: Remove temporarily stored image files
+# Do no harm and leave the world an untouched place
 
-
-
-
-
-
-
-
-
-# Not to Run
-scale_fac = 0.9
-
-pimage <- axis_canvas(
-  g, 
-  axis = "x") + 
-  draw_image(mk_logo(df1$url[1]), x = 0.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[2]), x = 1.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[3]), x = 2.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[4]), x = 3.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[5]), x = 4.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[6]), x = 5.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[7]), x = 6.5, scale = scale_fac) +
-  draw_image(mk_logo(df1$url[8]), x = 7.5, scale = scale_fac)
-
-
-# insert the image strip into the plot
-g2 <- ggdraw(
-  insert_xaxis_grob(
-    g, 
-    pimage, 
-    position = "bottom",
-    height = unit(25, "mm")
-  )
-)
-
+for (i in 1:8) {
+  unlink(paste0("xmenimage", i, ".png"))
+}
