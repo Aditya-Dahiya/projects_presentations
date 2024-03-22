@@ -19,6 +19,8 @@ library(figpatch)       # Images in patchwork
 library(magick)         # Work with Images and Logos
 library(colorspace)     # Lighten and darken Colours
 library(scales)         # Scale Labels in ggplot2
+library(cropcircles)    # Circular cropping of the image
+library(cowplot)        # Adding images to x-axis
 
 #==============================================================================#
 # Data Load-in------------------------------------------------------------------
@@ -78,8 +80,40 @@ df1 <- mutant_moneyball |>
   left_join(xmen_names) |> 
   select(-member) |> 
   mutate(names = paste0(full_name, "\n", superhero_name)) |> 
-  select(names, facet_var, value, url)
+  select(names, facet_var, value, url, superhero_name)
 
+f2 <- c(
+  "Total Number of Issues each character appeared in",
+  "Total value of character's issues (Heritage highest sale, in US Dollars)",
+  "Total value of character's issues eBay sales (2022) in US Dollars"
+)
+
+names(f2) <- df1 |> 
+  distinct(facet_var) |> 
+  pull(facet_var)
+
+# Making logos for characters to display on the x-axis
+mk_logo <- function(url){
+  image_read(url) |> 
+    image_resize("x300") |> 
+    circle_crop(border_size = 2, 
+                border_colour = text_col) |> 
+    image_read()
+}
+df1 |> distinct(superhero_name)
+
+xaxis_labels <- c(
+  Beast = "<img src = {mk_logo(df1$url[1])} width = '100' /> <br> {df1$names[1]}",
+  Cyclops = "<img src = {mk_logo(df1$url[2])} width = '100' /> <br> {df1$names[2]}",
+  Phoenix = "<img src = {mk_logo(df1$url[3])} width = '100' /> <br> {df1$names[3]}",
+  Storm = "<img src = {mk_logo(df1$url[4])} width = '100' /> <br> {df1$names[4]}",
+  Nightcrawler = "<img src = {mk_logo(df1$url[5])} width = '100' /> <br> {df1$names[5]}",
+  Wolverine = "<img src = {mk_logo(df1$url[6])} width = '100' /> <br> {df1$names[6]}",
+  Magneto = "<img src = {mk_logo(df1$url[7])} width = '100' /> <br> {df1$names[7]}",
+  `Professor X` = "<img src = {mk_logo(df1$url[8])} width = '100' /> <br> {df1$names[8]}"
+)
+  
+  
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
@@ -101,12 +135,12 @@ mypal <- paletteer::paletteer_d("MoMAColors::Dali")
 mypal
 
 # Define colours
-text_col <- "#700000"                 # Colour for the text
+text_col <- "#DC3B34FF"               # Colour for the text
 text_hil <- "#DC3B34FF"               # Colour for highlighted text
 bg_col <- "black"                     # Background Colour
 
 # Define Text Size
-ts = unit(40, units = "cm")                             # Text Size
+ts = unit(40, units = "cm")           # Text Size
 
 # Caption stuff
 sysfonts::font_add(family = "Font Awesome 6 Brands",
@@ -121,7 +155,7 @@ social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 # Add text to plot--------------------------------------------------------------
 plot_title <- "X-Men Mutant Moneyball"
 subtitle_text <- "Comparison of the main characters in X-Men Mutant comic-books from 1960s to 1990s"
-plot_subtitle <- paste(strwrap(subtitle_text, 50), collapse = "\n")
+plot_subtitle <- str_wrap(subtitle_text, 100)
 
 plot_caption <- paste0("**Data & Inspiration:** X-Men Mutant Moneyball by Anderson Evans |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
@@ -130,25 +164,25 @@ plot_caption <- paste0("**Data & Inspiration:** X-Men Mutant Moneyball by Anders
 #==============================================================================#
 
 g <- ggplot(
-  data = df1,
-  mapping = aes(
-    x = reorder(names, -value),
-    y = value,
-    fill = names
-  )
-) +
-  ggfx::with_outer_glow(
-    geom_col(),
-    colour = "white",
-    sigma = 15
-  )  +
+    data = df1,
+    mapping = aes(
+      x = reorder(superhero_name, -value),
+      y = value,
+      fill = superhero_name
+    )
+  ) +
+  geom_col() +
   facet_wrap(
     ~ facet_var,
     scales = "free_y",
-    ncol = 1
+    ncol = 1,
+    labeller = as_labeller(f2)
   ) +
   scale_y_continuous(
     labels = label_number(scale_cut = cut_short_scale())
+  ) +
+  scale_x_discrete(
+    labels = xaxis_labels
   ) +
   labs(
     x = NULL,
@@ -172,7 +206,7 @@ g <- ggplot(
                                     colour = text_hil,
                                     margin = margin(2, 0, 0, 0, "cm")),
     plot.subtitle    = element_text(size = 3 * ts,
-                                    family = "body_font",
+                                    family = "caption_font",
                                     colour = text_col,
                                     margin = margin(1, 0, 1, 0, "cm"),
                                     lineheight = 0.35,
@@ -180,23 +214,23 @@ g <- ggplot(
     plot.background =  element_rect(fill = bg_col,
                                     color = bg_col,
                                     linewidth = 0),
-    axis.text.y = element_text(size = 1.5 * ts,
-                             family = "body_font",
+    axis.text.y = element_text(size = 2.5 * ts,
+                             family = "caption_font",
                              colour = text_col,
                              face = "bold",
                              margin = margin(0, 0, 0, 0, "cm")),
-    axis.text.x = element_text(size = 2 * ts,
+    axis.text.x = element_markdown(size = 2 * ts,
                                family = "caption_font",
                                lineheight = 0.25,
                                colour = text_col,
                                hjust = 1,
-                               angle = 90,
                                margin = margin(0, 0, 0, 0),
-                               vjust = 0.5),
-    strip.text = element_text(size = 2 * ts,
-                              family = "body_font",
+                               vjust = 0.5,
+                               face = "bold"),
+    strip.text = element_text(size = 4 * ts,
+                              family = "caption_font",
                               colour = text_hil,
-                              margin = margin(1,0,0,0, "cm"),
+                              margin = margin(1.2, 0, 0.4, 0, "cm"),
                               hjust = 0.5),
     plot.title.position = "plot",
     legend.position = "none"
@@ -210,7 +244,43 @@ ggsave(
   filename = here::here("docs", "tidy_xmen_mutant.png"),
   plot = g,
   width = 40, 
-  height = 45, 
+  height = 55, 
   units = "cm",
   bg = bg_col
 )
+
+
+
+
+
+
+
+
+
+
+# Not to Run
+scale_fac = 0.9
+
+pimage <- axis_canvas(
+  g, 
+  axis = "x") + 
+  draw_image(mk_logo(df1$url[1]), x = 0.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[2]), x = 1.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[3]), x = 2.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[4]), x = 3.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[5]), x = 4.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[6]), x = 5.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[7]), x = 6.5, scale = scale_fac) +
+  draw_image(mk_logo(df1$url[8]), x = 7.5, scale = scale_fac)
+
+
+# insert the image strip into the plot
+g2 <- ggdraw(
+  insert_xaxis_grob(
+    g, 
+    pimage, 
+    position = "bottom",
+    height = unit(25, "mm")
+  )
+)
+
