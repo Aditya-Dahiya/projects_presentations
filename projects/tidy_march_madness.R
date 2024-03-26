@@ -8,17 +8,20 @@
 library(tidyverse)      # Data Wrangling and Plotting
 library(here)           # Files location and loading
 library(janitor)        # Cleaning names etc. of messy dataset
+library(glue)           # To apste together text for ggtext
 
 # Data Visualization Libraries
 library(showtext)       # Using Fonts More Easily in R Graphs
 library(ggimage)        # Using Images in ggplot2
 library(fontawesome)    # Social Media icons
 library(ggtext)         # Markdown Text in ggplot2
+library(scales)         # Scale Labels in ggplot2
+
+
 library(patchwork)      # For compiling plots
 library(figpatch)       # Images in patchwork
 library(magick)         # Work with Images and Logos
 library(colorspace)     # Lighten and darken Colours
-library(scales)         # Scale Labels in ggplot2
 library(cropcircles)    # Circular cropping of the image
 library(cowplot)        # Adding images to x-axis
 
@@ -44,23 +47,37 @@ rm(tuesdata)
 # Data Wrangling----------------------------------------------------------------
 #==============================================================================#
 
+col1 <- "darkred"
+col2 <- "blue"
+col3 <- "darkgreen"
 
 df <- results |> 
-  filter(games > 20)
+  filter(games > 20) |> 
+  mutate(
+    sublabel = glue("<i style='color:{col1}'>C {champ}</i> | <i style='color:{col2}'>F {f2}</i> | <i style='color:{col3}'>SF {f4}</i>")
+  )
+
+
 
 
 ggplot(
+  data = df,
   aes(
     x = games, 
     y = winpercent,
-    label = paste0(
-      team, "\n Champion:", champ, " | Finals: ", f2, " | Semi-finals: ", f4  
-    )
+    label = team
   )
-) +
-  geom_text()
-
-names(results)
+  ) +
+  geom_text(
+    size = 6
+  ) +
+  geom_richtext(
+    aes(
+      y = winpercent - 0.05,
+      label = sublabel
+    ),
+    size = 3
+  )
 
   
 #==============================================================================#
