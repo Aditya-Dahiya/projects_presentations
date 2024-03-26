@@ -59,7 +59,7 @@ showtext_auto()
 # Credits: Used code from
 
 # Creating a Colour Palette for the Visualization
-mypal <- paletteer::paletteer_d("nbapalettes::hornets")
+mypal <- paletteer::paletteer_d("nbapalettes::knicks_retro")
 mypal
 
 # Define colours
