@@ -26,6 +26,7 @@ library(tidyverse)
 library(janitor)
 library(here)
 library(sf)
+library(osmdata)
 
 # Final plot (ggplot2) tools
 library(scales)
@@ -42,9 +43,74 @@ library(patchwork)
 # Data Load-in, EDA & Data Wrangling--------------------------------------------
 # =============================================================================#
 
-aviation <- read_csv("https://raw.githubusercontent.com/jonkeegan/faa-navigation-waypoints/main/faa_navigation_waypoints.csv")
+# Aviation Way Points Data
+aviation <- read_csv("https://raw.githubusercontent.com/jonkeegan/faa-navigation-waypoints/main/faa_navigation_waypoints.csv") 
+
+# Getting a map of Boston
+bos <- opq("Boston")
+
+# Get Roads Data
+bos_roads <- bos |>
+  add_osm_feature(
+    key = "highway",
+    value = c("motorway", "trunk", "primary", "secondary", "tertiary")) |>
+  osmdata_sf()
 
 
+df <- aviation |> 
+  filter(state == "MASSACHUSETTS") |> 
+  filter(str_detect(description, "BOS")) |> 
+  mutate(
+    description = str_sub(description, start = -30L)
+  ) |> 
+  separate_wider_delim(
+    cols = description,
+    delim = " ",
+    names = c("lat", "long")
+  ) |> 
+  mutate(
+    lat = str_replace(lat, "\\..*", ""),
+    long = str_replace(long, "\\..*", ""),
+    lat = str_replace_all(lat, "-", ""),
+    long = str_replace_all(long, "-", ""),
+    lat = as.numeric(lat) / 1e4,
+    long = as.numeric(long) / 1e4
+  ) |> 
+  rename(av_point = fix_identifier)
+
+# Boston City Limits Bounding box
+lat_limits <- c(42.25, 42.45)
+long_limits <- c(-71.2, -70.9)
+
+major_roads <- bos_roads$osm_lines |>
+  filter(highway %in% c("motorway", "trunk")) |> 
+  st_crop(
+    xmin = long_limits[1],
+    xmax = long_limits[2],
+    ymin = lat_limits[1],
+    ymax = lat_limits[2]
+  )
+
+minor_roads <- bos_roads$osm_lines |>
+  filter(!(highway %in% c("motorway", "trunk"))) |> 
+  st_crop(
+    xmin = long_limits[1],
+    xmax = long_limits[2],
+    ymin = lat_limits[1],
+    ymax = lat_limits[2]
+  )
+
+boston_map <- rnaturalearth::ne_countries(
+  sovereignty = "United States of America",
+  returnclass = "sf"
+  ) |> 
+  st_transform(crs = st_crs(major_roads)) |> 
+  st_crop(
+    xmin = long_limits[1],
+    xmax = long_limits[2],
+    ymin = lat_limits[1],
+    ymax = lat_limits[2]
+  )
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 # =============================================================================#
@@ -101,6 +167,28 @@ plot_subtitle <- subtitle_text
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
+g <- ggplot() +
+  geom_sf(
+    data = major_roads,
+    colour = "black",
+    alpha = 0.8,
+    linewidth = 0.5
+  ) +
+  geom_sf(
+    data = minor_roads,
+    colour = "black",
+    alpha = 0.4,
+    linewidth = 0.2
+  ) +
+  geom_sf(
+    data = boston_map,
+    colour = "black",
+    linewidth = 1,
+    fill = "transparent"
+  ) +
+  labs(title = "Boston") +
+  theme_minimal()
+  
 
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
@@ -112,5 +200,5 @@ ggsave(
   width = 40,
   height = 45,
   units = "cm",
-  bg = mypal[3]
+  bg = "white"
 )
