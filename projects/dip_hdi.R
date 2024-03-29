@@ -46,8 +46,29 @@ hdi <- read_csv(url)
 
 names(hdi)
 
-hdi |> 
-  select(contains("hdi_"))
+dflong <- hdi |> 
+  select(iso3, 
+         country, 
+         region, 
+         (contains("hdi_") & !(contains("_m_")) & !(contains("_f_")) & !(contains("ihdi")) & !(contains("phdi")) & !(contains("rank"))
+          )
+         )
+
+df1 <- dflong |> 
+  pivot_longer(
+    cols = contains("hdi"),
+    names_to = "year",
+    values_to = "value"
+  ) |> 
+  mutate(year = parse_number(year))
+
+df_imp <- dflong |> 
+  mutate(improvement = hdi_2022 - hdi_2020) |> 
+  select(country, improvement)
+
+df_imp |> 
+  arrange(improvement)
+
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 # =============================================================================#
@@ -103,8 +124,18 @@ plot_subtitle <- subtitle_text
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
+df1 |> 
+  ggplot(
+    aes(
+      x = year,
+      y = value,
+      group = country
+    )
+  ) +
+  geom_line() +
+  facet_wrap(~ region)
 
-
+df1
 # =============================================================================#
 # Image Saving-----------------------------------------------------------------
 # =============================================================================#
