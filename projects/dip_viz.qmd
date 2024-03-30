@@ -3492,4 +3492,177 @@ ggsave(
 
 ```
 
-![](/docs/dip_hdi.png){#fig-hdi}
+![Line plot for HDI for different countries over time. Worst performers (red) and best performers (green) are highlighted.](/docs/dip_hdi.png){#fig-hdi}
+
+### An animated scatter plot to show trends over time
+
+Further, in @fig-hdi-anim, I use **{`gganimate`}** [@gganimate-2] to show a scatter-plot (for 6 different regions), where each dot represents a country, showing political representation (% seats by women in parliament) on Y-axis vs. mean years of schooling for females on X-axis, shows positive correlation in Europe, Latin America and Sub-Saharan Africa. However, there is a negative correlation in East Asia and South Asia, and its worsening over time in these regions.
+
+```{r}
+#| eval: false
+
+# Note this code picks up from the previous chunk of code
+
+
+# =============================================================================#
+# Animation: Female Schooling vs. Female Political Participation ---------------
+# =============================================================================#
+
+# Another EDA: Schooling years of females vs. Share of Seats in parliament held by women
+df3 <- hdi |> 
+  select(country, region, contains("mys_f_"), (contains("pr_f_") & !contains("lfpr_f"))) |> 
+  pivot_longer(
+    cols = -c(country, region),
+    names_to = "var_full",
+    values_to = "value"
+  ) |> 
+  separate_wider_delim(
+    cols = var_full,
+    delim = "_",
+    names = c("indicator", NA, "year")
+  ) |> 
+  mutate(
+    year = as.numeric(year),
+    indicator = case_when(
+      indicator == "mys" ~ "mean_yrs_school",
+      indicator == "pr" ~ "parl_rep",
+      .default = NA
+    )
+  ) |> 
+  pivot_wider(
+    id_cols = c(country, year, region),
+    names_from = indicator,
+    values_from = value
+  )
+
+###### Start Making animation: Parameters ######  
+library(gganimate)
+
+palcol2 <- "grey"
+mypal1 <- paletteer::paletteer_d("ggthemes::excel_Ion_Boardroom")
+font_add_google("Dosis", family = "anim_font")
+font_add_google("Saira Extra Condensed", family = "caption_font") 
+
+showtext_auto()
+
+regions <- c(
+  "Arab States",
+  "East Asia & Pacific",
+  "Europe and Central Asia",
+  "Latin America & Caribbean",
+  "South Asia",
+  "Sub-Saharan Africa"
+)
+abbr_regions <- c("AS", "EAP", "ECA", "LAC", "SA", "SSA")
+
+strip_region_labels <- paste0(
+  "<b style='color:",
+  mypal1,
+  "'>", 
+  regions,
+  "</b>"
+  )
+names(strip_region_labels) <- abbr_regions
+
+simple_labels <- regions
+names(simple_labels) <- abbr_regions
+
+##### The Plot to animate ########
+
+ganim <- ggplot(
+  data = df3 |> filter(!is.na(region)),
+  mapping = aes(
+    x = mean_yrs_school,
+    y = parl_rep,
+    colour = region
+    )
+  ) +
+  geom_point(
+    aes(group = country),
+    size = 4
+  ) +
+  geom_smooth(
+    method = "lm", 
+    se = FALSE,
+    colour = "darkgrey",
+    linewidth = 1
+    ) +
+  facet_wrap(~ region,labeller = labeller(region = simple_labels)) +
+  scale_x_continuous(
+    limits = c(0, 14),
+    breaks = seq(0, 12, 4),
+    expand = expansion(0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, 55),
+    breaks = seq(0, 50, 10),
+    labels = label_number(suffix = " %"),
+    expand = expansion(c(0.05, 0))
+  ) +
+  labs(
+    title = "Female Schooling vs. Political Representation: Year {frame_time}",
+    subtitle = "Each dot represents a Country over time",
+    y = "Females' Representation in Parliament",
+    x = "Mean years of Schooling for females",
+    caption = "Data: UNDP  |  Code: (GitHub) @aditya-dahiya"
+  ) +
+  scale_color_manual(values = mypal1) +
+  theme_bw(
+    base_family = "anim_font",
+    base_size = 16
+  ) +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(
+      linewidth = 0.5,
+      linetype = 2,
+      colour = "lightgrey"
+    ),
+    plot.title = element_text(
+      face = "bold",
+      family = "anim_font",
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5
+    ),
+    legend.position = "none",
+    plot.caption = element_text(
+      hjust = 1, 
+      family = "caption_font"
+    ),
+    strip.text = element_text(
+      family = "caption_font",
+      face = "bold",
+      colour = "black",
+      size = 16, 
+      margin = margin(10, 0, 10, 0, "pt")
+    ),
+    strip.background = element_rect(
+      fill = "transparent"
+    ),
+    axis.text = element_text(
+      colour = "black"
+    ),
+    axis.title = element_text(
+      margin = margin(5, 5, 5, 5, "pt")
+    )
+  ) +
+  transition_time(as.integer(year)) +
+  ease_aes('linear') 
+
+anim_save(
+  filename = "dip_hdi_anim.gif",
+  animation = ganim,
+  path = here("docs"),
+  nframes = 200,
+  end_pause = 10,
+  start_pause = 2,
+  width = 675,
+  height = 750
+  
+)
+
+```
+
+![Animated scatterplot of political representation (% seats by women in parliament) on Y-axis vs. mean years of schooling for females on X-axis.](/docs/dip_hdi_anim.gif){#fig-hdi-anim}
