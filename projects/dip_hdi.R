@@ -315,3 +315,83 @@ ggsave(
   units = "cm",
   bg = bg_col
 )
+
+# =============================================================================#
+# Additional impact of Wars ------------------------------------------------------
+# =============================================================================#
+
+dfwide
+
+ledata <- hdi |> 
+  select(
+    iso3,
+    country,
+    contains("ineq_le"),
+    (contains("le_") & !(contains("le_m")))
+  ) |> 
+  select(!contains("le_f")) |> 
+  pivot_longer(
+    cols = contains("le_"),
+    names_to = "variable",
+    values_to = "value"
+  ) |> 
+  separate_wider_delim(
+    cols = variable,
+    delim = "_",
+    too_few = "align_end",
+    names = c("var1", "var2", "year")
+  ) |> 
+  mutate(
+    year = parse_number(year),
+    variable = if_else(
+      is.na(var1),
+      "life_expectancy",
+      "inequality_le"
+    )
+  ) |> 
+  select(-var1, -var2) |> 
+  filter(!(country %in% c("East Asia and the Pacific"))) |> 
+  mutate(country = if_else(country == "T\xfcrkiye", "Turkiye", country),
+         country = if_else(country == "Syrian Arab Republic", "Syria", country))
+
+
+
+select_countries <- c(
+  "Ukraine",
+  "Iraq",
+  "Syria",
+  "Libya"
+)
+
+# A coefficient to multiply by
+coeff <- 5
+colpal <- c("blue", "darkgreen")
+
+ledata |> 
+  filter(country %in% select_countries) |> 
+  filter(year >= 2010) |> 
+  pivot_wider(
+    id_cols = c(iso3, country, year),
+    names_from = variable,
+    values_from = value
+  ) |> 
+  ggplot(aes(x = year)) +
+  geom_line(aes(y = life_expectancy), colour = colpal[1]) +
+  geom_point(aes(y = life_expectancy), colour = colpal[1]) +
+  geom_line(aes(y = inequality_le * coeff), colour = colpal[2]) +
+  geom_point(aes(y = inequality_le * coeff), colour = colpal[2]) +
+  facet_wrap(
+    ~ country, 
+    scales = "free",
+    ncol = 2
+    ) +
+  scale_x_continuous(
+    breaks = seq(2010, 2022, 4)
+  ) +
+  scale_y_continuous(
+    name = "Life Expectancy (in years)",
+    sec.axis = sec_axis(
+      name = "Inequality in Life Expectancy",
+      transform = ~. * coeff
+    )
+  )
