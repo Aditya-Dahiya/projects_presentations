@@ -44,17 +44,17 @@ url <- "https://hdr.undp.org/sites/default/files/2023-24_HDR/HDR23-24_Composite_
 
 hdi <- read_csv(url)
 
-names(hdi)
-
-dflong <- hdi |> 
+dfwide <- hdi |> 
   select(iso3, 
          country, 
          region, 
          (contains("hdi_") & !(contains("_m_")) & !(contains("_f_")) & !(contains("ihdi")) & !(contains("phdi")) & !(contains("rank"))
           )
-         )
+         ) |> 
+  filter(!(country %in% c("East Asia and the Pacific"))) |> 
+  mutate(country = if_else(country == "T\xfcrkiye", "Turkiye", country))
 
-df1 <- dflong |> 
+df1 <- dfwide |> 
   pivot_longer(
     cols = contains("hdi"),
     names_to = "year",
@@ -62,13 +62,31 @@ df1 <- dflong |>
   ) |> 
   mutate(year = parse_number(year))
 
-df_imp <- dflong |> 
-  mutate(improvement = hdi_2022 - hdi_2020) |> 
+df_imp <- dfwide |> 
+  mutate(improvement = hdi_2022 - hdi_1990) |> 
   select(country, improvement)
 
-df_imp |> 
-  arrange(improvement)
+least_imp <- df_imp |> 
+  slice_min(order_by = improvement, n = 5) |> 
+  pull(country)
 
+most_imp <- df_imp |> 
+  slice_max(order_by = improvement, n = 5) |> 
+  pull(country)
+
+least_imp
+most_imp
+
+plotdf <- df1 |> 
+  mutate(
+    most_improved = if_else(country %in% most_imp, country, NA),
+    least_improved= if_else(country %in% least_imp, country, NA)
+  ) |> 
+  pivot_longer(
+    cols = c(most_improved, least_improved),
+    names_to = "facet_var",
+    values_to = "colour_var"
+  )
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 # =============================================================================#
@@ -124,16 +142,20 @@ plot_subtitle <- subtitle_text
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-df1 |> 
+
+plotdf |> 
   ggplot(
     aes(
       x = year,
       y = value,
-      group = country
+      group = country,
+      color = colour_var
     )
   ) +
   geom_line() +
-  facet_wrap(~ region)
+  facet_wrap(~ facet_var)
+
+scale_color_brewer()
 
 df1
 # =============================================================================#
