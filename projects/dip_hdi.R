@@ -315,3 +315,52 @@ ggsave(
   units = "cm",
   bg = bg_col
 )
+
+
+
+# Another attempt at World Map with changes and improvements by shades
+mapdf <- dfwide |> 
+  select(-region) |> 
+  pivot_longer(
+    cols = -c(iso3, country),
+    names_to = "year",
+    values_to = "hdi"
+  ) |> 
+  mutate(year = parse_number(year)) |> 
+  tidyr::fill(hdi, .direction = "updown") |> 
+  pivot_wider(
+    id_cols = c(iso3, country),
+    names_from = year,
+    names_prefix = "year_",
+    values_from = hdi
+  ) |> 
+  mutate(
+    improvement = year_2022 - year_1990,
+    p_change = improvement / year_1990
+    ) |> 
+  select(iso3, country, improvement, p_change) |> 
+  rename(iso_a3 = iso3)
+
+library(rnaturalearth)
+
+mapdata <- ne_countries(returnclass = "sf") |> 
+  filter(!(sovereignt %in% c("Antarctica"))) |> 
+  mutate(iso_a3 = case_when(
+    iso_a3 == "FRA" ~ "NOR",
+    iso_a3 == "-99" ~ "FRA",
+    .default = iso_a3
+  ))
+
+mapdata |> 
+  left_join(mapdf) |> 
+  ggplot() +
+  geom_sf(aes(fill = improvement)) +
+  paletteer::scale_fill_paletteer_c("ggthemes::Temperature Diverging",
+                                    direction = -1)
+  scale_fill_gradient2(
+    mid = bg_col,
+    low = "#BE2A3EFF",
+    high = "#22763FFF",
+    na.value = bg_col,
+    midpoint = 0
+  )
