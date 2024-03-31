@@ -30,7 +30,6 @@
 library(tidyverse)
 library(janitor)
 library(here)
-library(sf)
 
 # Final plot (ggplot2) tools
 library(scales)
@@ -607,3 +606,183 @@ anim_save(
   
 )
 
+
+# =============================================================================#
+# Animation: Gross National Income vs. CO2 emissions per capita ----------------
+# =============================================================================#
+
+df4 <- hdi |>
+  mutate(country = if_else(country == "T\xfcrkiye", "Turkiye", country),
+         country = if_else(country == "Syrian Arab Republic", "Syria", country),
+         country = if_else(country == "'C<f4>te d'Ivoire'", "Ivory Coast", country)
+         ) |> 
+  select(
+    iso3,
+    country,
+    contains("co2_prod"),
+    contains("gnipc")
+  ) |> 
+  pivot_longer(
+    cols = -c(iso3, country),
+    names_to = "variable",
+    values_to = "value"
+  ) |> 
+  separate_wider_delim(
+    cols = variable,
+    delim = "_",
+    names = c(NA, "variable", "year"),
+    too_few = "align_end"
+  ) |> 
+  mutate(variable = if_else(variable == "prod", "co2prod", variable)) |> 
+  fill(value, .direction = "downup")
+
+# Code to find out which countries have changed the most
+# library(ggiraph)
+# tempg <- df4 |>
+#   mutate(com_var = paste0(variable, "_", year), .keep = "unused") |>
+#   pivot_wider(
+#     id_cols = c(iso3, country),
+#     names_from = com_var,
+#     values_from = value
+#   ) |>
+#   mutate(
+#     iso3 = iso3,
+#     country = country,
+#     change_co2 = co2prod_2022 - co2prod_1990,
+#     change_inc = gnipc_2022 - gnipc_1990,
+#     .keep = "none"
+#   ) |>
+#   filter(change_co2 > -100) |>
+#   ggplot(aes(
+#     x = change_inc,
+#     y = change_co2,
+#     tooltip = iso3,
+#     data_id = iso3)) +
+#   geom_point_interactive()
+# girafe(tempg)
+# Selected countries to view
+view_iso3 <- c("QAT", "IRL", "LUX", "ARE", "USA", "CHN", "IND", "BRN")
+icon_code <- c("qa", "ie", "lu", "ae", "us", "cn", "in", "bn" )
+
+temp1 <- tibble(
+  iso3 = view_iso3,
+  iso2 = icon_code
+  )
+
+
+# Installing ggflags package for flag icons
+# install.packages("ggflags", repos = c(
+#   "https://jimjam-slam.r-universe.dev",
+#   "https://cloud.r-project.org"))
+
+library(ggflags)
+library(gganimate)
+
+font_add_google("Barlow Semi Condensed", "flag_font")
+font_add_google("Saira Extra Condensed", "caption_font")
+showtext_auto()
+
+subtitle_text <- "Comparison of effect of rising incomes on carbon dioxide emissions in different countries.\nWhile Ireland and Luxembourg have grown per capita incomes without increasing emissions, Qatar & Brunei have massively rising emissions, without commesurate per capita income rise."
+subtitle_anim <- str_wrap(subtitle_text, 40)
+str_view(subtitle_anim)
+
+gfanim <- df4 |> 
+  filter(iso3 %in% view_iso3) |> 
+  pivot_wider(
+    id_cols = c(iso3, country, year),
+    names_from = variable,
+    values_from = value
+  ) |>
+  left_join(temp1) |> 
+  ggplot(
+    aes(
+      x = gnipc,
+      y = co2prod,
+      country = iso2,
+      label = country
+    )
+  ) +
+  ggflags::geom_flag(
+    size = 20
+  ) +
+  geom_text(
+    aes(y = co2prod + 5),
+    family = "flag_font",
+    size = 5
+  ) +
+  annotate(
+    geom = "text",
+    x = 0, 
+    y = 80,
+    label = subtitle_anim,
+    family = "flag_font",
+    size = 6,
+    hjust = 0,
+    vjust = 1,
+    colour = "grey30",
+    lineheight = 1.5
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0.02, 0)),
+    labels = label_number(
+      prefix = "$",
+      scale_cut = cut_short_scale()
+    )
+  ) +
+  scale_y_continuous(
+    expand = expansion(c(0.02, 0.05)),
+    breaks = seq(0, 75, 15)
+  ) +
+  labs(
+    y = "Annual carbon dioxide emissions, per capita (in Tonnes)",
+    x = "Gross National Income, per capita (in 2017 PPP US $)",
+    title = "Emissions & Incomes: {frame_time}",
+    caption = "Data: UNDP  |  Code: (GitHub) @aditya-dahiya"
+  ) +
+  theme_classic(
+    base_size = 16, 
+    base_family = "flag_font"
+    ) +
+  theme(
+    plot.title = element_text(
+      hjust = 0,
+      face = "bold",
+      size = 42, 
+      colour = "grey30"
+    ),
+    plot.caption = element_text(
+      family = "caption_font",
+      colour = "grey20"),
+    axis.title = element_text(
+      colour = "grey20"
+    ),
+    axis.line = element_line(
+      linewidth = 0.5,
+      arrow = arrow(length = unit(0.25, "cm")),
+      colour = "grey50"
+    ),
+    axis.ticks = element_line(linewidth = 0.15, colour = "grey50"),
+    axis.ticks.length = unit(0.5, "cm"),
+    plot.title.position = "panel",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(
+      colour = "lightgrey",
+      linewidth = 0.25,
+      linetype = "dotted"
+    )
+  ) +
+  transition_time(as.integer(year)) +
+  ease_aes('linear')
+
+anim_save(
+  filename = "hdi_anim_flags.gif",
+  path = here("docs"),
+  animation = gfanim,
+  duration = 20,
+  fps = 12,
+  start_pause = 5,
+  end_pause = 20,
+  height = 800,
+  width = 700,
+  units = "px"
+  )  
