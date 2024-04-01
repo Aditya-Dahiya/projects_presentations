@@ -661,8 +661,8 @@ df4 <- hdi |>
 #   geom_point_interactive()
 # girafe(tempg)
 # Selected countries to view
-view_iso3 <- c("QAT", "IRL", "LUX", "ARE", "USA", "CHN", "IND", "BRN")
-icon_code <- c("qa", "ie", "lu", "ae", "us", "cn", "in", "bn" )
+view_iso3 <- c("QAT", "IRL", "LUX", "USA", "CHN", "IND", "BRN")
+icon_code <- c("qa", "ie", "lu", "us", "cn", "in", "bn" )
 
 temp1 <- tibble(
   iso3 = view_iso3,
@@ -816,13 +816,13 @@ df5 <- df4 |>
     m2 = purrr::map(data, loess,
                     formula = gnipc ~ year, span = .9),
     # Retrieve the fitted values from each model
-    est_gnipc = purrr::map(m1, `[[`, "fitted")
+    est_gnipc = purrr::map(m2, `[[`, "fitted")
   ) |> 
   dplyr::select(-m1, -m2) |> 
   tidyr::unnest(cols = c(data, est_co2prod, est_gnipc)) |> 
   left_join(temp1)
 
-
+df5
 gfanim <- df5 |> 
   ggplot(
     aes(
@@ -909,7 +909,7 @@ anim_save(
   path = here("docs"),
   animation = gfanim,
   duration = 20,
-  fps = 12,
+  fps = 10,
   start_pause = 5,
   end_pause = 20,
   height = 700,
