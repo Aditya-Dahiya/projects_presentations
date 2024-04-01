@@ -3853,3 +3853,143 @@ anim_save(
 ```
 
 ![An animated scatterplot of Gross National Income (x-axis) vs. Per-capita Carbon dioxide emissions (Y-axis) from year 1990-2022 for some countries. Incomes in Ireland and Luxembourg increased without raising emissions, while the emissions rose in Brunei and Qatar without much impact on per capita incomes.](/docs/hdi_anim_flags.gif){#fig-anim2-hdi}
+
+Using loess and purr::map to smoothen the animation
+
+The @fig-anim3-hdi amends and impro, the @fig-anim2-hdi shows
+
+```{r}
+#| eval: false
+
+
+# A revised attempt to make the animation smoother, and not jagged by using
+# extrapolations in the middle years
+
+# Do loess by each group, i.e. country
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+
+df5 <- df4 |> 
+  filter(iso3 %in% view_iso3) |> 
+  pivot_wider(
+    id_cols = c(iso3, country, year),
+    names_from = variable,
+    values_from = value
+  ) |>
+  group_by(country) |> 
+  nest(data = c(co2prod, gnipc, year)) |> 
+  mutate(
+    # Perform loess for CO2 production on each Country as a group
+    m1 = purrr::map(data, loess,
+                   formula = co2prod ~ year, span = .9),
+    # Retrieve the fitted values from each model
+    est_co2prod = purrr::map(m1, `[[`, "fitted"),
+    # Perform loess for GNI Income on each Country as a group
+    m2 = purrr::map(data, loess,
+                    formula = gnipc ~ year, span = .9),
+    # Retrieve the fitted values from each model
+    est_gnipc = purrr::map(m1, `[[`, "fitted")
+  ) |> 
+  dplyr::select(-m1, -m2) |> 
+  tidyr::unnest(cols = c(data, est_co2prod, est_gnipc)) |> 
+  left_join(temp1)
+
+
+gfanim <- df5 |> 
+  ggplot(
+    aes(
+      x = est_gnipc,
+      y = est_co2prod,
+      country = iso2,
+      label = country
+    )
+  ) +
+  ggflags::geom_flag(
+    size = 20
+  ) +
+  geom_text(
+    aes(y = est_co2prod + 5),
+    family = "flag_font",
+    size = 5
+  ) +
+  annotate(
+    geom = "text",
+    x = 0, 
+    y = 80,
+    label = subtitle_anim,
+    family = "flag_font",
+    size = 6,
+    hjust = 0,
+    vjust = 1,
+    colour = "grey30",
+    lineheight = 1.5
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0.02, 0)),
+    labels = label_number(
+      prefix = "$",
+      scale_cut = cut_short_scale()
+    )
+  ) +
+  scale_y_continuous(
+    expand = expansion(c(0.02, 0.05)),
+    breaks = seq(0, 75, 15)
+  ) +
+  labs(
+    y = "Annual carbon dioxide emissions, per capita (in Tonnes)",
+    x = "Gross National Income, per capita (in 2017 PPP US $)",
+    title = "Emissions & Incomes: {frame_time}",
+    caption = "Data: LOESS Smoothed estimates from UNDP  |  Code: (GitHub) @aditya-dahiya"
+  ) +
+  theme_classic(
+    base_size = 16, 
+    base_family = "flag_font"
+  ) +
+  theme(
+    plot.title = element_text(
+      hjust = 0,
+      face = "bold",
+      size = 42, 
+      colour = "grey30"
+    ),
+    plot.caption = element_text(
+      family = "caption_font",
+      colour = "grey20"),
+    axis.title = element_text(
+      colour = "grey20"
+    ),
+    axis.line = element_line(
+      linewidth = 0.5,
+      arrow = arrow(length = unit(0.25, "cm")),
+      colour = "grey50"
+    ),
+    axis.ticks = element_line(linewidth = 0.15, colour = "grey50"),
+    axis.ticks.length = unit(0.5, "cm"),
+    plot.title.position = "panel",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(
+      colour = "lightgrey",
+      linewidth = 0.25,
+      linetype = "dotted"
+    )
+  ) +
+  transition_time(as.integer(year)) +
+  ease_aes('linear')
+
+anim_save(
+  filename = "hdi_anim_flags.gif",
+  path = here("docs"),
+  animation = gfanim,
+  duration = 20,
+  fps = 12,
+  start_pause = 5,
+  end_pause = 20,
+  height = 700,
+  width = 700,
+  units = "px"
+)  
+
+
+```
