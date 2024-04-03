@@ -28,8 +28,8 @@ tuesdata <- tidytuesdayR::tt_load(2024, week = 14)
 dubois <- tuesdata$dubois_week10
 rm(tuesdata)
 
-main_title <- "A series of statistical charts illustrating the condition of the descendants of former african slaves now resident in the United States of America."
-main_title_french <- "Une série de cartes et diagrammes statistiques montrant la condition présente des descendants d'anciens esclaves africains résidant désormais aux États-Unis d'Amérique."
+text_title <- "A series of statistical charts illustrating the condition of the descendants of former african slaves now resident in the United States of America."
+text_title_french <- "Une série de cartes et diagrammes statistiques montrant la condition présente des descendants d'anciens esclaves africains résidant désormais aux États-Unis d'Amérique."
 
 text1 <- c("Prepared and executed by african-american students under the direction of Atlanta University, Atlanta, GA, United States of America.")
 text1_french <- c("Préparé et exécuté par des étudiants afro-américains sous la direction de l'Université d'Atlanta, Atlanta, GA, États-Unis d'Amérique.")
@@ -76,13 +76,9 @@ french_labels <- c(
 #==============================================================================#
 
 # Load fonts
-font_add_google("Racing Sans One", 
-                family = "title_font")       # Font for titles
-font_add_google("Bowlby One SC",
-                family = "subtext_font")     # Font for subtext
-font_add_google("Saira Extra Condensed", 
+font_add_google("Six Caps", 
                 family = "caption_font")     # Font for the caption
-font_add_google("Changa", 
+font_add_google("Cinzel", 
                 family = "body_font")        # Font for plot text
 showtext_auto()
 
@@ -106,7 +102,7 @@ bg_col <-   "#fae4be"          # Background Colour
 text_col <- "brown"
 
 # Define Text Size
-ts = 50                        # Text Size
+ts = 20                        # Text Size
 
 # Caption stuff
 sysfonts::font_add(family = "Font Awesome 6 Brands",
@@ -119,18 +115,48 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- ""
-subtitle_text <- ""
-plot_subtitle <- str_wrap(subtitle_text, 55)
-plot_caption <- paste0("**Data & Inspiration:**  |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
+plot_caption <- paste0("**Data & Inspiration:** Du Bois Visualization Challenge 2024 |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
+base_theme <- function(...){
+  theme_void(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = NA
+    ),
+    plot.margin = margin(0,0,0,0),
+    ...
+    )
+}
+
+my_annotation <- function(label_text, wrap_length, 
+                          colour, size = size, 
+                          lineheight = 0.45, ...){
+  annotate(
+    geom = "text",
+    x = 0 , y = 0,
+    label = str_wrap(label_text, wrap_length),
+    hjust = 0.5,
+    size = size,
+    family = "body_font",
+    lineheight = lineheight,
+    colour = colour,
+    margin = margin(0,0,0,0)
+  )
+}
+  
+# Map of USA
 library(usmap)
 set.seed(42)
-us_map() |> 
+
+plot2 <- us_map() |> 
   mutate(fill_var = sample(1:6, size = 51, replace = T)) |> 
   ggplot(aes(fill = as_factor(fill_var))) +
   geom_sf(colour = txcl1) +
@@ -140,23 +166,104 @@ us_map() |>
   theme(
     legend.position = "none",
     plot.caption = element_text(
-      hjust = 0.5,
-      family = "text_font"
+      hjust = 0,
+      family = "text_font",
+      size = ts,
+      margin = margin(l = 4, unit = "cm")
+    ),
+    plot.background = element_rect(
+      fill = bg_col, 
+      colour = NA
     )
   )
-plot_usmap(
-  aes(fill = )
+
+
+plott1 <- ggplot() +
+  my_annotation(text_title, 70, txcl1, size = 2 * ts, 
+                lineheight = 0.25) +
+  base_theme()
+
+plott2 <- ggplot() +
+  my_annotation(text_title_french, 70, size = 2 * ts, 
+                lineheight = 0.25, colour = txcl2) +
+  base_theme()
+
+
+plot1 <- ggplot() +
+  my_annotation(text1, 30, size = ts, colour = txcl1) +
+  base_theme()
+
+plot3 <- ggplot() +
+  my_annotation(text1_french, 30, size = ts, colour = txcl2) +
+  base_theme()
+
+plot4 <- ggplot() +
+  my_annotation(text2, 70, size = ts, colour = txcl1) +
+  base_theme()
+
+plot5 <- ggplot() +
+  my_annotation(text2_french, 70, size = ts, colour = txcl2) +
+  base_theme()
+
+dubois <- dubois |> 
+  mutate(Occupation = fct(Occupation, levels = english_labels))
+
+
+plot6 <- ggplot(
+  data = dubois,
+  mapping = aes(
+    x = 1, 
+    y = Percentage,
+    fill = Occupation,
+    label = paste0(Percentage, "%"))
+) +
+  geom_col(colour = "black") +
+  geom_text(
+    aes(x = 1.3),
+    position = position_stack(vjust = 0.5),
+    fontface = "bold"
+  ) +
+  coord_polar(
+    theta = "y",
+    start = (pi * 90/180),
+    direction = -1
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(shape = 18)
+    )
+  ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_fill_manual(values = mypal) +
+  theme_void()
+
+plot6
+
+design <- c(
+  "
+  AAAA
+  BBBB
+  CDDE
+  CDDE
+  CDDE
+  FFFF
+  GGGG
+  "
 )
+
+g1 <- plott1 + plott2 + plot1 + plot2 + plot3 + plot4 + plot5 +
+  plot_layout(design = design)
+
 
 #==============================================================================#
 # Image Saving -----------------------------------------------------------------
 #==============================================================================#
 
 ggsave(
-  filename = here::here("docs", "tidy_march_madness.png"),
-  plot = g,
+  filename = here::here("docs", "tidy_dubois.png"),
+  plot = g1,
   width = 40, 
-  height = 55, 
+  height = 25, 
   units = "cm",
   bg = bg_col
 )
