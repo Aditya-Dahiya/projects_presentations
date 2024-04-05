@@ -25,7 +25,9 @@ library(magick)         # Work with Images and Logos
 
 # Option 1: tidytuesdayR package 
 tuesdata <- tidytuesdayR::tt_load(2024, week = 14)
-dubois <- tuesdata$dubois_week10
+dubois_week10 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-04-02/dubois_week10.csv')
+
+dubois <- dubois_week10
 rm(tuesdata)
 
 main_title <- "A series of statistical charts illustrating the condition of the descendants of former african slaves now resident in the United States of America."
@@ -52,6 +54,7 @@ english_labels <- c(
   "House Wives"
 )
 
+paste0(french_labels, collapse = " ")
 french_labels <- c(
   "Professeurs et Instituteurs",
   "Ministres de l'evangile",
@@ -122,7 +125,7 @@ social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 plot_title <- ""
 subtitle_text <- ""
 plot_subtitle <- str_wrap(subtitle_text, 55)
-plot_caption <- paste0("**Data & Inspiration:**  |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
+plot_caption <- paste0("**Reproduced from:** Dubois Challenge 2024 - Plate 37 |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
@@ -130,10 +133,10 @@ plot_caption <- paste0("**Data & Inspiration:**  |  **Graphics:** ", social_capt
 
 library(usmap)
 set.seed(42)
-us_map() |> 
+g1 <- us_map() |> 
   mutate(fill_var = sample(1:6, size = 51, replace = T)) |> 
   ggplot(aes(fill = as_factor(fill_var))) +
-  geom_sf(colour = txcl1) +
+  geom_sf(colour = "black") +
   scale_fill_manual(values = mypal) +
   labs(caption = "Centre for African-American Population\nAtlanta University") +
   cowplot::theme_map() +
@@ -142,12 +145,67 @@ us_map() |>
     plot.caption = element_text(
       hjust = 0.5,
       family = "text_font"
-    )
+    ),
+    plot.background = bg_col
   )
-plot_usmap(
-  aes(fill = )
+
+ggsave(
+  filename = here("docs", "temp_dubois.svg"),
+  plot = g1,
+  device = "svg"
 )
 
+# Pie Chart
+
+g2 <- dubois |> 
+  mutate(Occupation = fct(Occupation, levels = english_labels)) |> 
+  ggplot(aes(
+    fill = Occupation, 
+    y = Percentage, 
+    x = 1,
+    label = paste0(Percentage, " %"))) +
+  geom_col(
+    colour = "black"
+  ) +
+  geom_text(
+    aes(x = 1.3),
+    hjust = 0.5,
+    position = position_stack(vjust = 0.5),
+    fontface = "bold",
+    size = 12
+  ) +
+  scale_y_continuous(expand = expansion(0)) +
+  scale_fill_manual(values = mypal) +
+  coord_polar(
+    theta = "y",
+    start = +90 * pi/180,
+    direction = -1
+  ) +
+  theme_void() +
+  theme(legend.position = "none")
+
+ggsave(
+  filename = here("docs", "temp_dubois.svg"),
+  plot = g2,
+  device = "svg"
+)
+
+g3 <- ggplot() +
+  labs(caption = plot_caption) +
+  theme_void() +
+  theme(plot.caption = element_textbox(
+    family = "caption_font",
+    colour = text_col,
+    hjust = 1
+  ))
+
+
+g3
+ggsave(
+  filename = here("docs", "temp_dubois.svg"),
+  plot = g3,
+  device = "svg"
+)
 #==============================================================================#
 # Image Saving -----------------------------------------------------------------
 #==============================================================================#
