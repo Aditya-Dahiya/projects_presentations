@@ -30,8 +30,8 @@ tuesdata <- tidytuesdayR::tt_load(2024, week = 15)
 
 ea23 <- tuesdata$eclipse_annular_2023
 et24 <- tuesdata$eclipse_total_2024
-# ep23 <- tuesdata$eclipse_partial_2023
-# ep24 <- tuesdata$eclipse_partial_2024
+ep23 <- tuesdata$eclipse_partial_2023
+ep24 <- tuesdata$eclipse_partial_2024
 
 rm(tuesdata)
 
@@ -68,6 +68,37 @@ both_eclipse <- et24 |>
   ) |> 
   arrange(desc(dur2024), desc(dur2023)) |> 
   usmap_transform()
+
+
+dfep24 <- ep24 |> 
+  mutate(
+    dur_total = as.duration(eclipse_5 - eclipse_1),
+    dur_50 = as.duration(eclipse_4 - eclipse_2),
+    dur_ratio = dur_50 / dur_total
+  ) 
+plotep24 <- dfep24 |> 
+  usmap_transform() |> 
+  st_intersection(us_map() |> filter(!(abbr %in% c("AK", "HI"))))
+
+
+plot_usmap(
+    regions = "states",
+    exclude = c("AK", "HI")
+  ) +
+  geom_sf(
+    data = plotep24,
+    aes(colour = dur_total),
+    size = 0.5
+  )
+
+dfep24 |> 
+  ggplot(aes(lon, dur_50, colour = state)) +
+  geom_point(alpha = 0.2) +
+  coord_cartesian(
+    xlim = c(-130, -70)
+  ) +
+  theme(legend.position = "none")
+
 
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
