@@ -69,37 +69,6 @@ both_eclipse <- et24 |>
   arrange(desc(dur2024), desc(dur2023)) |> 
   usmap_transform()
 
-
-dfep24 <- ep24 |> 
-  mutate(
-    dur_total = as.duration(eclipse_5 - eclipse_1),
-    dur_50 = as.duration(eclipse_4 - eclipse_2),
-    dur_ratio = dur_50 / dur_total
-  ) 
-plotep24 <- dfep24 |> 
-  usmap_transform() |> 
-  st_intersection(us_map() |> filter(!(abbr %in% c("AK", "HI"))))
-
-
-plot_usmap(
-    regions = "states",
-    exclude = c("AK", "HI")
-  ) +
-  geom_sf(
-    data = plotep24,
-    aes(colour = dur_total),
-    size = 0.5
-  )
-
-dfep24 |> 
-  ggplot(aes(lon, dur_50, colour = state)) +
-  geom_point(alpha = 0.2) +
-  coord_cartesian(
-    xlim = c(-130, -70)
-  ) +
-  theme(legend.position = "none")
-
-
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
@@ -419,4 +388,339 @@ ggsave(
   units = "cm",
   bg = bg_col
 )
+
+#==============================================================================#
+# A Second Visualization -------------------------------------------------------
+#==============================================================================#
+
+
+# Defining Visualization Parameters
+font_add_google("Odibee Sans", family = "title_font")
+font_add_google("Thasadith", family = "body_font")
+font_add_google("Saira Extra Condensed", family = "caption_font")
+showtext_auto()
+
+# Define colours
+text_col <- "grey10"               # Colour for the text
+text_hil <- "grey30"               # Colour for highlighted text
+bg_col <- "white"                  # Background Colour
+text_hil2 <- "red"                 # Highlight colour special text
+
+# Define Text Size
+ts =  90             # Text Size
+
+# Caption stuff
+sysfonts::font_add(family = "Font Awesome 6 Brands",
+                   regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf"))
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "A Comparison of eclipse durations!"
+plot_caption <- paste0("**Data & Inspiration:** NASA's Scientific Visualization Studio |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
+
+
+# Some data structures
+dfep24 <- ep24 |> 
+  mutate(
+    dur_total = as.duration(eclipse_5 - eclipse_1),
+    dur_50 = as.duration(eclipse_4 - eclipse_2),
+    dur_ratio = dur_50 / dur_total
+  ) 
+plotep24 <- dfep24 |> 
+  usmap_transform() |> 
+  st_intersection(us_map() |> filter(!(abbr %in% c("AK", "HI"))))
+
+# Duration for total eclipse
+
+gi1 <- plot_usmap(
+  regions = "states",
+  exclude = c("AK", "HI"),
+  colour = "grey20"
+  ) +
+  geom_sf(
+    data = plotep24,
+    aes(colour = dur_total),
+    size = 0.75,
+    shape = 16
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    name = "Duration of partial eclipse (in minutes)",
+    "viridis::turbo",
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(6000, 10200, 1200),
+    limits = c(6000, 10200),
+    oob = squish
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position.inside = c(0,0),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.background = element_rect(fill = NA, colour = NA),
+    legend.box.background = element_rect(fill = NA, colour = NA)
+  )
   
+gi2 <- ggplot(
+  data = dfep24,
+  mapping = aes(
+    x = lon, 
+    y = dur_total, 
+    colour = dur_total)) +
+  geom_point(
+    alpha = 0.7,
+    shape = 16, 
+    size = 1
+  ) +
+  # geom_smooth(
+  #   se = FALSE,
+  #   linetype = 1,
+  #   linewidth = 1,
+  #   colour = text_col
+  # ) +
+  scale_y_continuous(
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(6000, 10200, 1200),
+    limits = c(6000, 10200),
+    expand = expansion(0)
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    name = "Duration of partial eclipse (in minutes)",
+    "viridis::turbo",
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(6000, 10200, 1200),
+    limits = c(6000, 10200),
+    oob = squish
+  ) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(
+    xlim = c(-125, -68),
+    ylim = c(5600, 9800)
+  ) +
+  labs(
+    x = "Longitude, in degrees meridian (of the town)",
+    y = "Total Duration of the partial eclipse (in mins.)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = text_hil
+    ),
+    axis.line = element_line(colour = text_hil),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      hjust = 1
+    )
+  )
+
+# Duration for 50% eclipse increasing to 50% eclipse decreasing
+
+gf1 <- plot_usmap(
+  regions = "states",
+  exclude = c("AK", "HI"),
+  colour = "grey20"
+) +
+  geom_sf(
+    data = plotep24,
+    aes(colour = dur_50),
+    size = 0.75,
+    shape = 16
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    name = "Duration of sun being covered >50 % (in minutes)",
+    "viridis::turbo",
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(3000, 4800, 600),
+    limits = c(3500, 4800),
+    oob = squish
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position.inside = c(0,0),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.background = element_rect(fill = NA, colour = NA),
+    legend.box.background = element_rect(fill = NA, colour = NA)
+  )
+
+gf2 <- ggplot(
+  data = dfep24,
+  mapping = aes(
+    x = lon, 
+    y = dur_50, 
+    colour = dur_50)) +
+  geom_point(
+    alpha = 0.7,
+    shape = 16, 
+    size = 1
+  ) +
+  # geom_smooth(
+  #   se = FALSE,
+  #   linetype = 1,
+  #   linewidth = 1,
+  #   colour = text_col
+  # ) +
+  scale_y_continuous(
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(3000, 4800, 600),
+    limits = c(3500, 4800),
+    expand = expansion(0)
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    name = "Duration of sun covered > 50 % (in minutes)",
+    "viridis::turbo",
+    labels = scales::label_timespan(
+      unit = "secs",
+      space = TRUE,
+      trim = FALSE
+    ),
+    breaks = seq(3000, 4800, 600),
+    limits = c(3500, 4800),
+    oob = squish
+  ) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(
+    xlim = c(-125, -68),
+    ylim = c(3500, 4800)
+  ) +
+  labs(
+    x = "Longitude, in degrees meridian (of the town)",
+    y = "Total Duration of the partial eclipse (in mins.)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = text_hil
+    ),
+    axis.line = element_line(colour = text_hil),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      hjust = 1
+    )
+  )
+
+gg1 <- ggplot(
+  data = dfep24,
+  mapping = aes(
+    x = lon, 
+    y = dur_ratio, 
+    colour = state)) +
+  geom_point(
+    alpha = 0.7,
+    shape = 16, 
+    size = 1
+  ) +
+  # geom_smooth(
+  #   se = FALSE,
+  #   linetype = 1,
+  #   linewidth = 1,
+  #   colour = text_col
+  # ) +
+  scale_y_continuous(expand = expansion(0)) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(
+    xlim = c(-125, -68)
+  ) +
+  labs(
+    x = "Longitude, in degrees meridian (of the town)",
+    y = "Ratio"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = text_hil
+    ),
+    axis.line = element_line(colour = text_hil),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      hjust = 1
+    )
+  )
+
+design <- c("
+AACC
+AACC
+BBDD
+BBDD
+EEEE
+")
+
+g <- gi1 + gi2 + gf1 + gf2 + gg1 +
+  plot_layout(design = design)
+
+
+#=============================================================================#
+# Image Saving-----------------------------------------------------------------
+#=============================================================================#
+
+ggsave(
+  filename = here::here("docs", "tidy_eclipse2.png"),
+  plot = g,
+  width = 40, 
+  height = 55, 
+  units = "cm",
+  bg = bg_col
+)
