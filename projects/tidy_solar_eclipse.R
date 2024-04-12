@@ -435,6 +435,25 @@ plotep24 <- dfep24 |>
   usmap_transform() |> 
   st_intersection(us_map() |> filter(!(abbr %in% c("AK", "HI"))))
 
+theme_axis <- theme(
+  axis.line = element_line(
+    colour = text_hil,
+    linewidth = 0.5
+  ),
+  axis.text = element_text(
+    colour = text_col,
+    margin = margin(0,0,0,0, "cm")
+  ),
+  axis.title = element_text(
+    colour = text_col,
+    hjust = 1,
+    margin = margin(0,0,0,0, "cm")
+  ),
+  plot.margin = margin(0.2, 0, 0.2, 0, "cm")
+)
+
+
+
 # Duration for total eclipse
 
 gi1 <- plot_usmap(
@@ -532,16 +551,9 @@ gi2 <- ggplot(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
-    ),
-    axis.line = element_line(colour = text_hil),
-    axis.text = element_text(
-      colour = text_col
-    ),
-    axis.title = element_text(
-      colour = text_col,
-      hjust = 1
     )
-  )
+  ) +
+  theme_axis
 
 # Duration for 50% eclipse increasing to 50% eclipse decreasing
 
@@ -640,16 +652,9 @@ gf2 <- ggplot(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
-    ),
-    axis.line = element_line(colour = text_hil),
-    axis.text = element_text(
-      colour = text_col
-    ),
-    axis.title = element_text(
-      colour = text_col,
-      hjust = 1
     )
-  )
+  ) +
+  theme_axis
 
 gg1 <- ggplot(
   data = dfep24,
@@ -689,16 +694,9 @@ gg1 <- ggplot(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
-    ),
-    axis.line = element_line(colour = text_hil),
-    axis.text = element_text(
-      colour = text_col
-    ),
-    axis.title = element_text(
-      colour = text_col,
-      hjust = 1
     )
-  )
+  ) +
+  theme_axis
 
 design <- c("
 AACC
