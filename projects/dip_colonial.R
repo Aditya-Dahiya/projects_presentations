@@ -34,6 +34,10 @@
 # Findings ---------------------------------------------------------------------
 # =============================================================================#
 
+# Total 127 countries who were colonized.
+# Total 8 colonizer countries.
+
+
 
 # =============================================================================#
 # Library Load-in---------------------------------------------------------------
@@ -118,11 +122,41 @@ df2 <- df1 |>
     year_end_max = max(year_end_max, na.rm = TRUE)
   ) |> 
   mutate(
-    colonizer = str_to_title(colonizer)
+    colonizer = str_to_title(colonizer),
+    duration = year_end_max - year_start_max
+  ) |> 
+  ungroup()
+
+colonizer_levels <- df2 |> 
+  count(colonizer, sort = T) |> 
+  arrange(n) |> 
+  pull(colonizer)
+
+df3 <- df2 |> 
+  mutate(colonizer = fct(colonizer, levels = colonizer_levels)) |> 
+  group_by(colonizer) |> 
+  arrange(colonizer, duration) |> 
+  mutate(id = row_number())
+
+year_df <- df2 |> 
+  group_by(colonizer) |> 
+  summarise(
+    year_start_mean = min(year_start_mean),
+    year_start_max = min(year_start_max),
+    year_end_mean = max(year_end_mean),
+    year_end_max = max(year_end_max)
   )
 
+total_year_df <- df2 |> 
+  summarise(
+    year_start_mean = min(year_start_mean),
+    year_start_max = min(year_start_max),
+    year_end_mean = max(year_end_mean),
+    year_end_max = max(year_end_max)
+  )
 
-
+df3
+  
 
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
@@ -178,6 +212,27 @@ plot_subtitle <- subtitle_text
 # ==============================================================================#
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
+
+ggplot(
+  data = df3,
+  mapping = aes(
+    y = id,
+    fill = colonizer,
+    colour = colonizer
+  )
+) +
+  geom_segment(
+    aes(
+      x = year_start_mean,
+      xend = year_end_mean
+    )
+  )
+  facet_wrap(
+    ~ colonizer,
+    ncol = 1,
+    scales = "free_y",
+    shrink = FALSE
+  )
 
 
 # =============================================================================#
