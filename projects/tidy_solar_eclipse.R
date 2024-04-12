@@ -435,27 +435,13 @@ plotep24 <- dfep24 |>
   usmap_transform() |> 
   st_intersection(us_map() |> filter(!(abbr %in% c("AK", "HI"))))
 
-theme_axis <- theme(
-  axis.line = element_line(
-    colour = text_hil,
-    linewidth = 0.5
-  ),
-  axis.text = element_text(
-    colour = text_col,
-    margin = margin(0,0,0,0, "cm")
-  ),
-  axis.title = element_text(
-    colour = text_col,
-    hjust = 1,
-    margin = margin(0,0,0,0, "cm")
-  ),
-  plot.margin = margin(0.2, 0, 0.2, 0, "cm")
-)
+
 
 
 
 # Duration for total eclipse
 
+## Plot gi1 --------------------------------------------------------------------
 gi1 <- plot_usmap(
   regions = "states",
   exclude = c("AK", "HI"),
@@ -484,13 +470,25 @@ gi1 <- plot_usmap(
     base_size = ts
   ) +
   theme(
-    legend.position.inside = c(0,0),
+    legend.position.inside = c(0,1.1),
     legend.direction = "horizontal",
     legend.title.position = "top",
     legend.background = element_rect(fill = NA, colour = NA),
-    legend.box.background = element_rect(fill = NA, colour = NA)
+    legend.box.background = element_rect(fill = NA, colour = NA),
+    legend.key.width = unit(3, "cm"),
+    legend.title = element_text(
+      margin = margin(0,0,0,0),
+      size = ts
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,0),
+      hjust = 0
+    ),
+    legend.justification = "left"
   )
-  
+
+
+## Plot gi2 --------------------------------------------------------------------  
 gi2 <- ggplot(
   data = dfep24,
   mapping = aes(
@@ -539,7 +537,8 @@ gi2 <- ggplot(
   ) +
   labs(
     x = "Longitude, in degrees meridian (of the town)",
-    y = "Total Duration of the partial eclipse (in mins.)"
+    y = "Duration (mins)",
+    subtitle = "Total Duration of the partial eclipse"
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -547,16 +546,29 @@ gi2 <- ggplot(
   ) +
   theme(
     legend.position = "none",
+    plot.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "cm"),
     panel.grid = element_line(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
+    ),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(
+      margin = margin(0,0,0,0,"cm")
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "cm")
     )
-  ) +
-  theme_axis
+  )
 
 # Duration for 50% eclipse increasing to 50% eclipse decreasing
 
+## Plot gf1 --------------------------------------------------------------------
 gf1 <- plot_usmap(
   regions = "states",
   exclude = c("AK", "HI"),
@@ -585,13 +597,24 @@ gf1 <- plot_usmap(
     base_size = ts
   ) +
   theme(
-    legend.position.inside = c(0,0),
+    legend.position.inside = c(0,1),
     legend.direction = "horizontal",
     legend.title.position = "top",
     legend.background = element_rect(fill = NA, colour = NA),
-    legend.box.background = element_rect(fill = NA, colour = NA)
+    legend.box.background = element_rect(fill = NA, colour = NA),
+    legend.key.width = unit(3, "cm"),
+    legend.title = element_text(
+      margin = margin(0,0,0,0),
+      size = ts
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,0),
+      hjust = 0
+    ),
+    legend.justification = "left"
   )
 
+## Plot gf2 --------------------------------------------------------------------
 gf2 <- ggplot(
   data = dfep24,
   mapping = aes(
@@ -640,7 +663,8 @@ gf2 <- ggplot(
   ) +
   labs(
     x = "Longitude, in degrees meridian (of the town)",
-    y = "Total Duration of the partial eclipse (in mins.)"
+    subtitle = "Duration of sun covered >50% by moon",
+    y = "Duration (mins.)"
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -652,10 +676,24 @@ gf2 <- ggplot(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
+    ),
+    plot.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "cm"),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(
+      margin = margin(0,0,0,0,"cm")
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "cm")
     )
-  ) +
-  theme_axis
+  )
 
+
+## Plot gg1 --------------------------------------------------------------------
 gg1 <- ggplot(
   data = dfep24,
   mapping = aes(
@@ -690,24 +728,39 @@ gg1 <- ggplot(
   ) +
   theme(
     legend.position = "none",
+    plot.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    axis.ticks = element_blank(),
     panel.grid = element_line(
       linetype = 3,
       linewidth = 0.5,
       colour = text_hil
+    ),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(
+      margin = margin(0,0,0,0,"cm")
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "cm")
     )
-  ) +
-  theme_axis
+  )
 
+## Patchwork -------------------------------------------------------------------
 design <- c("
 AACC
-AACC
-BBDD
 BBDD
 EEEE
 ")
 
-g <- gi1 + gi2 + gf1 + gf2 + gg1 +
-  plot_layout(design = design)
+g <- free(gi1) + gi2 + free(gf1) + gf2 + gg1 +
+  plot_layout(
+    design = design,
+    heights = c(1, 1, 1.2),
+    axis_titles = "collect"
+  )
+
 
 
 #=============================================================================#
@@ -717,7 +770,7 @@ g <- gi1 + gi2 + gf1 + gf2 + gg1 +
 ggsave(
   filename = here::here("docs", "tidy_eclipse2.png"),
   plot = g,
-  width = 40, 
+  width = 50, 
   height = 55, 
   units = "cm",
   bg = bg_col
