@@ -132,31 +132,25 @@ colonizer_levels <- df2 |>
   arrange(n) |> 
   pull(colonizer)
 
+colonizer_levels2 <- c(
+  "Britain", "Belgium", "France", "Germany",
+  "Spain", "Netherlands", "Portugal", "Italy"
+)
 df3 <- df2 |> 
-  mutate(colonizer = fct(colonizer, levels = colonizer_levels)) |> 
+  mutate(colonizer = fct(colonizer, levels = colonizer_levels2)) |> 
   group_by(colonizer) |> 
   arrange(colonizer, duration) |> 
+  ungroup() |> 
   mutate(id = row_number())
 
-year_df <- df2 |> 
+df4labs <- df3 |> 
   group_by(colonizer) |> 
-  summarise(
-    year_start_mean = min(year_start_mean),
-    year_start_max = min(year_start_max),
-    year_end_mean = max(year_end_mean),
-    year_end_max = max(year_end_max)
-  )
-
-total_year_df <- df2 |> 
-  summarise(
-    year_start_mean = min(year_start_mean),
-    year_start_max = min(year_start_max),
-    year_end_mean = max(year_end_mean),
-    year_end_max = max(year_end_max)
-  )
-
-df3
-  
+  summarize(
+    y_place = (max(id) + min(id))/2
+  ) |> 
+  mutate(
+    x_place = c(1500, 1600, 1500, 1500, 1900, 1500, 1450, 1500)
+    )
 
 # =============================================================================#
 # Options & Visualization Parameters--------------------------------------------
@@ -164,7 +158,7 @@ df3
 
 # Load fonts
 # Font for titles
-font_add_google("Road Rage",
+font_add_google("Stint Ultra Condensed",
   family = "title_font"
 ) 
 
@@ -174,21 +168,23 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Bubbler One",
+font_add_google("Advent Pro",
   family = "body_font"
 ) 
 
+# Font for plot text 2
+font_add_google("UnifrakturMaguntia",
+  family = "country_font"
+)
+
 showtext_auto()
 
-# Define colours
-mypal <- c()
-
-bg_col <- mypal[3] # Background Colour
-text_col <- mypal[1] # Colour for the text
-text_hil <- mypal[5] |> darken(0.3) # Colour for highlighted text
+bg_col <- "white" # Background Colour
+text_col <- "#364052" # Colour for the text
+text_hil <- "#4a5a78" # Colour for highlighted text
 
 # Define Text Size
-ts <- unit(20, units = "cm") # Text Size
+ts <- 80 # Text Size
 
 # Caption stuff
 sysfonts::font_add(
@@ -204,34 +200,153 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- "Rolling Stone 500 Albums"
-plot_caption <- paste0("**Data:** ", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
-subtitle_text <- ""
-plot_subtitle <- subtitle_text
+plot_title <- "Colonial Empires\nTimeline"
+plot_caption <- paste0("**Data:** Colonial Dates Dataset (COLDAT)", " | ", " **Code:** ", social_caption_1, " | ", " **Graphics:** ", social_caption_2)
+subtitle_text <- "A graph showing the span of colonial dominions, by the eight great European powers, across nations globally. Observe the abrupt cessation of many colonial realms after the Second World War, in the latter portion of the twentieth century."
+plot_subtitle <- "A graph showing the span of colonial\ndominions, by the eight great European\npowers, across nations globally. Observe\nthe abrupt cessation of many colonial\nrealms after the Second\nWorld War, in the\nlatter portion of the\ntwentieth century."
 
 # ==============================================================================#
 # Data Visualization------------------------------------------------------------
 # ==============================================================================#
 
-ggplot(
+g <- ggplot(
   data = df3,
   mapping = aes(
     y = id,
     fill = colonizer,
     colour = colonizer
   )
-) +
+  ) +
+  annotate(
+    geom = "label",
+    x = 1300,
+    y = 0,
+    hjust = 0,
+    vjust = 1,
+    family = "title_font",
+    colour = text_hil,
+    lineheight = 0.25,
+    size = 1.5 * ts,
+    label = plot_title,
+    label.size = NA,
+    fill = bg_col,
+    label.padding = unit(0, "lines"),
+    label.r = unit(0, "lines")
+  ) +
+  annotate(
+    geom = "label",
+    x = 1300,
+    y = 25,
+    hjust = 0,
+    vjust = 1,
+    family = "title_font",
+    colour = text_col,
+    lineheight = 0.3,
+    size = 0.5 * ts,
+    label = plot_subtitle,
+    label.size = NA,
+    fill = bg_col,
+    label.padding = unit(0, "lines"),
+    label.r = unit(0, "lines")
+  ) +
   geom_segment(
     aes(
-      x = year_start_mean,
-      xend = year_end_mean
+      x = year_start_max,
+      xend = year_end_max
+    ),
+    linewidth = 1
+  ) +
+  geom_point(
+    aes(x = year_start_max), 
+    pch = 20,
+    size = 2
+    ) +
+  geom_point(
+    aes(x = year_end_max), 
+    pch = 20,
+    size = 2
+    ) +
+  geom_text(
+    aes(
+      x = year_start_max - 10,
+      label = country
+    ),
+    hjust = 1,
+    size = ts/8,
+    family = "body_font"
+  ) +
+  geom_text(
+    aes(
+      x = year_end_max + 10,
+      label = country
+    ),
+    hjust = 0,
+    size = ts/8,
+    family = "body_font"
+  ) +
+  geom_text(
+    data = df4labs,
+    aes(x = 2050, 
+        y = y_place, 
+        label = colonizer),
+    size = 0.75 * ts, 
+    hjust = 0,
+    vjust = 0.5,
+    family = "country_font"
+  ) +
+  scale_y_reverse(
+    expand = expansion(c(0.02, 0))
+  ) +
+  scale_x_continuous(
+    breaks = seq(1400, 2000, 100),
+    expand = expansion(c(0.07, 0.38))
+  ) +
+  paletteer::scale_colour_paletteer_d("MetBrewer::Thomas") +
+  labs(
+    x = "Year",
+    y = NULL,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 1,
+      linewidth = 2,
+      colour = "grey95"
+    ),
+    panel.grid.minor.x = element_blank(),
+    axis.text = element_text(
+      colour = text_col,
+      size = 1 * ts,
+      margin = margin(0.2, 0, 0.5, 0, "cm"),
+      vjust = 1
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      size = 1.2 * ts,
+      margin = margin(0.2, 0, 0.5, 0, "cm"),
+      hjust = 0.5
+    ),
+    axis.line.x = element_line(
+      colour = "grey95",
+      linewidth = 2
+    ),
+    axis.ticks = element_blank(),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_col,
+      size = ts / 1.5,
+      margin = margin(0.5, 0, 1, 0, "cm")
     )
-  )
-  facet_wrap(
-    ~ colonizer,
-    ncol = 1,
-    scales = "free_y",
-    shrink = FALSE
   )
 
 
@@ -240,10 +355,10 @@ ggplot(
 # =============================================================================#
 
 ggsave(
-  filename = here::here("docs", "dip_gaza_agri.png"),
+  filename = here::here("docs", "dip_colonial.png"),
   plot = g,
   width = 40,
-  height = 45,
+  height = 59,
   units = "cm",
-  bg = mypal[3]
+  bg = "white"
 )
