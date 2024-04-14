@@ -277,7 +277,7 @@ g <- ggplot(
   ) +
   geom_text(
     aes(
-      x = year_end_max + 10,
+      x = 2000,
       label = country
     ),
     hjust = 0,
@@ -355,7 +355,7 @@ g <- ggplot(
 # =============================================================================#
 
 ggsave(
-  filename = here::here("docs", "dip_colonial.png"),
+  filename = here::here("docs", "dip_colonial2.png"),
   plot = g,
   width = 40,
   height = 59,
