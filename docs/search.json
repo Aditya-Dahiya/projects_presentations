@@ -1111,5 +1111,565 @@
     "title": "Data Visualizations from D.I.P.",
     "section": "D.I.P. 2024.04.10: Colonial empire timelines.",
     "text": "D.I.P. 2024.04.10: Colonial empire timelines.\nIn Figure 12, we display aggregated information on the reach and duration of European colonial empires from renowned secondary sources using the Colonial Dates Dataset, compiled by political scientist Bastian Becker.\n\n\nCode\n# =============================================================================#\n# About the Dataset-------------------------------------------------------------\n# =============================================================================#\n\n# Harvard Dataverse&gt;\n# Colonial Dates Dataset (COLDAT)\n# \n# https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/T9SDEW&version=3.0\n# The Colonial Dates Dataset (COLDAT) aggregates information on the reach and \n# duration of European colonial empires from renowned secondary sources. \n# By aggregating secondary sources, rather than collecting from primary \n# sources, the new dataset reflects the accumulated knowledge in the discipline \n# and relieves researchers from making hard to justify choices between \n# different historical datasets.\n# \n# Becker, Bastian, 2019, \"Colonial Dates Dataset (COLDAT)\", \n# https://doi.org/10.7910/DVN/T9SDEW, Harvard Dataverse, V3, \n# UNF:6:C6K8phVSG+Sfne/jKD+XhA== [fileUNF]\n# \n# Becker, Bastian (2019), Introducing COLDAT: \n# The Colonial Dates Dataset, SOCIUM/SFB1342 Working Paper Series, 02/2019.\n# \n# The Colonial Dates Dataset, compiled by political scientist Bastian Becker, \n# “aggregates information on the reach and duration of European colonial\n#  empires from renowned secondary sources.” Producing the dataset from its \n#  four main sources “is largely automated, relying on predefined coding \n#  rules.” The dataset indicates the first and last years each contemporary \n#  country was colonized, disaggregated by eight colonizing countries \n#  (Belgium, Britain, France, Germany, Italy, Netherlands, Portugal, \n#  and Spain). [h/t Erik Gahner Larsen]\n\n\n# =============================================================================#\n# Findings ---------------------------------------------------------------------\n# =============================================================================#\n\n# Total 127 countries who were colonized.\n# Total 8 colonizer countries.\n\n\n\n# =============================================================================#\n# Library Load-in---------------------------------------------------------------\n# =============================================================================#\n\n# Data Wrangling Tools\nlibrary(tidyverse)\nlibrary(janitor)\nlibrary(here)\nlibrary(dataverse)\n\n# Final plot (ggplot2) tools\nlibrary(scales)\nlibrary(fontawesome)\nlibrary(ggtext)\nlibrary(showtext)\nlibrary(colorspace)\nlibrary(ggthemes)\nlibrary(patchwork)\n\n# =============================================================================#\n# Data Load-in, EDA & Data Wrangling--------------------------------------------\n# =============================================================================#\n\ncolonial &lt;- get_dataframe_by_id(\n  fileid = 7416946,\n  .f = readr::read_tsv,\n  server = \"dataverse.harvard.edu\"\n) |&gt; \n  as_tibble()\n\ncolonial |&gt; \n  names()\n\ndf1 &lt;- colonial |&gt; \n  pivot_longer(\n    cols = starts_with(\"colstart.\") & ends_with(\"mean\"),\n    names_to = NULL,\n    values_to = \"year_start_mean\"\n  ) |&gt; \n  pivot_longer(\n    cols = starts_with(\"colstart.\") & ends_with(\"max\"),\n    names_to = NULL,\n    values_to = \"year_start_max\"\n  ) |&gt; \n  pivot_longer(\n    cols = starts_with(\"colend.\") & ends_with(\"mean\"),\n    names_to = NULL,\n    values_to = \"year_end_mean\"\n  ) |&gt; \n  pivot_longer(\n    cols = starts_with(\"colend.\") & ends_with(\"max\"),\n    names_to = NULL,\n    values_to = \"year_end_max\"\n  ) |&gt; \n  pivot_longer(\n    cols = c(\n      \"col.belgium\",\n      \"col.britain\",\n      \"col.france\",\n      \"col.germany\",\n      \"col.italy\",\n      \"col.netherlands\",\n      \"col.portugal\",\n      \"col.spain\"\n    ),\n    names_to = \"colonizer\",\n    values_to = \"filter_colonizer\"\n  ) |&gt; \n  filter(filter_colonizer != 0) |&gt; \n  select(-filter_colonizer) |&gt; \n  mutate(\n    colonizer = str_remove(colonizer, \"col.\")\n  )\n\ndf2 &lt;- df1 |&gt; \n  group_by(country, colonizer) |&gt; \n  summarise(\n    year_start_mean = min(year_start_mean, na.rm = TRUE),\n    year_start_max = min(year_start_max, na.rm = TRUE),\n    year_end_mean = max(year_end_mean, na.rm = TRUE),\n    year_end_max = max(year_end_max, na.rm = TRUE)\n  ) |&gt; \n  mutate(\n    colonizer = str_to_title(colonizer),\n    duration = year_end_max - year_start_max\n  ) |&gt; \n  ungroup()\n\ncolonizer_levels &lt;- df2 |&gt; \n  count(colonizer, sort = T) |&gt; \n  arrange(n) |&gt; \n  pull(colonizer)\n\ncolonizer_levels2 &lt;- c(\n  \"Britain\", \"Belgium\", \"France\", \"Germany\",\n  \"Spain\", \"Netherlands\", \"Portugal\", \"Italy\"\n)\ndf3 &lt;- df2 |&gt; \n  mutate(colonizer = fct(colonizer, levels = colonizer_levels2)) |&gt; \n  group_by(colonizer) |&gt; \n  arrange(colonizer, duration) |&gt; \n  ungroup() |&gt; \n  mutate(id = row_number())\n\ndf4labs &lt;- df3 |&gt; \n  group_by(colonizer) |&gt; \n  summarize(\n    y_place = (max(id) + min(id))/2\n  ) |&gt; \n  mutate(\n    x_place = c(1500, 1600, 1500, 1500, 1900, 1500, 1450, 1500)\n    )\n\n# =============================================================================#\n# Options & Visualization Parameters--------------------------------------------\n# =============================================================================#\n\n# Load fonts\n# Font for titles\nfont_add_google(\"Stint Ultra Condensed\",\n  family = \"title_font\"\n) \n\n# Font for the caption\nfont_add_google(\"Saira Extra Condensed\",\n  family = \"caption_font\"\n) \n\n# Font for plot text\nfont_add_google(\"Advent Pro\",\n  family = \"body_font\"\n) \n\n# Font for plot text 2\nfont_add_google(\"UnifrakturMaguntia\",\n  family = \"country_font\"\n)\n\nshowtext_auto()\n\nbg_col &lt;- \"white\" # Background Colour\ntext_col &lt;- \"#364052\" # Colour for the text\ntext_hil &lt;- \"#4a5a78\" # Colour for highlighted text\n\n# Define Text Size\nts &lt;- 80 # Text Size\n\n# Caption stuff\nsysfonts::font_add(\n  family = \"Font Awesome 6 Brands\",\n  regular = here::here(\"docs\", \"Font Awesome 6 Brands-Regular-400.otf\")\n)\ngithub &lt;- \"&#xf09b\"\ngithub_username &lt;- \"aditya-dahiya\"\nxtwitter &lt;- \"&#xe61b\"\nxtwitter_username &lt;- \"@adityadahiyaias\"\nsocial_caption_1 &lt;- glue::glue(\"&lt;span style='font-family:\\\"Font Awesome 6 Brands\\\";'&gt;{github};&lt;/span&gt; &lt;span style='color: {text_hil}'&gt;{github_username}  &lt;/span&gt;\")\nsocial_caption_2 &lt;- glue::glue(\"&lt;span style='font-family:\\\"Font Awesome 6 Brands\\\";'&gt;{xtwitter};&lt;/span&gt; &lt;span style='color: {text_hil}'&gt;{xtwitter_username}&lt;/span&gt;\")\n\n\n# Add text to plot--------------------------------------------------------------\nplot_title &lt;- \"Colonial Empires\\nTimeline\"\nplot_caption &lt;- paste0(\"**Data:** Colonial Dates Dataset (COLDAT)\", \" | \", \" **Code:** \", social_caption_1, \" | \", \" **Graphics:** \", social_caption_2)\nsubtitle_text &lt;- \"A graph showing the span of colonial dominions, by the eight great European powers, across nations globally. Observe the abrupt cessation of many colonial realms after the Second World War, in the latter portion of the twentieth century.\"\nplot_subtitle &lt;- \"A graph showing the span of colonial\\ndominions, by the eight great European\\npowers, across nations globally. Observe\\nthe abrupt cessation of many colonial\\nrealms after the Second\\nWorld War, in the\\nlatter portion of the\\ntwentieth century.\"\n\n# ==============================================================================#\n# Data Visualization------------------------------------------------------------\n# ==============================================================================#\n\ng &lt;- ggplot(\n  data = df3,\n  mapping = aes(\n    y = id,\n    fill = colonizer,\n    colour = colonizer\n  )\n  ) +\n  annotate(\n    geom = \"label\",\n    x = 1300,\n    y = 0,\n    hjust = 0,\n    vjust = 1,\n    family = \"title_font\",\n    colour = text_hil,\n    lineheight = 0.25,\n    size = 1.5 * ts,\n    label = plot_title,\n    label.size = NA,\n    fill = bg_col,\n    label.padding = unit(0, \"lines\"),\n    label.r = unit(0, \"lines\")\n  ) +\n  annotate(\n    geom = \"label\",\n    x = 1300,\n    y = 25,\n    hjust = 0,\n    vjust = 1,\n    family = \"title_font\",\n    colour = text_col,\n    lineheight = 0.3,\n    size = 0.5 * ts,\n    label = plot_subtitle,\n    label.size = NA,\n    fill = bg_col,\n    label.padding = unit(0, \"lines\"),\n    label.r = unit(0, \"lines\")\n  ) +\n  geom_segment(\n    aes(\n      x = year_start_max,\n      xend = year_end_max\n    ),\n    linewidth = 1\n  ) +\n  geom_point(\n    aes(x = year_start_max), \n    pch = 20,\n    size = 2\n    ) +\n  geom_point(\n    aes(x = year_end_max), \n    pch = 20,\n    size = 2\n    ) +\n  geom_text(\n    aes(\n      x = year_start_max - 10,\n      label = country\n    ),\n    hjust = 1,\n    size = ts/8,\n    family = \"body_font\"\n  ) +\n  geom_text(\n    aes(\n      x = year_end_max + 10,\n      label = country\n    ),\n    hjust = 0,\n    size = ts/8,\n    family = \"body_font\"\n  ) +\n  geom_text(\n    data = df4labs,\n    aes(x = 2050, \n        y = y_place, \n        label = colonizer),\n    size = 0.75 * ts, \n    hjust = 0,\n    vjust = 0.5,\n    family = \"country_font\"\n  ) +\n  scale_y_reverse(\n    expand = expansion(c(0.02, 0))\n  ) +\n  scale_x_continuous(\n    breaks = seq(1400, 2000, 100),\n    expand = expansion(c(0.07, 0.38))\n  ) +\n  paletteer::scale_colour_paletteer_d(\"MetBrewer::Thomas\") +\n  labs(\n    x = \"Year\",\n    y = NULL,\n    caption = plot_caption\n  ) +\n  theme_minimal(\n    base_family = \"body_font\",\n    base_size = ts\n  ) +\n  theme(\n    legend.position = \"none\",\n    axis.text.y = element_blank(),\n    axis.ticks.y = element_blank(),\n    panel.grid.major.y = element_blank(),\n    panel.grid.minor.y = element_blank(),\n    panel.grid.major.x = element_line(\n      linetype = 1,\n      linewidth = 2,\n      colour = \"grey95\"\n    ),\n    panel.grid.minor.x = element_blank(),\n    axis.text = element_text(\n      colour = text_col,\n      size = 1 * ts,\n      margin = margin(0.2, 0, 0.5, 0, \"cm\"),\n      vjust = 1\n    ),\n    axis.title = element_text(\n      colour = text_col,\n      size = 1.2 * ts,\n      margin = margin(0.2, 0, 0.5, 0, \"cm\"),\n      hjust = 0.5\n    ),\n    axis.line.x = element_line(\n      colour = \"grey95\",\n      linewidth = 2\n    ),\n    axis.ticks = element_blank(),\n    plot.caption = element_textbox(\n      hjust = 0.5,\n      family = \"caption_font\",\n      colour = text_col,\n      size = ts / 1.5,\n      margin = margin(0.5, 0, 1, 0, \"cm\")\n    )\n  )\n\n\n# =============================================================================#\n# Image Saving-----------------------------------------------------------------\n# =============================================================================#\n\nggsave(\n  filename = here::here(\"docs\", \"dip_colonial.png\"),\n  plot = g,\n  width = 40,\n  height = 59,\n  units = \"cm\",\n  bg = \"white\"\n)\n\n\n\n\n\n\n\n\nFigure 12: Timelines of major European Powers’ colonial empires in different countries."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#number-of-beneficiaries",
+    "href": "ias_ots_sectt_apr_2024.html#number-of-beneficiaries",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Number of beneficiaries",
+    "text": "Number of beneficiaries\n\nGuidelines: All the deprived families in SECC-2011 database were declared as the entitled beneficiaries of AB-PMJAY across the country.\nHaryana Statistics:\n\nTotal deprived families in SECC-2011 data: 15,51,798\nIdentified families: 9,25,08\nCards generated: 28,89,287\n\nExpansion: Benefits extended to Antyodya families (approximately 45 Lakh including 1.70 crore beneficiaries) in Haryana."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#chirayu-scheme-comprehensive-health-insurance-of-antyodaya-units",
+    "href": "ias_ots_sectt_apr_2024.html#chirayu-scheme-comprehensive-health-insurance-of-antyodaya-units",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CHIRAYU Scheme (Comprehensive Health Insurance of Antyodaya Units)",
+    "text": "CHIRAYU Scheme (Comprehensive Health Insurance of Antyodaya Units)\n\nLaunch: “Extension of Ayushman Bharat to Antyodaya families through CHIRAYU scheme” by Hon’ble Chief Minister, Haryana on 21.11.2022.\nCard Generation: Total of 1,15,04,640 Ayushman cards generated under AB-PMJAY, CHIRAYU, and CHIRAYU Extension scheme till 02.04.2024.\nFraud Prevention: Ayushman cards generated using PPP ID pre-seeded with UID."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#introduction",
+    "href": "ias_ots_sectt_apr_2024.html#introduction",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Introduction",
+    "text": "Introduction\n\nAyushman Bharat- Pradhan Mantri Jan Arogya Yojana Haryana is a flagship scheme of Government of India launched on 23rd September, 2018.\nAim: To holistically address healthcare services at secondary and tertiary level.\nFeatures:\n\nWorld’s largest health insurance/assurance scheme fully financed by the Government.\nProvides health cover of Rs. 5 lakhs per family per year for secondary and tertiary care hospitalization for entitled beneficiaries of SECC-2011 data."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#chirayu-scheme",
+    "href": "ias_ots_sectt_apr_2024.html#chirayu-scheme",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CHIRAYU Scheme",
+    "text": "CHIRAYU Scheme\n\nBudget Allocation:\n\nUnder AB-PMJAY: Central Govt. and State Govt. share budget in 60:40 ratio.\nUnder CHIRAYU Scheme: 100% budget provision by the State Government. Budget of Rs. 612 Crore sanctioned by Finance Department, State of Haryana for FY 2023-24.\n\nImplementation:\n\nData shared with National Health Authority, Govt. of India for integration of AB-PMJAY GoI portal with PPP ID.\nCashless, paperless, transparent, digital, and IT driven scheme."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#extension-of-pmjay-chirayu-scheme-to-families-with-verified-annual-income-above-rs.-1.80-upto-rs.-3-lakhs",
+    "href": "ias_ots_sectt_apr_2024.html#extension-of-pmjay-chirayu-scheme-to-families-with-verified-annual-income-above-rs.-1.80-upto-rs.-3-lakhs",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Extension of PMJAY-CHIRAYU Scheme to families with verified annual income above Rs. 1.80 upto Rs. 3 lakhs",
+    "text": "Extension of PMJAY-CHIRAYU Scheme to families with verified annual income above Rs. 1.80 upto Rs. 3 lakhs\n\nCM Budget Speech Announcement (FY 2023-24):\n\nExtension of Ayushman Bharat-CHIRAYU scheme to families with verified annual family income above ₹1.80 lakh and upto ₹3.00 lakh upon nominal contribution of ₹1500/- per family per annum.\n\nLaunch: 14.08.2023\n\nActivation of payment portal: 15.08.2023\n\nProgress:\n\nFamilies deposited nominal contribution: 56,451 (Till 03.04.2024)\nCard generation commenced: 01.11.2023\nTotal cards generated: 1,02,900 (Till 02.04.2024)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#highlights-of-the-scheme-in-haryana",
+    "href": "ias_ots_sectt_apr_2024.html#highlights-of-the-scheme-in-haryana",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Highlights of the Scheme in Haryana:",
+    "text": "Highlights of the Scheme in Haryana:\n\nTotal Ayushman Cards Generated: 1,15,04,640\n\nSECC-2011: 28,89,287\nCHIRAYU: 85,12,394\nCHIRAYU Extension: 1,02,959\n\nHospitals Empaneled: 1178 (Public- 511, Private-667)\nTotal claims submitted: 12,89,033\nTotal claims amount submitted: Rs. 1,792.98 crore"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#achievements-and-best-practices",
+    "href": "ias_ots_sectt_apr_2024.html#achievements-and-best-practices",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Achievements and Best practices:",
+    "text": "Achievements and Best practices:\n\n1st State to launch AB-PMJAY in the country.\n100% Aadhaar seeding of Ayushman Cards.\n100% Biometric Authentication at the time of hospitalization.\nFastest Claims Processing State: Appreciation letter from CEO NHA, GoI.\n100% quality closure of grievances: Appreciated by CEO, NHA."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#implementation-of-comprehensive-cashless-health-facility-cchf",
+    "href": "ias_ots_sectt_apr_2024.html#implementation-of-comprehensive-cashless-health-facility-cchf",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Implementation of Comprehensive Cashless Health Facility (CCHF):",
+    "text": "Implementation of Comprehensive Cashless Health Facility (CCHF):"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#category-i-beneficiaries",
+    "href": "ias_ots_sectt_apr_2024.html#category-i-beneficiaries",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Category-I beneficiaries:",
+    "text": "Category-I beneficiaries:\n\nScheme launch: 01.11.2023 (Department of Horticulture and Department of Fisheries in Trust Mode)\nExtension: 01.01.2024 (All employees in the State and families/dependents of employees of Horticulture and Fisheries)\nTotal cards generated: 35,162 (Till 02.04.2024)\nApproval:\n\nDraft notification of the scheme sent to the Govt.\nPPP ID linkage with Comprehensive Cashless Health Facility (CCHF) approved by the Govt."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#category-ii-beneficiaries",
+    "href": "ias_ots_sectt_apr_2024.html#category-ii-beneficiaries",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Category-II beneficiaries:",
+    "text": "Category-II beneficiaries:\n\nApproval: Hon’ble CM (08.08.2023)\nApproval by Finance Department: 23.11.2023\nDecision pending on inclusion in CCHF or CHIRAYU extension."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#overall-financials",
+    "href": "ias_ots_sectt_apr_2024.html#overall-financials",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Overall Financials",
+    "text": "Overall Financials\nThe detail of year-wise budget approved and expenditure (Figures in Crore)\n\n\n\n\n\n\n\n\n\n\n\nSr. No.\nYear\nRoP/Approval\nBudget Received\nExpenditure\n% Utilization\n\n\n\n\n1\n2012-13\n413.8\n388.60\n368.00\n95%\n\n\n2\n2013-14\n514.74\n416.05\n468.27\n113%\n\n\n3\n2014-15\n531.65\n379.75\n486.13\n128%\n\n\n4\n2015-16\n573.46\n482.94\n488.16\n101%\n\n\n5\n2016-17\n523.65\n508.49\n488.17\n96%\n\n\n6\n2017-18\n635.66\n494.19\n534.25\n108%\n\n\n7\n2018-19\n815.81\n743.10\n659.65\n89%\n\n\n8\n2019-20\n999.96\n768.77\n747.21\n97%\n\n\n9\n2020-21\n1139.78\n921.20\n806.05\n88%\n\n\n10\n2021-22\n1331.90\n903.98\n880.82\n97%\n\n\n11\n2022-23\n1443.14\n938.65\n990.28\n105%\n\n\n12\n2023-24\nTill Jan., 2024\n1440.26\n638.20\n610.18"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#maternal-health",
+    "href": "ias_ots_sectt_apr_2024.html#maternal-health",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Maternal Health",
+    "text": "Maternal Health\n\nCurrent Maternal Mortality Ratio (MMR) of Haryana: 110 (SRS-2018-20). Promotion of Institutional deliveries: Increased to 97.8% till January -2024 (HMIS).\nOperationalization of 56 First Referral Units (FRUs) for emergency Obstetric care services.\nSurakshit Janani Maah (SJM) celebrated in April-May, 2023.\n\nMore than 76000 pregnant women examined.\nAround 16000 identified as high-risk pregnancies."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#maternal-health-1",
+    "href": "ias_ots_sectt_apr_2024.html#maternal-health-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Maternal Health",
+    "text": "Maternal Health\n\nAvailability of free Injection Iron Sucrose for treatment of severe Anaemia in pregnant ladies.\neSanjeevaniOPD: Online Stay Home OPD under National Tele - Consultation services of Govt. of India.\n\nInitiated in Haryana since 01.05.2020.\nAvailable 24X7 since 16.08.2021."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#child-health",
+    "href": "ias_ots_sectt_apr_2024.html#child-health",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Child Health",
+    "text": "Child Health\n\nInfant Mortality Rate (IMR) of Haryana: 28 per 1000 live births (SRS 2020), decreased by 13 points since 2013 (IMR-41 in 2013).\nUnder Five mortality Rate (U5MR): Declined by 12 points from 45 (SRS 2013) to 33 (SRS 2020).\n\n\n\n\nFunctional\nUnits\n\n\n\n\nSpecial Newborn Care Unit (SNCU)\n24\n\n\nKangaroo Mother Care Units (KMCU)\n66\n\n\nNewborn Stabilization Unit (NBSU)\n439\n\n\nNewborn Care Corner (NBCC)\n11"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#child-health-1",
+    "href": "ias_ots_sectt_apr_2024.html#child-health-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Child Health",
+    "text": "Child Health\n\nSpecial Newborn Care Unit (SNCU):\n\nTotal 26,861 newborns admitted in FY 2022-23 in 24 SNCUs.\nTotal 23362 newborns admitted in 24 SNCUs from April 2023-January 2024.\n\nVitamin A supplementation round: 18.2 lakh children received vitamin A dose in May-June 2023.\nMicronutrient Supplementation Program (MSP): Approx. 24.3 lakh IFA syrup bottles provided to targeted 6-59 month children in May 2023."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#child-health-2",
+    "href": "ias_ots_sectt_apr_2024.html#child-health-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Child Health",
+    "text": "Child Health\n\nIntensified Diarrhoea Control Fortnight (IDCF): 27,000 children treated with Tab Zinc and ORS in July 2023. Approx. 25 Lakhs under five children distributed ORS packets.\nMother Absolute Affection (MAA) program: Sensitization of pregnant & lactating women on breastfeeding practices.\nEmergency Covid Response Package (ECRP-II): Pediatric care units including HDU/ICU established in 20-district hospital of Haryana."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#routine-immunization",
+    "href": "ias_ots_sectt_apr_2024.html#routine-immunization",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Routine Immunization",
+    "text": "Routine Immunization\n\nNFHS-5 Routine Immunization coverage: Increased to 77% compared to 62% in NFHS-4.\nFY 2022-23:\n\nFully Immunized Children (FIC): 94% with 5.47 lac beneficiaries vaccinated against a target of 5.8 lac beneficiaries.\n\nFY 2023-24 (till January 2024):\n\nFIC: 92% with 4.5 lac beneficiaries vaccinated against a target of 4.9 lac beneficiaries."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#routine-immunization-1",
+    "href": "ias_ots_sectt_apr_2024.html#routine-immunization-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Routine Immunization",
+    "text": "Routine Immunization\n\nIntensified Mission Indradhanush (IMI):\n\nIMI 4.0: 3 districts, 6274 sessions, 69835 children, 19203 pregnant women immunized.\nIMI 5.0: 3 rounds, total 1,95,268 children and 44,895 pregnant women vaccinated.\n\nNational Immunization Days (NID): Approx. 3600384 children given polio drops in March 2024."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#referral-transport-scheme",
+    "href": "ias_ots_sectt_apr_2024.html#referral-transport-scheme",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Referral Transport Scheme",
+    "text": "Referral Transport Scheme"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#introduction-1",
+    "href": "ias_ots_sectt_apr_2024.html#introduction-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Introduction",
+    "text": "Introduction\n\nInitiated on 14th November 2009. All districts of Haryana covered. Total Ambulances: 588.\n\n55 Advance Life Support\n259 Basic Life Support\n239 Patient Transport\n29 Kilkari/Back to home\n6 Neonatal\n\nResponse time: 12 minutes. Drop in time: 32 minutes"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#free-transportation-services-provided-for",
+    "href": "ias_ots_sectt_apr_2024.html#free-transportation-services-provided-for",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Free transportation services provided for:",
+    "text": "Free transportation services provided for:\n\nAny patient in emergency\nPregnant women\nVictims of roadside accidents\nPost-natal cases (emergency till 6 weeks after delivery)\nSick infants and children up to 5 years"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#charges-for-emergency-transportation",
+    "href": "ias_ots_sectt_apr_2024.html#charges-for-emergency-transportation",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Charges for emergency transportation:",
+    "text": "Charges for emergency transportation:\n\nBLS ambulances: Rs. 7 per km\nALS/Neonate Care Ambulances: Rs. 15 per km"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#manpower",
+    "href": "ias_ots_sectt_apr_2024.html#manpower",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Manpower:",
+    "text": "Manpower:\n\nFleet Manager: 1\nControl Room Operator: 4\nEMT: 3\nDrivers:\n\nBLS, ALS & Neonate Ambulances: 3 each\nPTA: 3\nKilkari ambulances: 1"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#achievement-2023-24-till-mar-12-2024",
+    "href": "ias_ots_sectt_apr_2024.html#achievement-2023-24-till-mar-12-2024",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Achievement (2023-24 till Mar 12, 2024):",
+    "text": "Achievement (2023-24 till Mar 12, 2024):\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nYear\nTotal Cases\nPregnant Women\nReferral\nRoad Side Accident\nBack Home\nSick Child\nSick Neonate\nOther Cases\n\n\n\n\n2023-24\n411120\n213381\n86397\n27785\n27446\n3624\n1467\n49702"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#rashtriya-kishor-swasthya-karyakram-rksk",
+    "href": "ias_ots_sectt_apr_2024.html#rashtriya-kishor-swasthya-karyakram-rksk",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "RASHTRIYA KISHOR SWASTHYA KARYAKRAM (RKSK)",
+    "text": "RASHTRIYA KISHOR SWASTHYA KARYAKRAM (RKSK)\n\nWIFS IFA tablet: 80.6% children consumed WIFS IFA Blue tablet from April to Dec 2023.\nNational De-worming Day: Conducted on 15th February 2024.\nMenstrual Hygiene Scheme: Provided sanitary napkin packets to rural adolescent girls and ASHAs.\nAdolescent Friendly Health Clinics (AFHCs)/Mitrata Clinics: Functional at various levels.\nSchool Health and Wellness Programme (SHWP): Trained teachers as Health and Wellness Ambassadors."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk",
+    "href": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)",
+    "text": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)\n\nEarly identification and intervention for children (birth to 18 years).\n\nScreening:\n\nNewborn screening at health facilities and home visits.\nMobile Health Teams for children (6 weeks-18 years).\nBiannual screening in Anganwadis and schools."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#national-urban-health-mission-nuhm",
+    "href": "ias_ots_sectt_apr_2024.html#national-urban-health-mission-nuhm",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "National Urban Health Mission (NUHM)",
+    "text": "National Urban Health Mission (NUHM)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#introduction-2",
+    "href": "ias_ots_sectt_apr_2024.html#introduction-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Introduction",
+    "text": "Introduction\n\nLaunched in May 2013 under NHM. Focus on urban poor population, including slum dwellers, homeless, etc.\nServices provided through Urban Primary Health Centres (UPHCs).\n107 UPHCs operational in Haryana.\nStaffing: 1 M.O, 1 Staff Nurse, 1 Pharmacist, 1 Lab Technician, 1 Information Assistant, 1 Class-IV cum sweeper, 4-5 ANMs, and 1 Urban ASHA per 1500-2000 slum population."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#services-provided",
+    "href": "ias_ots_sectt_apr_2024.html#services-provided",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Services provided:",
+    "text": "Services provided:\n\nOPD Services\nRoutine Immunization Sessions\nAnte Natal Registration and ANC\nReferral Services\nBasic Laboratory Services\nCounselling services\nServices for non-communicable diseases\nSocial mobilization and community level activities"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#activities-and-achievements",
+    "href": "ias_ots_sectt_apr_2024.html#activities-and-achievements",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Activities and Achievements",
+    "text": "Activities and Achievements\n\nUpgradation to Health and Wellness Centers (HWC) at all UPHCs.\nE-sanjeevani tele-consultation services initiated.\nUrban Health Nutrition Day celebrated twice monthly.\nSpecial Outreach Camps providing specialist services.\nIntersectoral convergence with Urban Local Bodies."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#community-processes",
+    "href": "ias_ots_sectt_apr_2024.html#community-processes",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Community Processes",
+    "text": "Community Processes"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#accredited-social-health-activist-asha-recruitment-of-community-health-officers-cho",
+    "href": "ias_ots_sectt_apr_2024.html#accredited-social-health-activist-asha-recruitment-of-community-health-officers-cho",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Accredited Social Health Activist (ASHA) & Recruitment of Community Health Officers (CHO)",
+    "text": "Accredited Social Health Activist (ASHA) & Recruitment of Community Health Officers (CHO)\n\nTotal 20374 ASHA enrolled against a target of 20676.\nMonthly honorarium increased to Rs. 6100, highest in the country.\nProvision of Rs. 2.00 lakh at the time of relieving for ASHA.\nCompensatory grant of Rs. 3.00 lakh each provided to families of deceased ASHA.\nMaking golden cards for free treatment under Ayushman Bharat."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#ayushman-bharat-health-wellness-centres-ab-hwcs",
+    "href": "ias_ots_sectt_apr_2024.html#ayushman-bharat-health-wellness-centres-ab-hwcs",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Ayushman Bharat-Health & Wellness Centres (AB-HWCs)",
+    "text": "Ayushman Bharat-Health & Wellness Centres (AB-HWCs)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#introduction-3",
+    "href": "ias_ots_sectt_apr_2024.html#introduction-3",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Introduction",
+    "text": "Introduction\n\nDeliver Comprehensive Primary Health Care under Ayushman Bharat.\nExpanded range of services closer to the community.\nServices include care in pregnancy, neonatal and infant health care, family planning, management of diseases, emergency medical services, etc."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#key-points",
+    "href": "ias_ots_sectt_apr_2024.html#key-points",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Key Points",
+    "text": "Key Points\n\nAdditional human resource provision for Sub Health Centre level HWCs.\nTotal 1570 Community Health Officers (BAMS/BSc. Nursing with 6-month certificate course) working.\n2668 AB-HWCs operational, including Sub Centres, Rural PHCs, Urban PHCs, and UHWCs.\nAll standalone Rural-PHCs and Sub Centres transformed into HWCs in Mewat/Nuh.\nE-Sanjeevani Tele-consultation services initiated, with 342233 consultations conducted till date.\nNQAS Certification for HWCs underway, with 45 SC HWCs targeted.\nKayakalp Awards won by PHCs and SHCs for FY 2022-23.\nAdoption status of AB-HWC App is 98%.\nHWCs’ staff played a significant role in COVID-19 management."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#administration-division-n.h.m.",
+    "href": "ias_ots_sectt_apr_2024.html#administration-division-n.h.m.",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Administration Division (N.H.M.)",
+    "text": "Administration Division (N.H.M.)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#financial-assistance-announcement",
+    "href": "ias_ots_sectt_apr_2024.html#financial-assistance-announcement",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Financial Assistance Announcement",
+    "text": "Financial Assistance Announcement\n\nHon’ble CM announced financial assistance of Rs. 5000/- to NHM and NUHM workers.\nPayment issued to 12650 workers out of 12672 sanctioned.\nData verification ongoing for remaining workers."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#health-indicators-haryana-vs.-india",
+    "href": "ias_ots_sectt_apr_2024.html#health-indicators-haryana-vs.-india",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Health Indicators (Haryana vs. India)",
+    "text": "Health Indicators (Haryana vs. India)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#adolescent-health-ah",
+    "href": "ias_ots_sectt_apr_2024.html#adolescent-health-ah",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Adolescent Health (AH)",
+    "text": "Adolescent Health (AH)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#neonatal-mortality-rate-nmr-and-infant-mortality-rate-imr",
+    "href": "ias_ots_sectt_apr_2024.html#neonatal-mortality-rate-nmr-and-infant-mortality-rate-imr",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Neonatal Mortality Rate (NMR) and Infant Mortality Rate (IMR)",
+    "text": "Neonatal Mortality Rate (NMR) and Infant Mortality Rate (IMR)\n\n\n\n\n\n\n\n\n\n\nSR. NO.\nINDICATOR WITH SOURCE\nHaryana (2013-14)\nHaryana (2020-23)\nIndia (2020)\n\n\n\n\n1\nNeonatal Mortality Rate (NMR)\n26 (SRS 2013)\n19 (SRS 2020)\n20 (SRS 2020)\n\n\n2\nInfant Mortality Rate (IMR)\n41 (SRS 2013)\n28 (SRS 2020)\n28 (SRS 2020)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#maternal-mortality-ratio-and-first-referral-unit",
+    "href": "ias_ots_sectt_apr_2024.html#maternal-mortality-ratio-and-first-referral-unit",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Maternal Mortality Ratio and First Referral Unit",
+    "text": "Maternal Mortality Ratio and First Referral Unit\n\n\n\n\n\n\n\n\n\n\nSR. NO.\nINDICATOR WITH SOURCE\nHaryana (2011-13)\nHaryana (2018-20)\nIndia (2020)\n\n\n\n\n3\nMaternal Mortality Ratio\n127 (SRS 2011-13)\n110 (SRS 2018-20)\n97 (SRS 2018-20)\n\n\n4\nFirst Referral Unit (FRU)\n40 (including 2 urban FRU in Faridabad)\n56 (including 2 urban FRU in Faridabad)\n-"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#under-5-mortality-rate-and-sex-ratio-at-birth",
+    "href": "ias_ots_sectt_apr_2024.html#under-5-mortality-rate-and-sex-ratio-at-birth",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Under-5 Mortality Rate and Sex Ratio at Birth",
+    "text": "Under-5 Mortality Rate and Sex Ratio at Birth\n\n\n\n\n\n\n\n\n\n\nSR. NO.\nINDICATOR WITH SOURCE\nHaryana (2013)\nHaryana (2020)\nIndia (2020)\n\n\n\n\n5\nUnder-5 Mortality Rate\n45 (SRS 2013)\n33 (SRS 2020)\n32 (SRS 2020)\n\n\n6\nSex Ratio at Birth (CRS)\n868 (CRS 2013)\n917 (upto Feb 2024)\n-"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#institutional-delivery-full-immunization-asha",
+    "href": "ias_ots_sectt_apr_2024.html#institutional-delivery-full-immunization-asha",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Institutional Delivery, Full Immunization, ASHA",
+    "text": "Institutional Delivery, Full Immunization, ASHA\n\n\n\n\n\n\n\n\n\n\nSR. NO.\nINDICATOR WITH SOURCE\nHaryana (2017)\nHaryana (Jan. 2024)\nIndia (Jan. 2023)\n\n\n\n\n7\nInstitutional Delivery\n90.37% (HMIS)\n97.1% (HMIS Jan. 2024)\n-\n\n\n8\nFull Immunization (HMIS)\n85.7%\n92.6%\n92%\n\n\n9\nASHA\n16861 (92.67%)\n20380 (98.57% upto Dec 2023)\n-"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#newborn-care",
+    "href": "ias_ots_sectt_apr_2024.html#newborn-care",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Newborn Care",
+    "text": "Newborn Care\n\n\n\n\n\n\n\n\n\n\nSR. NO.\nINDICATOR WITH SOURCE\nHaryana (2017)\nHaryana (Jan. 2024)\nIndia (Jan. 2023)\n\n\n\n\n10\nSpecial Newborn Care Units (SNCU)\n15\n24 (2022-23)\n-\n\n\n11\nNewborn Stabilizing Units (NBSU)\n52\n66 (2022-23)\n-\n\n\n12\nNewborn Care Corners (NBCC)\n192\n439 (2022-23)\n-"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#chirayu-scheme-1",
+    "href": "ias_ots_sectt_apr_2024.html#chirayu-scheme-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CHIRAYU Scheme",
+    "text": "CHIRAYU Scheme\n\nBenefits:\n\nNo cap in family size and age of family members.\nCovers all pre-existing diseases.\nAll Health Benefit Packages (HBP) extended without changes.\nAround 2,200 treatment packages available.\nCovers treatment cost of investigations, hospitalization, and post-hospitalization expenses for medicines, etc."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#extension-of-pmjay-chirayu-scheme",
+    "href": "ias_ots_sectt_apr_2024.html#extension-of-pmjay-chirayu-scheme",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Extension of PMJAY-CHIRAYU Scheme",
+    "text": "Extension of PMJAY-CHIRAYU Scheme\n\nExtended to families with verified annual income above Rs. 1.80 upto Rs. 3 lakhs\nCM Budget Speech Announcement (FY 2023-24):\n\nExtension of Ayushman Bharat-CHIRAYU scheme to families with verified annual family income above ₹1.80 lakh and upto ₹3.00 lakh upon nominal contribution of ₹1500/- per family per annum.\n\nProgress:\n\nFamilies deposited nominal contribution: 56,451 (Till 03.04.2024)\nCard generation commenced: 01.11.2023\nTotal cards generated: 1,02,900 (Till 02.04.2024)"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#maternal-health-2",
+    "href": "ias_ots_sectt_apr_2024.html#maternal-health-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Maternal Health",
+    "text": "Maternal Health\n\nEstablishment of specialized MCH Wings:\n\n6 specialized separate MCH Wings to be established in the state.\nConstruction ongoing for MCH Panchkula and Panipat.\n2 new MCH Wings approved at Sirsa and Kaithal.\n\nEstablishment of Obstetric High Dependency Unit (HDU) and Intensive Care Unit (ICU):\n\nSanction accorded by GoI at 5 Govt. /Govt. aided Medical colleges.\n05 Obs HDU/ICUs functional."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#routine-immunization-2",
+    "href": "ias_ots_sectt_apr_2024.html#routine-immunization-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Routine Immunization",
+    "text": "Routine Immunization\n\nSub-National Immunization Days (SNID):\n\nMay 2023: 1486324 children in 6 districts given polio drops.\nDec 2023: 1522197 children in 6 districts given polio drops.\n\nSpecial Immunization week: Conducted quarterly in all districts.\nMeasles Rubella campaign: Conducted from 6th February to 31st March with 99% coverage.\nUWIN (Winning over Universal Immunization): Digital solution for Universal Immunization Program (UIP) by MoHFW."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#free-transportation-services-provided-for-1",
+    "href": "ias_ots_sectt_apr_2024.html#free-transportation-services-provided-for-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Free transportation services provided for:",
+    "text": "Free transportation services provided for:\n\nSevere Acute Malnourished (SAM) Children\nHaemophilia and Thalassaemia patients during blood transfusion\nWomen after delivery\nFreedom fighters/Ex-servicemen to Military Hospital\nMental/psychiatric emergencies\nInter-facility transportation"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk-1",
+    "href": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)",
+    "text": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)\nReferral and Management:\n\nDistrict Early Intervention Centre (DEIC) established at Civil Hospital Level.\nFinancial aid for selected conditions.\nReferral to Govt. and private empanelled health facilities.\nMoU with Smile Train Clinics for cleft lip/palate treatment.\nSurgical management for clubfoot."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk-2",
+    "href": "ias_ots_sectt_apr_2024.html#rashtriya-bal-swasthya-karyakram-rbsk-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)",
+    "text": "RASHTRIYA BAL SWASTHYA KARYAKRAM (RBSK)\nAchievements:\n\nHealth screening of around 35-40 Lakh children annually.\nApprox. 5.3 Lakh children availed treatment services from April to Dec 2023.\nApprox. 1.24 Lakh New and Follow up cases availed services at DEIC.\nFinancial support of Rs 6.65 Cr given to RBSK beneficiaries for treatment."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#activities-and-achievements-1",
+    "href": "ias_ots_sectt_apr_2024.html#activities-and-achievements-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Activities and Achievements",
+    "text": "Activities and Achievements\n\nRecognition for best practices in national summits.\nMeraaspataal integrated for patient feedback.\nNQAS certification for quality assurance.\nKayakalp implementation for cleanliness.\nProvision of specialist services at UPHCs.\nUrban Health and wellness centers establishment.\nSupport for diagnostic infrastructure."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#accredited-social-health-activist-asha-community-health-officers-cho",
+    "href": "ias_ots_sectt_apr_2024.html#accredited-social-health-activist-asha-community-health-officers-cho",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Accredited Social Health Activist (ASHA) & Community Health Officers (CHO)",
+    "text": "Accredited Social Health Activist (ASHA) & Community Health Officers (CHO)\n\nTotal 20374 ASHA enrolled against a target of 20676.\nMonthly honorarium increased to Rs. 6100, highest in the country.\nProvision of Rs. 2.00 lakh at the time of relieving for ASHA.\nCompensatory grant of Rs. 3.00 lakh each provided to families of deceased ASHA.\nMaking golden cards for free treatment under Ayushman Bharat."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on",
+    "href": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Special Secretary Health Department: Handling Policy level issues on",
+    "text": "Special Secretary Health Department: Handling Policy level issues on\n\nAdulteration of foodstuffs and other goods.\nBlood Transfusion Service and Blood Transfusion Centers in the State.\nDrugs and poisons and objectionable advertisements relating to drugs and medicines.\nEstablishment matters relating to officers and staff under the administrative control of the Department except matters allotted to the General Administration Department.\nFamily Planning."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-1",
+    "href": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Special Secretary Health Department: Handling Policy level issues on",
+    "text": "Special Secretary Health Department: Handling Policy level issues on\n\nGrant-in-aid to local bodies (for hospitals and dispensaries, Ayurvedic Aushdhaliyas, and other institutions).\nHospitals, Dispensaries, Primary and Rural Health Centers.\nInfectious diseases, hospitals for their treatment and other measures for their suppression.\nLunacy and mental deficiency including places for the reception or treatment of lunatics and mentally deficient individuals.\nMedical attendance on Government servants and their families."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-2",
+    "href": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Special Secretary Health Department: Handling Policy level issues on",
+    "text": "Special Secretary Health Department: Handling Policy level issues on\n\nMaternity and child welfare.\nMedical inspection of school children.\nProhibition of inoculation and making the Primary vaccination and revaccination of children compulsory.\nProhibition of smoking in Cinema Halls.\nPublic Health, Epidemic Diseases, and Sanitation."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-3",
+    "href": "ias_ots_sectt_apr_2024.html#special-secretary-health-department-handling-policy-level-issues-on-3",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Special Secretary Health Department: Handling Policy level issues on",
+    "text": "Special Secretary Health Department: Handling Policy level issues on\n\nRegistration of births and deaths.\nSupply of unclaimed bodies of deceased persons to hospitals and medical and teaching institutions for therapeutic purposes or for the purpose of anatomical operation and research work.\nThe Homoeopathic system of medicine.\nThe Indigenous systems of medicine."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-i-branch",
+    "href": "ias_ots_sectt_apr_2024.html#hr-i-branch",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-I Branch",
+    "text": "HR-I Branch"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities",
+    "href": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-I Branch Responsibilities",
+    "text": "HR-I Branch Responsibilities\n\nProbation, Confirmation, Determination of seniority, Departmental Test and SETC\nPromotion Policy including all matters pertaining to promotion\nOnline Transfer Policy\nPremature Retirement\nAnnual Confidential Reports\nAdverse Remarks"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities-1",
+    "href": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-I Branch Responsibilities",
+    "text": "HR-I Branch Responsibilities\n\nConduct Rules\nAll matters pertaining to Code of Conduct\nMoral Turpitude\nSexual Harassment\nSuspension etc.\nAll matters pertaining to Punishment & Appeal Rules"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities-2",
+    "href": "ias_ots_sectt_apr_2024.html#hr-i-branch-responsibilities-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-I Branch Responsibilities",
+    "text": "HR-I Branch Responsibilities\n\nMemorials\nPetitions\nLTC Policy\nGazetted Holidays\nExamine the cases of Departments of which FD is AD involving financial liability\nRe-employment and Extension beyond the age of"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-ii-branch-responsibilities",
+    "href": "ias_ots_sectt_apr_2024.html#hr-ii-branch-responsibilities",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-II Branch Responsibilities",
+    "text": "HR-II Branch Responsibilities\n\nCET Policy\nRecruitment Policy\nSocio Economic Criteria\nWaiting list\nJoining time on direct recruitment\nEx-gratia Policy\nAll kinds of Compassionate Appointments"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-iii-branch",
+    "href": "ias_ots_sectt_apr_2024.html#hr-iii-branch",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-III Branch",
+    "text": "HR-III Branch"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-iii-branch-conditions-before-joining",
+    "href": "ias_ots_sectt_apr_2024.html#hr-iii-branch-conditions-before-joining",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-III Branch: Conditions Before Joining",
+    "text": "HR-III Branch: Conditions Before Joining\n\nCharacter and antecedent verification\nMedical Certificate of Fitness\nFixation of Age for entry into Govt. service\nMinimum qualification for entry into service\nClassification of Posts\nUp-gradation of Post\nOutsourcing Policy"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-iii-branch-resignation-and-reservation",
+    "href": "ias_ots_sectt_apr_2024.html#hr-iii-branch-resignation-and-reservation",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-III Branch: Resignation and Reservation",
+    "text": "HR-III Branch: Resignation and Reservation\n\nResignation from service\nReservation Policy\nCertificates of reserved category candidates\nDomicile Certificates"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-iii-branch-special-benefits-and-incentives",
+    "href": "ias_ots_sectt_apr_2024.html#hr-iii-branch-special-benefits-and-incentives",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-III Branch: Special Benefits and Incentives",
+    "text": "HR-III Branch: Special Benefits and Incentives\n\nAll matter pertaining to certain benefits admissible to the categories employees or other employees including Pw Outstanding Sports Persons, etc.\nAdditional increments, incentive, award etc."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-iii-branch-miscellaneous-matters",
+    "href": "ias_ots_sectt_apr_2024.html#hr-iii-branch-miscellaneous-matters",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-III Branch: Miscellaneous Matters",
+    "text": "HR-III Branch: Miscellaneous Matters\n\nSpecial Casual Leave\nOutsourcing Policy\nHaryana Kaushal Rozgar Nigam\nFixation/Revision of Nigam Wage Rates(DC Rates)\nMilitary Service Benefits\nIncluding RTI cases on above matters."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#cc-i-ii-branches",
+    "href": "ias_ots_sectt_apr_2024.html#cc-i-ii-branches",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CC-I & II Branches",
+    "text": "CC-I & II Branches"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#cc-i-branch-responsibilities",
+    "href": "ias_ots_sectt_apr_2024.html#cc-i-branch-responsibilities",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CC-I Branch Responsibilities",
+    "text": "CC-I Branch Responsibilities\n\nEstablishment of Common Cadre Group D Employees\nAll cases pertaining to establishment of Common Cadre group D Employees from Joining to retirement.\nImplementation of and amendment in Group D Act, 2018.\nIncluding RTI cases above matters."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#cc-ii-branch-responsibilities",
+    "href": "ias_ots_sectt_apr_2024.html#cc-ii-branch-responsibilities",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "CC-II Branch Responsibilities",
+    "text": "CC-II Branch Responsibilities\n\nEstablishment of Common Cadre Group C Employees\nAll cases pertaining to establishment of Common Cadre Group C Employees, i.e. from joining to retirement.\nDrafting of Group C Bill.\nIncluding RTI cases on above matters."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#monitoring-and-coordination-branch",
+    "href": "ias_ots_sectt_apr_2024.html#monitoring-and-coordination-branch",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Monitoring and Coordination Branch",
+    "text": "Monitoring and Coordination Branch\n\nMonitoring of Hon’ble CM Announcements\nNorth Zonal Council Matters\nInter-State Coordination Issues\nAll miscellaneous and coordiantion matters by Chief Secretary\nMonitoring of projects &gt; Rs. 100 cr."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#administrative-reforms-branch",
+    "href": "ias_ots_sectt_apr_2024.html#administrative-reforms-branch",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Administrative Reforms Branch",
+    "text": "Administrative Reforms Branch\n\nAll matters concerning Administrative Reforms in the departments of the Government and introduction of Organization and Methods work.\nAll matters relating to Administrative Reforms Commission and follow up action on its reports.\nAssociations of Government employees-Policy regarding.\nClassification of Offices.\nInspection for delay checking and other administrative lapses in various departments."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#administrative-reforms-branch-1",
+    "href": "ias_ots_sectt_apr_2024.html#administrative-reforms-branch-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Administrative Reforms Branch",
+    "text": "Administrative Reforms Branch\n\nJoint Consultative Machinery for Government employees.\nPolicy regarding Records Management in Government departments.\nRevision and updating of Secretariat instructions and Office Manuals.\nWork study of various departments of Government for assessing staff requirements.\nRight to Information Act, 2005 (Act 22 of 2005).\nAll matters relating to the State Information Commission.\nPreparation and implementation of Citizen’s charters of departments."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#departmental-examinations",
+    "href": "ias_ots_sectt_apr_2024.html#departmental-examinations",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Departmental Examinations",
+    "text": "Departmental Examinations\nFor the following officers:\n\nIAS (OT)s: Assistant Commissioners (Under Training)\nHCS(EB) (OT)s: Extra Assistant Commissioners (Under Training)\n\nConfidential Branch.\nEach year, planned around June - July."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#recruitment-bodies",
+    "href": "ias_ots_sectt_apr_2024.html#recruitment-bodies",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Recruitment Bodies",
+    "text": "Recruitment Bodies\nAll establishment and policy matters of - Haryana Public Service Commission - Haryana Staff Selection Commission"
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#health-administrative-department",
+    "href": "ias_ots_sectt_apr_2024.html#health-administrative-department",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Health: Administrative Department",
+    "text": "Health: Administrative Department\n\nAdulteration of foodstuffs and other goods.\nBlood Transfusion Service and Blood Transfusion Centers in the State.\nDrugs and poisons and objectionable advertisements relating to drugs and medicines.\nEstablishment matters relating to officers and staff under the administrative control of the Department except matters allotted to the General Administration Department.\nFamily Planning."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#health-administrative-department-1",
+    "href": "ias_ots_sectt_apr_2024.html#health-administrative-department-1",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Health: Administrative Department",
+    "text": "Health: Administrative Department\n\nGrant-in-aid to local bodies (for hospitals and dispensaries, Ayurvedic Aushdhaliyas, and other institutions).\nHospitals, Dispensaries, Primary and Rural Health Centers.\nInfectious diseases, hospitals for their treatment and other measures for their suppression.\nLunacy and mental deficiency including places for the reception or treatment of lunatics and mentally deficient individuals.\nMedical attendance on Government servants and their families."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#health-administrative-department-2",
+    "href": "ias_ots_sectt_apr_2024.html#health-administrative-department-2",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Health: Administrative Department",
+    "text": "Health: Administrative Department\n\nMaternity and child welfare.\nMedical inspection of school children.\nProhibition of inoculation and making the Primary vaccination and revaccination of children compulsory.\nProhibition of smoking in Cinema Halls.\nPublic Health, Epidemic Diseases, and Sanitation."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#health-administrative-department-3",
+    "href": "ias_ots_sectt_apr_2024.html#health-administrative-department-3",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "Health: Administrative Department",
+    "text": "Health: Administrative Department\n\nRegistration of births and deaths.\nSupply of unclaimed bodies of deceased persons to hospitals and medical and teaching institutions for therapeutic purposes or for the purpose of anatomical operation and research work.\nThe Homoeopathic system of medicine.\nThe Indigenous systems of medicine."
+  },
+  {
+    "objectID": "ias_ots_sectt_apr_2024.html#hr-ii-branch",
+    "href": "ias_ots_sectt_apr_2024.html#hr-ii-branch",
+    "title": "Interaction with IAS (OT)s 2023-25 batch - Secretariat Attachment",
+    "section": "HR-II Branch",
+    "text": "HR-II Branch"
   }
 ]
