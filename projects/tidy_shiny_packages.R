@@ -15,6 +15,7 @@ library(ggtext)         # Markdown Text in ggplot2
 library(scales)         # Scale Labels in ggplot2
 library(treemapify)     # Tree-Map in the ggplot2
 library(colorspace)     # To lighten and darken colours
+library(magick)         # Editing images
 
 # Other optional libraries
 library(glue)           # To paste together text for ggtext
@@ -47,9 +48,10 @@ font_add_google("Nova Mono",
 showtext_auto()
 
 # Colour palette
-mypal <- paletteer::paletteer_d("wesanderson::GrandBudapest2")
-fillpal <- mypal |> lighten(0.2)
+mypal <- paletteer::paletteer_d("RColorBrewer::Pastel2")
+fillpal <- mypal
 colpal <- mypal |> darken(0.5)
+mypal <- mypal |> darken(0.5)
 
 # Define colours
 text_col <- "grey5"               # Colour for the text
@@ -69,15 +71,9 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-# Title image
-library(magick)
-title_image <- image_read(shiny_logo_url) |> 
-  image_crop("560X150+300+70") |> 
-  image_write(path = here("temp.png"))
-
 # Add text to plot--------------------------------------------------------------
 plot_title <- "<img src='temp.png' width='600'/>"
-subtitle_text <- glue::glue("Over 146,000 packages connect to Shiny. Most of these <b style='color:{mypal[1]}'> depend on </b>, or <b style='color:{mypal[2]}'> import</b>,<br>or, are <b style='color:{mypal[3]}'>linked to</b>, or, <b style='color:{mypal[4]}'>suggest</b>, some popular “parent” R packages. A look at<br>the most popular “parent” packages, with size (and numbers in bottom-right<br>of boxes) representing the number of “child” packages.")
+subtitle_text <- glue::glue("Over 146,000 packages connect to Shiny. Most of these <b style='color:{mypal[1]}'> depend on </b>, or <b style='color:{mypal[2]}'> import</b>,<br>or, are <b style='color:{mypal[3]}'>linked to</b>, or, <b style='color:{mypal[4]}'>suggest</b>, some popular “parent” R packages. The most<br>popular “parent” packages are shown below, with child pacakge-numbers in bottom-right.")
 plot_subtitle <- str_wrap(subtitle_text, 75)
 plot_caption <- paste0("**Data:** ShinyConf2024 - Tracy Teal and Jon Harmon |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
@@ -138,14 +134,20 @@ plot_caption <- paste0("**Data:** ShinyConf2024 - Tracy Teal and Jon Harmon |  *
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
+
+# Title image
+title_image <- image_read(shiny_logo_url) |> 
+  image_crop("560X150+300+70") |> 
+  image_write(path = here("temp.png"))
+
 g <- shiny_revdeps |> 
   count(dependency_type, parent) |> 
   filter(n > 100) |> 
   mutate(dependency_type = case_when(
-    dependency_type == "depends" ~ "Depends on",
-    dependency_type == "imports" ~ "Import",
-    dependency_type == "suggests" ~ "Suggested",
-    dependency_type == "linkingto" ~ "Linked to",
+    dependency_type == "depends" ~ glue("<b style='color:{mypal[1]}'> Depends on </b>"),
+    dependency_type == "imports" ~ glue("<b style='color:{mypal[2]}'> Imports</b>"),
+    dependency_type == "suggests" ~ glue("<b style='color:{mypal[4]}'>Suggests</b>"),
+    dependency_type == "linkingto" ~ glue("<b style='color:{mypal[3]}'>Linked to</b>"),
     .default = NA
   )) |> 
   ggplot(
@@ -197,11 +199,11 @@ g <- shiny_revdeps |>
     base_family = "body_font"
   ) +
   theme(
-    legend.position = "top",
+    legend.position = "none",
     legend.direction = "horizontal",
     plot.margin = margin(2, 2, 2, 2, "cm"),
     legend.title = element_blank(),
-    legend.text = element_text(
+    legend.text = element_markdown(
       margin = margin(0.4, 0.7, 0.4, 0.05, "cm"),
       size = 1.2 * ts,
       colour = text_hil,
@@ -240,3 +242,10 @@ ggsave(
   bg = "white"
 )
 
+unlink(here("temp.png"))
+
+shiny_revdeps |> 
+  count(dependency_type, parent) |> 
+  filter(n > 100) |> 
+  group_by(dependency_type) |> 
+  slice_max(order_by = n, n = 2)
