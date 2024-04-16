@@ -13,10 +13,8 @@ library(showtext)       # Using Fonts More Easily in R Graphs
 library(fontawesome)    # Social Media icons
 library(ggtext)         # Markdown Text in ggplot2
 library(scales)         # Scale Labels in ggplot2
-
-# Network data manipulation and visualization
-library(tidygraph)
-library(ggraph)
+library(treemapify)     # Tree-Map in the ggplot2
+library(colorspace)     # To lighten and darken colours
 
 # Other optional libraries
 library(glue)           # To paste together text for ggtext
@@ -47,15 +45,19 @@ font_add_google("Pompiere",
                 family = "body_font")        # Font for plot text
 showtext_auto()
 
+# Colour palette
+mypal <- paletteer::paletteer_d("nbapalettes::thunder")
+fillpal <- mypal |> lighten(0.2)
+colpal <- mypal |> darken(0.3)
+
 # Define colours
-text_col <- "#F2EBBBFF"               # Colour for the text
-text_hil <- "#DDAA33FF"               # Colour for highlighted text
-bg_col <- "grey10"                    # Background Colour
-text_hil2 <- "red"                    # Highlight colour for town names 
+text_col <- "white"               # Colour for the text
+text_hil <- "grey95"               # Colour for highlighted text
+bg_col <- "white"                    # Background Colour
+text_hil2 <- "grey5"                    # Highlight colour for town names 
 
 # Define Text Size
 ts =  90             # Text Size
-tsi = ts / 1.5       # Text Size Inset
 
 # Caption stuff
 sysfonts::font_add(family = "Font Awesome 6 Brands",
@@ -68,11 +70,10 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- ""
-subtitle_text <- glue::glue("")
+plot_title <- "How R packages connect to Shiny"
+subtitle_text <- glue::glue("The most popular way in which packages are connected to Shiny. Boxes show the most popular parent packages, and the number in boxes represent the number of packages depending on this package.")
 plot_subtitle <- subtitle_text
-plot_caption <- paste0("**Data & Inspiration:**  |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
-
+plot_caption <- paste0("**Data & Inspiration:** ShinyConf2024 - Tracy Teal and Jon Harmon |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
 #==============================================================================#
 # Exploratory Data Analysis & Data Wrangling -----------------------------------
@@ -125,32 +126,63 @@ plot_df <- as_tbl_graph(graph_df, directed = TRUE) |>
     NA
   ))
 
+# Second Concept Exploration and Data Viz Attempt
+
+bg_col <- "white"
+
+
+
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
 #==============================================================================#
 
-g <- plot_df |> 
-  ggraph(layout = "graphopt") +
-  geom_edge_link(
-    aes(colour = dependency_type),
-    alpha = 0.1
+g <- shiny_revdeps |> 
+  count(dependency_type, parent) |> 
+  filter(n > 100) |> 
+  ggplot(
+    aes(
+      label = parent,
+      area = n,
+      subgroup = dependency_type,
+      fill = dependency_type,
+      colour = dependency_type
+    )
   ) +
-  geom_node_point(
-    aes(size = importance),
-    colour = "grey25",
-    alpha = 0.5
+  geom_treemap(
+    layout = "scol",
+    alpha = 0.9
   ) +
-  geom_node_text(
-    aes(size = importance, label = display_name),
-    colour = "grey10",
-    check_overlap = TRUE
+  geom_treemap_subgroup_border(
+    colour = bg_col,
+    layout = "scol",
+    size = 10
   ) +
-  theme_void() +
+  geom_treemap_text(
+    layout = "scol",
+    place = "center",
+    grow = TRUE,
+    reflow = FALSE,
+    min.size = ts/5
+  ) +
+  geom_treemap_text(
+    aes(label = n),
+    layout = "scol",
+    place = "bottomright",
+    grow = FALSE,
+    size = ts/5, 
+    min.size = ts/10
+  ) +
+  scale_colour_manual(values = colpal) +
+  scale_fill_manual(values = fillpal) +
+  theme_void(
+    base_size = ts,
+    base_family = "body_font"
+  ) +
   theme(
-    legend.position = "none"
+    legend.position = "top",
+    legend.direction = "horizontal",
+    plot.margin = margin(2, 2, 2, 2, "cm")
   )
-
-
 #=============================================================================#
 # Image Saving-----------------------------------------------------------------
 #=============================================================================#
