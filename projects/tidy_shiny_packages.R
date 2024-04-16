@@ -31,30 +31,30 @@ library(glue)           # To paste together text for ggtext
 # rm(tuesdata)
 shiny_revdeps <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-04-16/shiny_revdeps.csv')
 
+shiny_logo_url <- "https://cache.sessionize.com/image/d4a2-1140o400o3-73VQ929AGYNKiVSALpF67z.png"
 
 #==============================================================================#
 # Options & Visualization Parameters--------------------------------------------
 #==============================================================================#
 
 # Load fonts
-font_add_google("Gotu", 
+font_add_google("Changa", 
                 family = "title_font")       # Font for titles
 font_add_google("Saira Extra Condensed", 
                 family = "caption_font")     # Font for the caption
-font_add_google("Pompiere", 
+font_add_google("Nova Mono", 
                 family = "body_font")        # Font for plot text
 showtext_auto()
 
 # Colour palette
-mypal <- paletteer::paletteer_d("nbapalettes::thunder")
+mypal <- paletteer::paletteer_d("wesanderson::GrandBudapest2")
 fillpal <- mypal |> lighten(0.2)
-colpal <- mypal |> darken(0.3)
+colpal <- mypal |> darken(0.5)
 
 # Define colours
-text_col <- "white"               # Colour for the text
-text_hil <- "grey95"               # Colour for highlighted text
+text_col <- "grey5"               # Colour for the text
+text_hil <- "grey25"               # Colour for highlighted text
 bg_col <- "white"                    # Background Colour
-text_hil2 <- "grey5"                    # Highlight colour for town names 
 
 # Define Text Size
 ts =  90             # Text Size
@@ -66,14 +66,20 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+# Title image
+library(magick)
+title_image <- image_read(shiny_logo_url) |> 
+  image_crop("560X150+300+70") |> 
+  image_write(path = here("temp.png"))
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- "How R packages connect to Shiny"
-subtitle_text <- glue::glue("The most popular way in which packages are connected to Shiny. Boxes show the most popular parent packages, and the number in boxes represent the number of packages depending on this package.")
-plot_subtitle <- subtitle_text
-plot_caption <- paste0("**Data & Inspiration:** ShinyConf2024 - Tracy Teal and Jon Harmon |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
+plot_title <- "<img src='temp.png' width='600'/>"
+subtitle_text <- glue::glue("Over 146,000 packages connect to Shiny. Most of these <b style='color:{mypal[1]}'> depend on </b>, or <b style='color:{mypal[2]}'> import</b>,<br>or, are <b style='color:{mypal[3]}'>linked to</b>, or, <b style='color:{mypal[4]}'>suggest</b>, some popular “parent” R packages. A look at<br>the most popular “parent” packages, with size (and numbers in bottom-right<br>of boxes) representing the number of “child” packages.")
+plot_subtitle <- str_wrap(subtitle_text, 75)
+plot_caption <- paste0("**Data:** ShinyConf2024 - Tracy Teal and Jon Harmon |  **Graphics:** ", social_caption_1, " |  **Code:**", social_caption_2)
 
 #==============================================================================#
 # Exploratory Data Analysis & Data Wrangling -----------------------------------
@@ -82,55 +88,51 @@ plot_caption <- paste0("**Data & Inspiration:** ShinyConf2024 - Tracy Teal and J
 # library(summarytools)
 # dfSummary(shiny_revdeps) |> view()
 
-# Number of parent packages to visualize
-nos_parent_pckgs <- 10
-# Number of child packages to visualize
-nos_child_pckgs <- 50
-
-top_pkgs <- shiny_revdeps |> 
-  count(parent, sort = T) |> 
-  slice_max(order_by = n, n = nos_parent_pckgs) |> 
-  pull(parent)
-
-filter_pckgs <- shiny_revdeps |> 
-  filter(parent %in% top_pkgs) |> 
-  count(child, sort = T) |> 
-  slice_max(order_by = n, n = nos_child_pckgs, with_ties = FALSE) |> 
-  pull(child)
-
-graph_df <- shiny_revdeps |> 
-  filter(parent %in% top_pkgs) |> 
-  filter(child %in% filter_pckgs) |> 
-  rename(
-    from = child,
-    to = parent
-  ) |> 
-  relocate(dependency_type, .after = everything())
-
-count_pckgs <- graph_df |> 
-  select(from, to) |> 
-  pivot_longer(
-    cols = everything(),
-    names_to = NULL, 
-    values_to = "name"
-  ) |> 
-  count(name, sort = TRUE) |> 
-  rename(importance = n)
-
-plot_df <- as_tbl_graph(graph_df, directed = TRUE) |> 
-  activate(nodes) |> 
-  left_join(count_pckgs) |> 
-  mutate(display_name = if_else(
-    name %in% top_pkgs,
-    name,
-    NA
-  ))
+# # Number of parent packages to visualize
+# nos_parent_pckgs <- 10
+# # Number of child packages to visualize
+# nos_child_pckgs <- 50
+# 
+# top_pkgs <- shiny_revdeps |> 
+#   count(parent, sort = T) |> 
+#   slice_max(order_by = n, n = nos_parent_pckgs) |> 
+#   pull(parent)
+# 
+# filter_pckgs <- shiny_revdeps |> 
+#   filter(parent %in% top_pkgs) |> 
+#   count(child, sort = T) |> 
+#   slice_max(order_by = n, n = nos_child_pckgs, with_ties = FALSE) |> 
+#   pull(child)
+# 
+# graph_df <- shiny_revdeps |> 
+#   filter(parent %in% top_pkgs) |> 
+#   filter(child %in% filter_pckgs) |> 
+#   rename(
+#     from = child,
+#     to = parent
+#   ) |> 
+#   relocate(dependency_type, .after = everything())
+# 
+# count_pckgs <- graph_df |> 
+#   select(from, to) |> 
+#   pivot_longer(
+#     cols = everything(),
+#     names_to = NULL, 
+#     values_to = "name"
+#   ) |> 
+#   count(name, sort = TRUE) |> 
+#   rename(importance = n)
+# 
+# plot_df <- as_tbl_graph(graph_df, directed = TRUE) |> 
+#   activate(nodes) |> 
+#   left_join(count_pckgs) |> 
+#   mutate(display_name = if_else(
+#     name %in% top_pkgs,
+#     name,
+#     NA
+#   ))
 
 # Second Concept Exploration and Data Viz Attempt
-
-bg_col <- "white"
-
-
 
 #==============================================================================#
 # Data Visualization------------------------------------------------------------
@@ -139,6 +141,13 @@ bg_col <- "white"
 g <- shiny_revdeps |> 
   count(dependency_type, parent) |> 
   filter(n > 100) |> 
+  mutate(dependency_type = case_when(
+    dependency_type == "depends" ~ "Depends on",
+    dependency_type == "imports" ~ "Import",
+    dependency_type == "suggests" ~ "Suggested",
+    dependency_type == "linkingto" ~ "Linked to",
+    .default = NA
+  )) |> 
   ggplot(
     aes(
       label = parent,
@@ -155,25 +164,34 @@ g <- shiny_revdeps |>
   geom_treemap_subgroup_border(
     colour = bg_col,
     layout = "scol",
-    size = 10
+    size = 2
   ) +
   geom_treemap_text(
     layout = "scol",
     place = "center",
     grow = TRUE,
-    reflow = FALSE,
-    min.size = ts/5
+    reflow = TRUE,
+    min.size = ts/20,
+    padding.x = unit(1, "mm"),
+    family = "body_font"
   ) +
   geom_treemap_text(
     aes(label = n),
     layout = "scol",
     place = "bottomright",
-    grow = FALSE,
-    size = ts/5, 
-    min.size = ts/10
+    size = ts / 4,
+    #min.size = ts/20,
+    padding.x = unit(1, "mm"),
+    padding.y = unit(1, "mm"),
+    family = "body_font"
   ) +
   scale_colour_manual(values = colpal) +
   scale_fill_manual(values = fillpal) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
   theme_void(
     base_size = ts,
     base_family = "body_font"
@@ -181,7 +199,33 @@ g <- shiny_revdeps |>
   theme(
     legend.position = "top",
     legend.direction = "horizontal",
-    plot.margin = margin(2, 2, 2, 2, "cm")
+    plot.margin = margin(2, 2, 2, 2, "cm"),
+    legend.title = element_blank(),
+    legend.text = element_text(
+      margin = margin(0.4, 0.7, 0.4, 0.05, "cm"),
+      size = 1.2 * ts,
+      colour = text_hil,
+      family = "title_font"
+    ),
+    plot.title = element_markdown(
+      margin = margin(0,0,0,0, "cm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_markdown(
+      size = ts,
+      hjust = 0.5,
+      colour = text_hil,
+      family = "title_font",
+      lineheight = 0.3,
+      margin = margin(0, 0, 0.5, 0, "cm")
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      size = 0.75 * ts,
+      hjust = 0.5,
+      colour = text_hil
+    ),
+    legend.key.width = unit(2, "cm")
   )
 #=============================================================================#
 # Image Saving-----------------------------------------------------------------
@@ -191,7 +235,8 @@ ggsave(
   filename = here::here("docs", "tidy_shiny_packages.png"),
   plot = g,
   width = 40, 
-  height = 55, 
+  height = 52, 
   units = "cm",
   bg = "white"
 )
+
