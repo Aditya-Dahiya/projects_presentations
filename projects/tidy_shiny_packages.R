@@ -7,6 +7,7 @@
 # Data Wrangling Libraries
 library(tidyverse)      # Data Wrangling and Plotting
 library(here)           # Files location and loading
+library(janitor)        # Cleaning names
 
 # Data Visualization Libraries
 library(showtext)       # Using Fonts More Easily in R Graphs
@@ -24,11 +25,11 @@ library(glue)           # To paste together text for ggtext
 #==============================================================================#
 
 # Option 1: tidytuesdayR package 
-## install.packages("tidytuesdayR")
-# tuesdata <- tidytuesdayR::tt_load(2024, week = 16)
-# 
-# shiny_revdeps <- tuesdata$shiny_revdeps
-# package_details <- tuesdata$package_details
+# install.packages("tidytuesdayR")
+tuesdata <- tidytuesdayR::tt_load(2024, week = 16)
+
+shiny_revdeps <- tuesdata$shiny_revdeps
+package_details <- tuesdata$package_details
 # rm(tuesdata)
 shiny_revdeps <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-04-16/shiny_revdeps.csv')
 
@@ -71,7 +72,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-# Add text to plot--------------------------------------------------------------
+# Add text to plot
 plot_title <- "<img src='temp.png' width='600'/>"
 subtitle_text <- glue::glue("Over 146,000 packages connect to Shiny. Most of these <b style='color:{mypal[1]}'> depend on </b>, or <b style='color:{mypal[2]}'> import</b>,<br>or, are <b style='color:{mypal[3]}'>linked to</b>, or, <b style='color:{mypal[4]}'>suggest</b>, some popular “parent” R packages. The most<br>popular “parent” packages are shown below, with child pacakge-numbers in bottom-right.")
 plot_subtitle <- str_wrap(subtitle_text, 75)
@@ -249,3 +250,140 @@ shiny_revdeps |>
   filter(n > 100) |> 
   group_by(dependency_type) |> 
   slice_max(order_by = n, n = 2)
+
+
+
+#==============================================================================#
+# Attempt 2nd Viz---------------------------------------------------------------
+#==============================================================================#
+
+# Load libraries + Data Wrangling ----------------------------------------------
+library(tidygraph)
+library(ggraph)
+# from CRAN
+# install.packages("PNWColors")
+library(PNWColors)
+library(colorspace)
+mypal <- pnw_palette("Winter", 4)
+font_add_google("Thasadith", family = "first_font")
+font_add_google("Saira Extra Condensed", family = "second_font")
+
+object.size(package_details)
+
+df5 <- package_details |> 
+  clean_names() |> 
+  select(
+    package, date, date_publication, 
+    maintainer, reverse_imports,
+  ) |> 
+  mutate(
+    date = as_date(date),
+    date_time = as_datetime(date_publication)
+  ) |> 
+  select(-date_publication) |> 
+  separate_wider_delim(
+    cols = maintainer,
+    names = c("maintainer", NA),
+    delim = " <",
+    too_few = "align_start"
+  )
+  
+
+# Network Graph amongst top "top_m" maintainers --------------------------------
+top_m <- 20
+
+selected_maintainers <- df5 |> 
+  count(maintainer, sort = T) |> 
+  slice_max(order_by = n, n = top_m)
+
+network1 <- df5 |> 
+  select(-date, -date_time) |> 
+  filter(maintainer %in% selected_maintainers$maintainer) |> 
+  separate_longer_delim(
+    cols = reverse_imports,
+    delim = ", "
+  ) |> 
+  left_join(
+    df5 |> select(package, maintainer) |> rename(ri_maintainer = maintainer),
+    by = join_by(reverse_imports == package)
+  ) |> 
+  filter(ri_maintainer %in% selected_maintainers$maintainer) |> 
+  rename(
+    to = ri_maintainer,
+    from = maintainer
+  ) |> 
+  select(-c(package, reverse_imports)) |> 
+  count(from, to)
+
+# Plotting ---------------------------------------------------------------------
+set.seed(42)
+g <- as_tbl_graph(network1, directed = TRUE) |>
+  activate(nodes) |> 
+  mutate(
+    popularity = centrality_degree(mode = "in", weights = n)
+  ) |>
+  left_join(selected_maintainers, by = join_by(name == maintainer)) |> 
+  rename(n_pckgs = n) |> 
+  ggraph(layout = "stress") +
+  geom_edge_arc(
+    aes(width = n),
+    alpha = 0.3,
+    lineend = "round",
+    strength = -0.05,
+    colour = mypal[3],
+    arrow = arrow()
+  ) +
+  geom_node_label(
+    aes(
+      label = paste0(name, " (", n_pckgs, ")"),
+      size = popularity
+    ),
+    alpha = 1,
+    family = "second_font",
+    colour = mypal[2],
+    fill  = mypal[4] |> lighten(0.2),
+    label.padding = unit(2, "mm"),
+    label.r = unit(2, "mm"), repel = T
+  ) +
+  scale_edge_width(range = c(0.5, 10)) +
+  scale_size_continuous(range = c(ts/8, ts/2)) +
+  labs(
+    title = paste0("Top ", top_m, " R Packages' Maintainers"),
+    subtitle = "Linkages (imports) amongst packages maintained by each author.\nNumber in brackets represents number of packages maintained by each.",
+    caption = plot_caption
+  ) +
+  theme_void(
+    base_family = "first_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      size = ts * 3,
+      colour = mypal[1],
+      margin = margin(2,0,0,1, "cm")
+    ),
+    plot.subtitle = element_text(
+      hjust = 0,
+      size = 1.2 * ts,
+      lineheight = 0.35,
+      colour = mypal[1],
+      margin = margin(0.5,0,0,1, "cm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      colour = mypal[1],
+      margin = margin(0,0,1.5,0, "cm"),
+      family = "caption_font"
+    ),
+  )
+
+# Saving -----------------------------------------------------------------------
+ggsave(
+  filename = here::here("docs", "tidy_shiny_packages2.png"),
+  plot = g,
+  width = 45, 
+  height = 45, 
+  units = "cm",
+  bg = mypal[4]
+)
