@@ -1,0 +1,196 @@
+---
+title: "Global Border Crossings"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "Global Border Crossings"
+categories:
+  - "Data Is Plural"
+  - "Maps"
+image: "dip_border_crossings.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+[Michael R. Kenwick and colleagues](https://journals.sagepub.com/doi/10.1177/00223433221145582) have compiled the [Border Crossings of the World](https://mkenwick.com/datameasurement/#borders) dataset, which examines how state authority is manifested spatially through infrastructure at international borders. Using satellite imagery, the researchers identified the presence of gates, official structures, and split-lane inspection facilities on an annual basis since the 1990s. Additionally, the [dataset](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/RRV0JZ) includes a metric called "**border orientation score**" (measured at the directed border crossing year) that assesses the *degree to which a state demonstrates its commitment to controlling the terms of border penetration through spatial displays of its capacities*. This information was brought to light by [Erik Gahner](https://github.com/erikgahner/PolData/commit/c46f0ae069a2ccdd28d47ec17c254c80c3babcbe) \| Data [Codebook](https://dataverse.harvard.edu/file.xhtml?fileId=4815394&version=1.1) \| [Data](https://dataverse.harvard.edu/file.xhtml?fileId=4556046&version=1.1)
+
+```{r}
+#| label: setup
+
+# Data Wrangling Tools
+library(tidyverse)
+library(janitor)
+library(here)
+library(dataverse)
+
+# Final plot tools
+library(scales)
+library(fontawesome)
+library(ggtext)
+library(showtext)
+library(colorspace)
+library(ggthemes)
+library(patchwork)
+
+# Mapping tools
+library(rnaturalearth)
+
+# Data Load-in, EDA & Data Wrangling 
+
+border <- get_dataframe_by_id(
+  fileid = 4556046,
+  .f = readr::read_tsv,
+  server = "dataverse.harvard.edu"
+) |> 
+  as_tibble()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Stint Ultra Condensed",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Advent Pro",
+  family = "body_font"
+) 
+
+# Font for plot text 2
+font_add_google("UnifrakturMaguntia",
+  family = "country_font"
+)
+
+showtext_auto()
+
+bg_col <- "lightblue" # Background Colour
+text_col <- "grey5" # Colour for the text
+text_hil <- "grey20" # Colour for highlighted text
+
+# Define Text Size
+ts <- 80 # Text Size
+
+# Caption stuff
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- ""
+plot_caption <- paste0(
+  "**Data:** ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+subtitle_text <- ""
+plot_subtitle <- str_wrap("", width = 70)
+
+```
+
+Data Analysis and Plotting the Visualization
+
+```{r}
+#| label: data-wrangling
+
+plotdf <- border |> 
+  select(borderid, country1, country2, 
+         lat, lon = long,
+         theta, visa_waiver) |> 
+  group_by(borderid) |> 
+  summarise(
+    lat = mean(lat), lon = mean(lon),
+    theta = mean(theta),
+    visa_waiver = mean(visa_waiver)
+  )
+
+
+world <- ne_countries(
+  type = "countries",
+  returnclass = "sf"
+) |> 
+  filter(sovereignt != "Antarctica")
+
+
+```
+
+```{r}
+#| label: dataviz
+
+
+ggplot() +
+  geom_sf(
+    data = world,
+    fill = "white",
+    colour = "black"
+  ) +
+  geom_point(
+    data = plotdf,
+    mapping = aes(
+      x = lon,
+      y = lat,
+      colour = theta,
+      shape = as_factor(visa_waiver)
+    )
+  ) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    "ggthemes::Red-Green-Gold Diverging"
+    ) +
+  ggthemes::theme_map() +
+  theme(
+    plot.background = element_rect(
+      fill = bg_col,
+      linewidth = NA, 
+      colour = NA
+    )
+  )
+
+
+# Image Saving
+ggsave(
+  filename = here::here("docs", "....png"),
+  plot = g,
+  width = 210,
+  height = 297,
+  units = "mm",
+  bg = bg_col
+)
+```
