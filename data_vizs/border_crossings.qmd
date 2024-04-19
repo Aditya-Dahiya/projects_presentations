@@ -160,26 +160,37 @@ world <- ne_countries(
 #| label: dataviz
 
 
-ggplot() +
+g <- ggplot() +
   geom_sf(
     data = world,
     fill = "white",
-    colour = "black"
+    colour = "black",
+    linewidth = 0.1
   ) +
   geom_point(
     data = plotdf,
     mapping = aes(
       x = lon,
       y = lat,
-      colour = theta,
-      shape = as_factor(visa_waiver)
-    )
+      colour = theta
+    ),
+    alpha = 0.75,
+    shape = 1
   ) +
   scale_x_continuous(
     expand = expansion(0)
   ) +
   paletteer::scale_colour_paletteer_c(
-    "ggthemes::Red-Green-Gold Diverging"
+    "ggthemes::Red-Green-Gold Diverging",
+    breaks = seq(-2, 2, 1),
+    labels = c(
+      "Least Checks",
+      "Less",
+      "Average",
+      "More",
+      "Most strict"
+    ),
+    name = "Border Orientation Score: Checks &  Infrastructure"
     ) +
   ggthemes::theme_map() +
   theme(
@@ -187,16 +198,21 @@ ggplot() +
       fill = bg_col,
       linewidth = NA, 
       colour = NA
-    )
+    ),
+    legend.position.inside = c(0.4, 0),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.key.width = unit(20, "mm"),
+    legend.background = element_rect(fill = NA, colour = NA)
   )
 
 
 # Image Saving
 ggsave(
-  filename = here::here("docs", "....png"),
+  filename = here::here("data_vizs", "border_crossings.png"),
   plot = g,
-  width = 210,
-  height = 297,
+  width = 297,
+  height = 210,
   units = "mm",
   bg = bg_col
 )
