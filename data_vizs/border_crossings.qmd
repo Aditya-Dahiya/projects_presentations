@@ -29,6 +29,8 @@ share:
 
 [Michael R. Kenwick and colleagues](https://journals.sagepub.com/doi/10.1177/00223433221145582) have compiled the [Border Crossings of the World](https://mkenwick.com/datameasurement/#borders) dataset, which examines how state authority is manifested spatially through infrastructure at international borders. Using satellite imagery, the researchers identified the presence of gates, official structures, and split-lane inspection facilities on an annual basis since the 1990s. Additionally, the [dataset](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/RRV0JZ) includes a metric called "**border orientation score**" (measured at the directed border crossing year) that assesses the *degree to which a state demonstrates its commitment to controlling the terms of border penetration through spatial displays of its capacities*. This information was brought to light by [Erik Gahner](https://github.com/erikgahner/PolData/commit/c46f0ae069a2ccdd28d47ec17c254c80c3babcbe) \| Data [Codebook](https://dataverse.harvard.edu/file.xhtml?fileId=4815394&version=1.1) \| [Data](https://dataverse.harvard.edu/file.xhtml?fileId=4556046&version=1.1)
 
+Load libraries and Data, Creating custom functions
+
 ```{r}
 #| label: setup
 
@@ -49,6 +51,8 @@ library(patchwork)
 
 # Mapping tools
 library(rnaturalearth)
+library(sf)
+library(patchwork)
 
 # Data Load-in, EDA & Data Wrangling 
 
@@ -58,6 +62,23 @@ border <- get_dataframe_by_id(
   server = "dataverse.harvard.edu"
 ) |> 
   as_tibble()
+
+# border <- read_tsv("C:/Users/dradi/Downloads/regression_data.tab")
+
+# Create a function to draw a bounding box to plot a rectangle on Map
+geometric_rectangle <- function(lat_min, lat_max, lon_min, lon_max) {
+  box_coords <- matrix(
+    data = c(
+      c(lon_min, lon_max, lon_max, lon_min, lon_min),
+      c(lat_min, lat_min, lat_max, lat_max, lat_min)
+    ),
+    ncol = 2, byrow = FALSE
+  )
+  return(
+    st_polygon(list(box_coords)) |> 
+      st_sfc(crs = 4326)   # Set the CRS to EPSG:4326, the default
+  )
+} 
 ```
 
 Visualization Parameters
@@ -65,16 +86,9 @@ Visualization Parameters
 ```{r}
 #| label: viz-params
 
-# Basics: QR Code
-library(qrcode)
-qrcode::qr_code("https://aditya-dahiya.github.io/projects_presentations/data_vizs.html") |> 
-  plot()
-  raster::raster()
-  magick::image_background(color = "lightblue")
-
 
 # Font for titles
-font_add_google("Stint Ultra Condensed",
+font_add_google("Scope One",
   family = "title_font"
 ) 
 
@@ -84,23 +98,18 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Advent Pro",
+font_add_google("Barlow Semi Condensed",
   family = "body_font"
 ) 
-
-# Font for plot text 2
-font_add_google("UnifrakturMaguntia",
-  family = "country_font"
-)
 
 showtext_auto()
 
 bg_col <- "lightblue" # Background Colour
-text_col <- "grey5" # Colour for the text
+text_col <- "grey15" # Colour for the text
 text_hil <- "grey20" # Colour for highlighted text
 
 # Define Text Size
-ts <- 80 # Text Size
+ts <- 40 # Text Size
 
 # Caption stuff
 sysfonts::font_add(
@@ -115,99 +124,328 @@ social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
 
+```
 
-# Add text to plot--------------------------------------------------------------
-plot_title <- ""
+Plot Text
+
+```{r}
+#| label: plot-text
+
+plot_title <- "International Border Crossings"
 plot_caption <- paste0(
-  "**Data:** ", 
+  "**Data:** Border Crossings of the World by Michael R. Kenwick et al", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
-subtitle_text <- ""
-plot_subtitle <- str_wrap("", width = 70)
-
+subtitle_text <- "Comparison of Infrastructure at the Border Crossings. West-European and West-African border crossings are the least secured, while Eastern Europe and US-Mexico Border have high checking infrastructure."
+plot_subtitle <- str_wrap(subtitle_text, width = 105)
+plot_subtitle |> str_view()
 ```
 
-Data Analysis and Plotting the Visualization
+Data Analysis and Wrangling
 
 ```{r}
 #| label: data-wrangling
 
+# Data on Border Crossings - Selected Fields to plot on the World Map
 plotdf <- border |> 
-  select(borderid, country1, country2, 
-         lat, lon = long,
+  dplyr::select(borderid, country1, country2, 
+         lat, long,
          theta, visa_waiver) |> 
   group_by(borderid) |> 
   summarise(
-    lat = mean(lat), lon = mean(lon),
+    lat = mean(lat), lon = mean(long),
     theta = mean(theta),
     visa_waiver = mean(visa_waiver)
-  )
+  ) |> 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
 
-
+# Getting a World Map for Base Plot
 world <- ne_countries(
+  scale = "large",
   type = "countries",
   returnclass = "sf"
-) |> 
-  filter(sovereignt != "Antarctica")
+)
 
-
+# Adding the politically correct map of India to the World Map by ne_countries()
+india_correct <- read_sf(here("data", "india_map", "India_State_Boundary.shp")) |> 
+  st_simplify(dTolerance = 500) |> 
+  rmapshaper::ms_dissolve() |>            # removing the internal state borders
+  rmapshaper::ms_simplify(keep = 0.2)     # removing left over multiploygons
 ```
 
+The Base Plot - World Map
+
 ```{r}
-#| label: dataviz
+#| label: main-dataviz
 
-
-g <- ggplot() +
+g_base <- ggplot() +
   geom_sf(
     data = world,
     fill = "white",
-    colour = "black",
-    linewidth = 0.1
+    colour = text_col,
+    linewidth = 0.05
   ) +
-  geom_point(
+  geom_sf(
+    data = india_correct,
+    fill = "white",
+    colour = text_col,
+    linewidth = 0.05
+  ) +
+  geom_sf(
     data = plotdf,
     mapping = aes(
-      x = lon,
-      y = lat,
       colour = theta
     ),
     alpha = 0.75,
-    shape = 1
+    shape = 1,
+    size = 2,
+    stroke = 0.5
   ) +
-  scale_x_continuous(
-    expand = expansion(0)
+  geom_sf(
+    data = geometric_rectangle(35, 70, -10, 40),
+    fill = NA, colour = text_col,
+    linewidth = 0.3, 
+    linetype = 3
+  ) +
+  coord_sf(
+    crs = this_crs,
+    expand = FALSE
   ) +
   paletteer::scale_colour_paletteer_c(
-    "ggthemes::Red-Green-Gold Diverging",
+    "grDevices::Temps",
     breaks = seq(-2, 2, 1),
+    limits = c(-2, +2),
+    oob = scales::squish,
     labels = c(
-      "Least Checks",
+      "Minimal",
       "Less",
       "Average",
       "More",
-      "Most strict"
+      "Most developed"
     ),
-    name = "Border Orientation Score: Checks &  Infrastructure"
+    name = "Infrastructure at the Border Crossing",
+    na.value = "#EAD68EFF"  # Impute average value to missing values
     ) +
-  ggthemes::theme_map() +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle, 
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = ts
+  ) +
   theme(
     plot.background = element_rect(
       fill = bg_col,
       linewidth = NA, 
       colour = NA
     ),
-    legend.position.inside = c(0.4, 0),
+    legend.position.inside = c(0.4, 0.1),
+    legend.justification = c(0, 0),
     legend.direction = "horizontal",
     legend.title.position = "top",
-    legend.key.width = unit(20, "mm"),
-    legend.background = element_rect(fill = NA, colour = NA)
+    legend.key.width = unit(15, "mm"),
+    legend.key.height = unit(3, "mm"),
+    legend.title = element_text(
+      hjust = 0.5, 
+      margin = margin(0,0,2,0,"mm"),
+      face = "bold",
+      colour = text_col,
+      size = 1.2 * ts
+    ),
+    legend.text = element_text(
+      margin = margin(1,0,0,0, "mm"),
+      size = 0.75 * ts,
+      family = "caption_font"
+    ),
+    legend.background = element_rect(fill = NA, colour = NA),
+    plot.title = element_text(
+      size = ts * 4,
+      colour = text_hil,
+      family = "title_font",
+      margin = margin(10,0,1,0,"mm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      lineheight = 0.3,
+      colour = text_col,
+      family = "caption_font",
+      margin = margin(0,0,2,0,"mm"),
+      size = 1.5 * ts
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(0,0,5,0,"mm")
+    ),
+    plot.margin = margin(0,0,0,0, "mm")
   )
 
+```
 
-# Image Saving
+Add-on maps, insets and annotations
+
+```{r}
+#| label: insets
+
+# Define limits of the inset map
+map_lim <- geometric_rectangle(36, 70, -10, 38) |> 
+  st_transform(this_crs) |> 
+  st_bbox()
+
+# A subtitle for the inset
+inset_subtitle <- "Those is <b style='color:#089392FF'> Western Europe </b> have minimal infrastructure,<br>perhaps due to free movement in the Schengen Area.<br> In contrast, <b style='color:#CF597EFF'> East-Europe  </b> have checks & high infrastructure,<br>perhaps a reminiscent of the 'Iron Curtain'!"
+inset_title <- "Europe's border crossings"
+
+set.seed(42)
+g1 <- ggplot() +
+  geom_sf(
+    data = world,
+    fill = "white",
+    colour = "black",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = plotdf,
+    mapping = aes(
+      colour = theta
+    ),
+    alpha = 0.75,
+    shape = 1,
+    size = 1,
+    stroke = 1.2
+  ) +
+  geom_sf_text(
+    data = world,
+    aes(label = sovereignt),
+    family = "caption_font",
+    colour = text_hil,
+    size = ts/7
+  ) +
+  coord_sf(
+    xlim = c(map_lim["xmin"], map_lim["xmax"]),
+    ylim = c(map_lim["ymin"], map_lim["ymax"]),
+    expand = FALSE,
+    crs = this_crs
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    "grDevices::Temps",
+    breaks = seq(-2, 2, 1),
+    limits = c(-2, +2),
+    na.value = "#EAD68EFF",
+    oob = scales::squish
+    ) +
+  labs(
+    subtitle = inset_subtitle,
+    title = inset_title
+  ) +
+  ggthemes::theme_map(
+    base_size = 0.5 * ts,
+    base_family = "body_font"
+  ) +
+  theme(
+    plot.subtitle = element_markdown(
+      lineheight = 0.3,
+      margin = margin(0.5,0,1,0, "mm"),
+      colour = text_col
+    ),
+    plot.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      face = "bold"
+    ),
+    panel.border = element_rect(
+      fill = NA,
+      linewidth = 0.5,
+      linetype = 3,
+      colour = text_col
+    ),
+    legend.position = "none"  
+    )
+
+# ggplot() +
+#   annotate(
+#     geom = "text",
+#     x = 0, y = 0,
+#     size = ts/5,
+#     hjust = 0,
+#     vjust = 1,
+#     lineheight = 0.5,
+#     label = str_wrap(
+#       subtitle_text,
+#       70
+#     ),
+#     family = "body_font",
+#     colour = text_col
+#   ) +
+#   theme_void()
+
+# QR Code for the plot
+url_graphics <- "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_col, fill = bg_col
+    ) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = text_col,
+    linewidth = 1,
+    linetype = 1
+    )
+  )
+```
+
+Compiling Plots with Patchwork
+
+```{r}
+#| label: patchwork
+
+g <- g_base +
+  
+  # Add inset to the plot
+  inset_element(
+    p = g1, 
+    left = 0, right = 0.27,
+    top = 0.65, bottom = 0.01,
+    align_to = "plot"
+  ) +
+  
+  # Add QR Code
+  inset_element(
+    p = plot_qr,
+    left = 0.9, right = 1,
+    top = 0.3, bottom = -0.1,
+    align_to = "plot"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col, 
+        colour = NA, linewidth = 0
+      )
+    )
+  )
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
 ggsave(
   filename = here::here("data_vizs", "border_crossings.png"),
   plot = g,
