@@ -1,0 +1,231 @@
+---
+title: "Template"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "Template for future Visualizations"
+categories:
+  - "Data Is Plural"
+  - "#TidyTuesday"
+  - "Maps"
+  - "Geopolitics"
+  - "Sciences"
+image: ".png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+**\|** [Source](#) **\|** [Data](#)
+
+\[Insert Image Here\]
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(here)                 # Root Directory Management
+library(dataverse)            # Getting data from Harvard Dataverse
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(ggthemes)             # Themes for ggplot2
+library(patchwork)            # Combining plots
+
+# Mapping tools
+library(rnaturalearth)        # Maps of the World   
+library(sf)                   # All spatial objects in R
+
+# Importing raw data
+
+# Custom Theme Function
+theme_custom <- function(...){
+  theme(
+    plot.background = element_rect(
+      fill = bg_col,
+      linewidth = NA, 
+      colour = NA
+    ),
+    plot.title = element_text(
+      size = 2 * ts,
+      colour = text_hil,
+      family = "title_font",
+      margin = margin(10, 0, 5, 0,"mm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      lineheight = 0.3,
+      colour = text_col,
+      family = "body_font",
+      margin = margin(5, 0, 5, 0, "mm"),
+      size = ts
+    ),
+    plot.caption = ggtext::element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(0, 0, 5, 0, "mm")
+    ),
+    ...
+  )
+}
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Scope One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "lightblue"
+
+# Colour for the text
+text_col <- "grey15" 
+
+# Colour for highlighted text
+text_hil <- "grey20" 
+
+# Define Base Text Size
+ts <- 40 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Plot Text
+
+```{r}
+#| label: plot-text
+
+plot_title <- ""
+
+plot_caption <- paste0(
+  "**Data:** ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+subtitle_text <- ""
+plot_subtitle <- str_wrap(subtitle_text, width = 100)
+plot_subtitle |> str_view()
+```
+
+Data Analysis and Wrangling
+
+```{r}
+#| label: data-wrangling
+
+```
+
+The Base Plot - World Map
+
+```{r}
+#| label: main-dataviz
+
+
+```
+
+Add-on maps, insets and annotations
+
+```{r}
+#| label: insets
+
+```
+
+Compiling Plots with Patchwork
+
+```{r}
+#| label: patchwork
+
+g <- g_base +
+  
+  # Add inset to the plot
+  inset_element(
+    p = g1, 
+    left = 0, 
+    right = 0.27,
+    bottom = 0.01,
+    top = 0.65, 
+    align_to = "plot"
+  ) +
+  
+  # Basix Plot Annotations
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col, 
+        colour = NA, linewidth = 0
+      )
+    )
+  )
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", ".png"),
+  plot = g,
+  width = 210,    # Default A4 size page
+  height = 297,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
+```
