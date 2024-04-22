@@ -243,10 +243,10 @@ anim_save(
   filename = here::here("docs", "tidy_outer_space.gif"),
   animation = g,
   start_pause = 0,
-  end_pause = 25,
-  fps = 20,
+  end_pause = 40,
+  fps = 15,
   duration = 20,
-  height = 550,
+  height = 500,
   width = 500,
   units = "px"
 )
