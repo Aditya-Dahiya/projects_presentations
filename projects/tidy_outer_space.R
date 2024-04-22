@@ -224,7 +224,7 @@ g <- ggplot(
     ),
     axis.title.x = element_text(
       colour = text_col,
-      margin = margin(10, 0, 2, 0, "pt")
+      margin = margin(20, 0, 2, 0, "pt")
     )
   ) +
     # For animation: Creating facets by year, and then removing them
