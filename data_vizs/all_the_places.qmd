@@ -1,0 +1,329 @@
+---
+title: "All the places - brands & stores around the world"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "Template for future Visualizations"
+categories:
+  - "Data Is Plural"
+  - "#TidyTuesday"
+  - "Maps"
+  - "Geopolitics"
+  - "Sciences"
+image: ".png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+# All the places
+
+**All the Places** is a project aimed at generating [point of interest (POI)](https://en.wikipedia.org/wiki/Point_of_interest) data by sourcing information from websites with 'store location' pages. The project utilizes [`scrapy`](https://scrapy.org/), a popular Python-based web scraping framework, to run individual site [spiders](https://doc.scrapy.org/en/latest/topics/spiders.html) that extract POI data. The results are then published in a [standard format](https://github.com/alltheplaces/alltheplaces/blob/master/DATA_FORMAT.md). There are several `scrapy` tutorials available on-line, and [this series on YouTube](https://www.youtube.com/watch?v=s4jtkzHhLzY) provides a reasonable starting point.
+
+*\[Insert Image Here\]*
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(ggthemes)             # Themes for ggplot2
+library(patchwork)            # Combining plots
+
+# Mapping tools
+library(rnaturalearth)        # Maps of the World   
+library(sf)                   # All spatial objects in R
+library(geojsonio)            # To read geojson files into R
+
+
+# Importing raw data: Ramraj Cotton
+name_of_store <- "ramraj_cotton_in"
+url1 <- paste0(
+  "https://alltheplaces-data.openaddresses.io/runs/2024-04-20-13-31-46/output/", 
+  name_of_store, 
+  ".geojson")
+
+df1 <- geojsonio::geojson_read(url1, what = "sp") |> 
+  st_as_sf(crs = 4326) |> 
+  janitor::clean_names() |> 
+  mutate(store_name = "Ramraj Cotton")
+
+# Importing raw data: Blackberrys India
+name_of_store <- "blackberrys_in"
+url2 <- paste0(
+  "https://alltheplaces-data.openaddresses.io/runs/2024-04-20-13-31-46/output/", 
+  name_of_store, 
+  ".geojson")
+
+df2 <- geojsonio::geojson_read(url1, what = "sp") |> 
+  st_as_sf(crs = 4326) |> 
+  janitor::clean_names() |> 
+  mutate(store_name = "Blackberrys")
+
+rm(url1, url2, name_of_store)
+
+# Custom Theme Function
+theme_custom <- function(...){
+  theme(
+    plot.background = element_rect(
+      fill = bg_col,
+      linewidth = NA, 
+      colour = NA
+    ),
+    plot.title = element_text(
+      size = 2 * ts,
+      colour = text_hil,
+      family = "title_font",
+      margin = margin(10, 0, 5, 0,"mm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      lineheight = 0.3,
+      colour = text_col,
+      family = "body_font",
+      margin = margin(5, 0, 5, 0, "mm"),
+      size = ts
+    ),
+    plot.caption = ggtext::element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(0, 0, 5, 0, "mm")
+    ),
+    ...
+  )
+}
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Sansita",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Amita",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "grey5"
+
+# Colour for the text
+text_col <- "grey90" 
+
+# Colour for highlighted text
+text_hil <- "grey75" 
+
+# Define Base Text Size
+ts <- 40 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- glue::glue("Indian Store locations: <b style='color:red'>Blackberrys</b> vs. <b style='color:red'>Ramraj Cotton</b>")
+
+plot_caption <- paste0(
+  "**Data: www.alltheplaces.xyz** ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+subtitle_text <- glue::glue("A comparison of the store locations across India shows the spread of <b style='color:red'>Blackberrys'</b> stores: mostly located in northern India, and on the contrary, <b style='color:red'>Ramraj Cotton stores are predominantly located in the Southern States.</b>")
+plot_subtitle <- str_wrap(subtitle_text, width = 100)
+plot_subtitle |> str_view()
+```
+
+Plot on the map of India
+
+```{r}
+#| label: temp-function
+
+g <- ggplot(
+  data = df1,
+  mapping = aes(colour = store_name)
+  ) +
+    geom_sf(
+        data = ,
+        colour = "grey50",
+        linewidth = 0.5
+      ) +
+      geom_sf(
+        data = df,
+        alpha = 0.2,
+        colour = dot_colour) +
+    labs(title = name_of_store) +
+    # coord_sf(crs = this_crs) +
+    theme_map(base_size = 40)
+  
+  ggsave(
+    filename = here::here("data_vizs", "all_the_places.png"),
+    plot = g,
+    width = 210,    # Default A4 size page
+    height = 297,   # Default A4 size page
+    units = "mm",
+    bg = bg_col
+  )
+  
+  rm(url1, df, g)
+}
+
+plot_my_brand("ramraj_cotton_in", "blue")
+
+plot_my_brand("blackberrys_in", "red")
+
+
+```
+
+Temporary: A function to plot on the map of the world
+
+```{r}
+#| label: temp-function-world
+
+plot_my_world <- function(name_of_store = "nike", dot_colour = "blue"){
+  url1 <- paste0(
+    "https://alltheplaces-data.openaddresses.io/runs/2024-04-20-13-31-46/output/", 
+    name_of_store, 
+    ".geojson")
+
+  df <- geojsonio::geojson_read(url1, what = "sp") |> 
+    st_as_sf(crs = 4326) |> 
+    janitor::clean_names()
+  
+  g <- ggplot() +
+      geom_sf(
+        data = rnaturalearth::ne_countries(returnclass = "sf"),
+        colour = "grey50",
+        linewidth = 0.5
+      ) +
+      geom_sf(
+        data = df,
+        alpha = 0.2,
+        colour = dot_colour) +
+    labs(title = name_of_store) +
+    # coord_sf(crs = this_crs) +
+    theme_map(base_size = 40)
+  
+  ggsave(
+    filename = here::here("data_vizs", "all_the_places.png"),
+    plot = g,
+    width = 297,    # Default A4 size page
+    height = 210,   # Default A4 size page
+    units = "mm",
+    bg = bg_col
+  )
+  
+  rm(url1, df, g)
+}
+
+
+plot_my_world("adidas", "blue")
+
+```
+
+Add-on maps, insets and annotations
+
+```{r}
+#| label: insets
+
+```
+
+Compiling Plots with Patchwork
+
+```{r}
+#| label: patchwork
+  
+  
+  
+  # Add inset to the plot
+  inset_element(
+    p = g1, 
+    left = 0, 
+    right = 0.27,
+    bottom = 0.01,
+    top = 0.65, 
+    align_to = "plot"
+  ) +
+  
+  # Basix Plot Annotations
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col, 
+        colour = NA, linewidth = 0
+      )
+    )
+  )
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "all_the_places.png"),
+  plot = g,
+  width = 210,    # Default A4 size page
+  height = 297,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
+```
