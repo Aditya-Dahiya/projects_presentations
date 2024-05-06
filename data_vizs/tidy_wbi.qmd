@@ -53,6 +53,7 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
+library(ggbeeswarm)           # For beeswarm plots
 
 # library(ggfx)                 # Outer glow in the map
 # library(magick)               # Adding images to plot
@@ -72,10 +73,19 @@ wwbi_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascien
 Exploratory Data Analysis
 
 ```{r}
+#| label: eda
+
+# The indicator we want to display is Public Doctors salary
 selected_indicator <- wwbi_series |> 
   filter(str_detect(indicator_name, "Pay compression ratio in public sector, by occupation: Hospital doctor")) |> 
   select(indicator_code) |> 
   pull(indicator_code)
+
+# Names of Countries to display in the graphic
+display_countries <- c("India", "United States", "China", 
+                       "United Kingdom", "United States", 
+                       "Nigeria", "Ghana", "Sierra Leone",
+                       "Qatar", "Costa Rica", "Thailand")
 
 df <- wwbi_data |>
   filter(indicator_code == selected_indicator) |> 
@@ -89,7 +99,21 @@ df <- wwbi_data |>
       mutate(code2 = str_to_lower(code2))
   ) |> 
   left_join(wwbi_series) |> 
-  select(-indicator_code)
+  select(-indicator_code) |> 
+  mutate(
+    display_name = if_else(
+      short_name %in% display_countries,
+      short_name,
+      NA
+    )
+  )
+
+# # List of countries with flags in ggflags
+# flag_cons <- ggflags::lflags |> names()
+# 
+# # Only the relevant countries are filtered
+# df |> filter(!is.na(income_group)) |> 
+#   filter(country %in% flag_cons)
 ```
 
 Visualization Parameters
@@ -99,17 +123,17 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Sansita",
+font_add_google("Bevan",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Saira Extra Condensed",
+font_add_google("Stint Ultra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Amita",
+font_add_google("Josefin Slab",
   family = "body_font"
 ) 
 
@@ -123,6 +147,9 @@ text_col <- "grey25"
 
 # Colour for highlighted text
 text_hil <- "grey35" 
+
+# Annotation colour
+ann_col <- "red"
 
 # Define Base Text Size
 ts <- 40 
@@ -145,80 +172,177 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- glue::glue("Indian Store locations: <b style='color:{col_bb}'>Blackberrys</b> vs. <b style='color:{col_rc}'>Ramraj Cotton</b>")
+plot_title <- "Public Doctors' Salaries"
 
 plot_caption <- paste0(
-  "**Data:** alltheplaces", 
+  "Data: **World Bank:** Worldwide Bureaucracy Indicators", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-plot_subtitle <- glue::glue("A comparison between <b style='color:{col_bb}'>Blackberrys'</b> stores (mostly located in northern India), and <br><b style='color:{col_rc}'>Ramraj Cotton</b> stores (predominantly located in the Southern States) shows the <br>preferences of consumers, and perhaps can be attributed to year-long hot <br>weather in Southern India. Store locations webscraped at <i style='color:{text_hil}'>www.alltheplaces.xyz</i>")
+plot_subtitle <- "....................................."
 ```
 
 The Plot / Graphic
 
 ```{r}
-#| label: map-of-india
+#| label: base-plot
 
-g_base
+ts = 80
 
-# List of countries with flags in ggflags
-flag_cons <- ggflags::lflags |> names()
-
-# Only the relevant countries are filtered
-df |> filter(!is.na(income_group)) |> 
-  filter(country %in% flag_cons)
-
-
-g <- ggplot(
+g_base <- ggplot(
   data = df |> filter(!is.na(income_group)),
   mapping = aes(
     x = value,
     y = income_group,
-    colour = income_group)
-) +
+    colour = income_group,
+    fill = income_group)
+  ) +
+  
+  # Actual points for the Countries
   geom_point(
     size = 8,
     pch = 1,
-    stroke = 2,
+    stroke = 1,
     position = position_beeswarm(
       cex = 2.5,
       method = "hex",
       priority = "density",
       corral = "omit",
       corral.width = 1.2
-    )
+    ),
+    alpha = 0.4
   ) +
+  
+  scale_x_continuous(
+    limits = c(0, 8),
+    breaks = c(2,3,4,6,7,8)
+  ) +
+  
+  # Labels for the countries and their values
+  geom_text(
+    aes(
+      label = display_name
+      ),
+    position = position_beeswarm(
+      cex = 2.5,
+      method = "hex",
+      priority = "density",
+      corral = "omit",
+      corral.width = 1.2
+    ),
+    lineheight = 0.35,
+    size = ts / 5
+  ) +
+  
+  # Basic annotations for the background
+  annotate(
+    geom = "text",
+    label = "Public Doctor's salary is equal to a clerk",
+    x = 0.95, 
+    y = 4.5,
+    angle = 90,
+    hjust = 1,
+    vjust = 0,
+    colour = ann_col,
+    alpha = 0.5,
+    family = "caption_font",
+    size = ts / 3
+  ) +
+  geom_vline(
+    xintercept = 1,
+    colour = ann_col,
+    linetype = 1,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  annotate(
+    geom = "text",
+    label = "Public Doctor's salary is 4 times that of a clerk",
+    x = 5.05, 
+    y = 4.5,
+    angle = -90,
+    hjust = 0,
+    vjust = 0,
+    colour = ann_col,
+    alpha = 0.5,
+    family = "caption_font",
+    size = ts / 3
+  ) +
+  geom_vline(
+    xintercept = 5,
+    colour = ann_col,
+    linetype = 1,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  
+  geom_text(
+    aes(
+      label = paste0(income_group, " countries"),
+      x = 8.5
+    ),
+    hjust ="inward",
+    nudge_y = +0.2,
+    family = "caption_font",
+    size = ts/1.5
+  ) +
+  
+  # Labels
   labs(
-    x = "",
-    y = NULL
+    x = "Ratio of Salary of a public sector (Government Doctor) to a clerk in the country",
+    y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
+  
+  # Themeing customization
   theme_minimal(
-    base_family = "caption_font",
+    base_family = "body_font",
     base_size = ts
   ) +
   theme(
     panel.grid.major.y = element_blank(),
     panel.grid.minor.y = element_blank(),
-    legend.position = "none"
+    legend.position = "none",
+    panel.grid.minor.x = element_blank(),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    plot.title = element_markdown(
+      family = "title_font",
+      colour = text_hil,
+      hjust = 0.5,
+      size = 3*ts
+    ),
+    plot.subtitle = element_markdown(
+      family = "body_font",
+      colour = text_col,
+      hjust = 0.5,
+      lineheight = 0.35
+    ),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = "grey75"
+    ),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col,
+      hjust = 1, 
+      margin = margin(0,0,0,0,"mm")
+    ),
+    plot.title.position = "plot"
   )
 
-#   geom_text(
-#     aes(
-#       label = paste0(short_name, "/n", value),
-#       position = position_beeswarm(
-#         cex = 3,
-#         method = "hex",
-#         priority = "density",
-#         corral = "omit",
-#         corral.width = 1.2
-#       )
-#     )
-#   )
-#   
+
+
 #   
 #   geom_flag(
 #     mapping = aes(country = code2),
@@ -286,7 +410,7 @@ Savings the graphics
 
 ggsave(
   filename = here::here("data_vizs", "tidy_wbi.png"),
-  plot = g,
+  plot = g_base,
   width = 400,    # Best Twitter Aspect Ratio = 4:5
   height = 500,   
   units = "mm",
