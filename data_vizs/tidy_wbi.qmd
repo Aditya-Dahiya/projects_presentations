@@ -29,11 +29,9 @@ share:
 
 # All the places (Work in-progress)
 
-This week at [#TidyTuesday](https://github.com/rfordatascience/tidytuesday/tree/master?tab=readme-ov-file), we're examining the Worldwide Bureaucracy Indicators (WWBI) dataset provided by the World Bank.
+For these visualization(s), we are examining the [Worldwide Bureaucracy Indicators](https://datacatalog.worldbank.org/search/dataset/0038132) (WWBI) [dataset](https://blogs.worldbank.org/en/developmenttalk/introducing-worldwide-bureaucracy-indicators) provided by the [World Bank](https://www.worldbank.org/en/home). The WWBI database offers a comprehensive cross-national dataset on public sector employment and wages. Its goal is to bridge an information gap, aiding researchers, development practitioners, and policymakers in gaining a deeper insight into various aspects such as the personnel dimensions of state capability, the public sector's role within the labor market, and the fiscal implications of the public sector wage bill. The dataset is compiled from administrative data and household surveys, complementing existing expert perception-based approaches.
 
-The WWBI database offers a comprehensive cross-national dataset on public sector employment and wages. Its goal is to bridge an information gap, aiding researchers, development practitioners, and policymakers in gaining a deeper insight into various aspects such as the personnel dimensions of state capability, the public sector's role within the labor market, and the fiscal implications of the public sector wage bill. The dataset is compiled from administrative data and household surveys, complementing existing expert perception-based approaches.
-
-![](tidy_wbi.png){width="600"}
+![](tidy_wbi.png){width="1500"}
 
 ### **How I made this graphic?**
 
@@ -70,7 +68,7 @@ wwbi_series <- readr::read_csv('https://raw.githubusercontent.com/rfordatascienc
 wwbi_country <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-04-30/wwbi_country.csv')
 ```
 
-Exploratory Data Analysis
+Exploratory Data Analysis & Data Wrangling
 
 ```{r}
 #| label: eda
@@ -84,8 +82,8 @@ selected_indicator <- wwbi_series |>
 # Names of Countries to display in the graphic
 display_countries <- c("India", "United States", "China", 
                        "United Kingdom", "United States", 
-                       "Nigeria", "Ghana", "Sierra Leone",
-                       "Qatar", "Costa Rica", "Thailand")
+                       "Nigeria", "Qatar", "Costa Rica", "Thailand",
+                       "Nicaragua", "The Gambia")
 
 df <- wwbi_data |>
   filter(indicator_code == selected_indicator) |> 
@@ -108,12 +106,69 @@ df <- wwbi_data |>
     )
   )
 
-# # List of countries with flags in ggflags
-# flag_cons <- ggflags::lflags |> names()
-# 
-# # Only the relevant countries are filtered
-# df |> filter(!is.na(income_group)) |> 
-#   filter(country %in% flag_cons)
+# List of countries with flags in ggflags
+flag_cons <- ggflags::lflags |> names()
+
+# Creating a custom y-axis variable and an interval x-axis variable to plot flags
+
+levels_income <- c(
+  "Low income",
+  "Lower middle income",
+  "Upper middle income",
+  "High income"
+  )
+
+# An intermediate step
+df1 <- df |>
+  select(-indicator_name) |> 
+  filter(code2 %in% flag_cons) |> 
+  
+  # Roudning to make it easier to plot flags nicely
+  mutate(value = round_to_fraction(value, 4)) |> 
+  mutate(income_group = fct(income_group, levels = levels_income))
+  
+df2 <- df1 |> 
+  group_by(income_group, value) |> 
+  slice_head(n = 6) |> 
+  # Geting number of countries in each interval
+  count() |> 
+  rename(gp_nos = n)
+```
+
+**Manually positioning in a sort-of *bee-swarm*:**
+
+I have a vector c(1,2,3,4,5,6). I want to convert it into c(0.08, -0.08, 0.24, 0.24, 0.4, -0.4). You can achieve this transformation manually for now.
+
+```{r}
+#| label: manual-positioning
+
+# A position multiplication Factor (to manually create a beeswarm)
+position_vector <- seq(-0.4, +0.4, length.out = 6)
+position_vector
+
+plotdf <- df1 |> 
+  left_join(df2) |> 
+  group_by(income_group, value) |>
+  arrange(income_group, value) |> 
+  mutate(group_num = row_number()) |> 
+  mutate(y_jizz = case_when(
+    group_num == 1 ~ +0.08,
+    group_num == 2 ~ -0.08,
+    group_num == 3 ~ +0.24,
+    group_num == 4 ~ -0.24,
+    group_num == 5 ~ +0.40,
+    group_num == 6 ~ -0.40,
+  )) |> 
+  mutate(y_var = as.numeric(income_group) + y_jizz)
+
+# Labelling income groups - a tibble
+df_labels <- tibble(
+  x_var = 8.5,
+  y_var = (1:4 + 0.25),
+  label = paste0(levels_income, " countries"),
+  income_group = levels_income
+)
+
 ```
 
 Visualization Parameters
@@ -151,9 +206,6 @@ text_hil <- "grey35"
 # Annotation colour
 ann_col <- "red"
 
-# Define Base Text Size
-ts <- 40 
-
 # Caption stuff for the plot
 sysfonts::font_add(
   family = "Font Awesome 6 Brands",
@@ -182,13 +234,15 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- "....................................."
+plot_subtitle <- glue::glue("Salaries of Government doctors in different countries, compared to a clerk.<br>
+Compared to clerks, <b style='color:{ann_col}'>Qatar</b> pays its doctors the least, while <b style='color:{ann_col}'>The Gambia</b> pays the most.
+")
 ```
 
-The Plot / Graphic
+*Previous Plot / Graphic attempt - using `geom_beeswarm()` - it doesn't work for `geom_flag()`*
 
 ```{r}
-#| label: base-plot
+#| label: beeswarm-plot-not-to-implement
 
 ts = 80
 
@@ -366,40 +420,192 @@ g_base <- ggplot(
 
 ```
 
-Add-on maps, insets and annotations
+The Actual Base Plot / Graphic
 
 ```{r}
-#| label: insets
+#| label: base-plot
 
-inset1
-```
 
-Compiling Plots with Patchwork
+ts = 90
 
-```{r}
-#| label: patchwork
-  
-g <- g_base + 
-  
-  # Add inset to the plot
-  inset_element(
-    p = inset1, 
-    left = -0.3, 
-    right = 0.22,
-    bottom = 0.01,
-    top = 0.5, 
-    align_to = "plot"
+g_base <- ggplot(
+  data = plotdf,
+  mapping = aes(
+    x = value,
+    y = y_var,
+    colour = income_group)
   ) +
   
-  # Basix Plot Annotations
-  plot_annotation(
-    theme = theme(
-      plot.background = element_rect(
-        fill = bg_col, 
-        colour = NA, linewidth = 0
-      )
-    )
+  # Points for countries
+  ggflags::geom_flag(
+    aes(country = code2),
+    size = 12
+  ) +
+  # while building plot, I use geom_point() as a replacement
+  # to geom_flag to save plot rendering time
+  # geom_point(
+  #   size = 8
+  # ) +
+  
+  scale_x_continuous(
+    limits = c(0.5, 8.3),
+    breaks = 1:8,
+    expand = expansion(0)
+  ) +
+  
+  scale_y_continuous(
+    limits = c(0.8,  4.5),
+    expand = expansion(0)
+  ) +
+  
+  # Labels for the countries and their values
+  geom_text(
+    aes(label = display_name, 
+        y = y_var - 0.1),
+    lineheight = 0.35,
+    size = ts / 3,
+    vjust = 0,
+    colour = text_col,
+    alpha = 0.7,
+    family = "body_font"
+  ) +
+  
+  # Basic annotations for the background
+  annotate(
+    geom = "text",
+    label = "Public Doctor's salary is equal to a clerk",
+    x = 0.95, 
+    y = 0.9,
+    angle = 90,
+    hjust = 0,
+    vjust = 0,
+    colour = ann_col,
+    alpha = 0.5,
+    family = "caption_font",
+    size = ts / 3
+  ) +
+  geom_vline(
+    xintercept = 1,
+    colour = ann_col,
+    linetype = 1,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  # annotate(
+  #   geom = "text",
+  #   label = "Public Doctor's salary is 4 times that of a clerk",
+  #   x = 5.05, 
+  #   y = 4.5,
+  #   angle = -90,
+  #   hjust = 0,
+  #   vjust = 0,
+  #   colour = ann_col,
+  #   alpha = 0.5,
+  #   family = "caption_font",
+  #   size = ts / 3
+  # ) +
+  # geom_vline(
+  #   xintercept = 5,
+  #   colour = ann_col,
+  #   linetype = 1,
+  #   linewidth = 0.5,
+  #   alpha = 0.5
+  # ) +
+  
+  # Names / Labels for the income groups
+  geom_text(
+    data = df_labels,
+    mapping = aes(
+      x = 8.15,
+      y = y_var,
+      label = label
+    ),
+    hjust = "inward",
+    vjust = 0,
+    family = "caption_font",
+    size = ts / 1.5,
+    colour = text_col,
+    alpha = 0.7
+  ) +
+  
+  # Labels
+  labs(
+    x = "Ratio of Salary of a public sector (Government Doctor) to a clerk in the country",
+    y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  
+  # Themeing customization
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.position = "none",
+    panel.grid.minor.x = element_blank(),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    plot.title = element_markdown(
+      family = "title_font",
+      colour = text_hil,
+      hjust = 0.5,
+      size = 2.5 * ts,
+      margin = margin(5,0,2,0, "mm")
+    ),
+    plot.subtitle = element_markdown(
+      family = "body_font",
+      colour = text_col,
+      hjust = 0.5,
+      lineheight = 0.35,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = "grey75"
+    ),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col,
+      hjust = 1, 
+      margin = margin(0,0,0,0,"mm")
+    ),
+    plot.title.position = "plot"
   )
+
+
+
+#   
+#   geom_flag(
+#     mapping = aes(country = code2),
+#     size = 4,
+#     # pch = 1,
+#     position = position_beeswarm(
+#       cex = 3,
+#       method = "hex",
+#       priority = "density",
+#       corral = "omit",
+#       corral.width = 1.2
+#     )
+#   )
+# 
+#   
+#   
+# 
+# 
+# # An example label in markdown: Not to use for now
+# label = glue::glue("<span style='font-size:9pt; color:black'>{short_name}</span><br><span style='color:{text_col}'>{value}</span>")
+
 
 ```
 
