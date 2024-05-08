@@ -1,0 +1,461 @@
+---
+title: "Rolling Stone Album Rankings"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "Comparison of the salaries of the Government Doctors in different countries"
+categories:
+  - "#TidyTuesday"
+  - "Governance"
+  - "Public Health"
+  - "Health Financing"
+image: "tidy_wbi.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+# Rolling Stone Album Rankings
+
+This week, we're delving into Rolling Stone's album rankings, thanks to [Data is Plural](https://www.data-is-plural.com/archive/2024-03-27-edition/). The Pudding has created a visual essay exploring [what qualifies an album as the greatest of all time](https://pudding.cool/2024/03/greatest-music/) and shares [the data](https://docs.google.com/spreadsheets/d/1c_Tdnm7S1oo8R9UNtdCVIY7bYASmf_cvMynOJTpKuHA/edit#gid=0) they collected for the essay.
+
+In a new visual essay by [The Pudding](https://pudding.cool/), they compare Rolling Stone's "500 Greatest Albums of All Time" lists from 2003, 2012, and 2020. They began the project using a spreadsheet by Chris Eckert and eventually developed their own dataset. Their dataset includes every album in the rankings, along with its name, genre, release year, ranking in 2003/2012/2020, the artist's name, birth year, gender, and more. Additionally, it lists the voters for each year. \[credit to [Jason Kottke](https://www.instagram.com/jkottke)\]
+
+What trends can we identify regarding the characteristics of popular artists and genres at different points in time?
+
+![](tidy_rolling_stone.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+# library(janitor)              # Cleaning names etc.
+library(geniusr)              # Getting Album cover art
+library(magick)               # Image processing
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# library(ggbeeswarm)           # For beeswarm plots
+# library(ggfx)                 # Outer glow in the map
+# library(ggthemes)             # Themes for ggplot2
+
+# Mapping tools
+# library(rnaturalearth)        # Maps of the World   
+# library(sf)                   # All spatial objects in R
+# library(geojsonio)            # To read geojson files into R
+
+# Load Data
+rolling_stone <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-07/rolling_stone.csv')
+
+df1 <- rolling_stone |> 
+  slice_max(order_by = spotify_popularity, n = 100)
+df2 <- rolling_stone |> 
+  slice_max(order_by = weeks_on_billboard, n = 100)
+# The final data frame that I will use
+plotdf <- inner_join(df1, df2) |> 
+  select(-c(sort_name, differential, release_year,
+            type, spotify_url, artist_member_count,
+            artist_birth_year_sum, debut_album_release_year, 
+            ave_age_at_top_500, years_between, album_id)) |> 
+  mutate(id = row_number()) |> 
+  relocate(id, .before = everything())
+
+# Remove intermediate steps to reduce clutter
+rm(df1, df2)
+
+# Define your own genius token for API from genius.com
+genius_token <- "" # Obtain from https://genius.com/api-clients
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda-dont-run
+
+rolling_stone
+
+rolling_stone |>
+  count(peak_billboard_position, sort = T)
+
+rolling_stone$peak_billboard_position |> range()
+  
+rolling_stone |> summarytools::dfSummary() |> summarytools::view()
+
+# A scatter plot of rank in each of three years show little to no 
+# correlation with Spotify popularity
+# Year 2003
+rolling_stone |> 
+  ggplot(aes(x = spotify_popularity, y = rank_2003)) + 
+  geom_point() +
+  geom_smooth() +
+  scale_y_reverse()
+
+# Year 2012
+rolling_stone |> 
+  ggplot(aes(x = spotify_popularity, y = rank_2012)) + 
+  geom_point() +
+  geom_smooth() +
+  scale_y_reverse()
+
+# Year 2020
+rolling_stone |> 
+  ggplot(aes(x = spotify_popularity, y = rank_2012)) + 
+  geom_point() +
+  geom_smooth() +
+  scale_y_reverse()
+
+# No specific insight from release year vs. weeks on billboard
+rolling_stone |> 
+  ggplot(aes(release_year, 
+             weeks_on_billboard,
+             size = spotify_popularity)) +
+  geom_point(alpha = 0.2)
+
+# Correlation between weeks on billboard and spotify popularity
+df1 <- rolling_stone |> 
+  slice_max(order_by = spotify_popularity, n = 100)
+df2 <- rolling_stone |> 
+  slice_max(order_by = weeks_on_billboard, n = 100)
+
+inner_join(df1, df2) |> 
+  ggplot(aes(spotify_popularity, weeks_on_billboard)) +
+  geom_jitter(alpha = 0.5) +
+  geom_text(aes(label = album), check_overlap = T) +
+  scale_y_continuous() +
+  scale_x_continuous() 
+
+# We can choose to work on this correlation and identify the outliers.
+
+# Experiment to see if we extract images from spotify url
+rolling_stone |> 
+  filter(str_detect(album, "Man on the Moon")) |> 
+  select(spotify_url)
+
+# 
+rolling_stone |> 
+  ggplot(aes(spotify_popularity, ave_age_at_top_500)) +
+  geom_point(alpha = 0.5)
+
+rolling_stone |> 
+  ggplot(aes(weeks_on_billboard, ave_age_at_top_500)) +
+  geom_point(alpha = 0.5) +
+  scale_x_continuous(transform = "log2")
+
+# The final data frame that I will use
+plotdf <- inner_join(df1, df2) |> 
+  select(-c(sort_name, differential, release_year,
+            type, spotify_url, artist_member_count,
+            artist_birth_year_sum, debut_album_release_year, 
+            ave_age_at_top_500, years_between, album_id))
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Satisfy",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("News Cycle",
+  family = "body_font"
+) 
+
+ts <- 40
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "#eadcf7"
+
+# Colour for the text
+text_col <- bg_col |> darken(0.9) 
+
+# Colour for highlighted text
+text_hil <- bg_col |> darken(0.7)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Create Some Temporary Image Files storing the Album Art Cover Pics. Credits: [@geniusr] and [@magick]; code inspiration: [mindlessgreen](https://stackoverflow.com/users/1310511/mindlessgreen) on [StackOverflow](https://stackoverflow.com/).
+
+```{r}
+
+for (i in 1:nrow(plotdf)) {
+  
+  temp1 <- plotdf |>
+  filter(id == i) |>
+  mutate(temp = paste(clean_name, album)) |>
+  pull(temp) |>
+  search_genius(
+    n_results = 1,
+    access_token = genius_token
+  )
+
+  temp2 <- temp1$content[[1]]
+  
+  im <- magick::image_read(temp2$song_art_image_thumbnail_url)
+  
+  # Technique Credits: https://stackoverflow.com/questions/64597525/r-magick-square-crop-and-circular-mask
+  # get height, width and crop longer side to match shorter side
+  ii <- image_info(im)
+  ii_min <- min(ii$width, ii$height)
+  im1 <- image_crop(
+    im, 
+    geometry = paste0(ii_min, "x", ii_min, "+0+0"), 
+    repage = TRUE
+    )
+  
+  # create a new image with white background and black circle
+  fig <- image_draw(image_blank(ii_min, ii_min))
+  symbols(ii_min / 2, ii_min / 2, circles = (ii_min / 2) - 3, bg = "black", inches = FALSE, add = TRUE)
+  dev.off()
+  
+  # create an image composite using both images
+  im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
+  
+  # set background as white
+  
+  
+  image_write(
+    image = magick::image_background(im2, bg_col),
+    path = paste0("image_temp__", i,".png"),
+    format = "png"
+    )
+}
+
+
+# Some Album Art didint show up on Spotify. Need to do them Manually
+# 
+
+custom_art <- function(i, custom_url) {
+  im <- magick::image_read(custom_url)
+  ii <- image_info(im)
+  ii_min <- min(ii$width, ii$height)
+  im1 <- image_crop(
+    im, 
+    geometry = paste0(ii_min, "x", ii_min, "+0+0"), 
+    repage = TRUE
+    )
+  fig <- image_draw(image_blank(ii_min, ii_min))
+  symbols(ii_min / 2, ii_min / 2, circles = (ii_min / 2) - 3, 
+          bg = "black", inches = FALSE, add = TRUE)
+  dev.off()
+  im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
+  image_write(
+    image = magick::image_background(im2, bg_col),
+    path = paste0("image_temp__", i,".png"),
+    format = "png"
+    )
+}
+
+custom_art(5, "https://upload.wikimedia.org/wikipedia/en/a/a0/Blonde_-_Frank_Ocean.jpeg")
+
+custom_art(7, "https://upload.wikimedia.org/wikipedia/en/5/51/Kendrick_Lamar_-_Damn.png")
+
+custom_art(4, "https://upload.wikimedia.org/wikipedia/en/3/38/When_We_All_Fall_Asleep%2C_Where_Do_We_Go%3F.png")
+
+custom_art(14, "https://upload.wikimedia.org/wikipedia/en/a/ae/The_Marshall_Mathers_LP.jpg")
+
+custom_art(16, "https://m.media-amazon.com/images/I/61jNfu1D+HL._UF1000,1000_QL80_DpWeblab_.jpg")
+
+custom_art(38, "https://m.media-amazon.com/images/I/81Ahe2x9qBL._UF1000,1000_QL80_.jpg")
+
+custom_art(23, "https://upload.wikimedia.org/wikipedia/en/4/4b/Green_Day_-_Dookie_cover.jpg")
+
+custom_art(13, "https://upload.wikimedia.org/wikipedia/en/e/e7/X100pre.jpg")
+
+custom_art(3, "https://upload.wikimedia.org/wikipedia/en/3/35/The_Eminem_Show.jpg")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- "Billboard rankings vs. Spotify Popularity"
+
+plot_caption <- paste0(
+  "Data: ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+label_cols <- c("#0033cc", "#ff3300")
+
+plot_subtitle <- glue::glue("Of the top 30 albums at both platforms (2003-2020), some albums are <b style='color:{label_cols[1]}'>more popular</b> on <br> Billboard (stayed in Billboard Top 200 rankings for more weeks), while <b style='color:{label_cols[2]}'>others</b> enjoy higher <br> popularity on Spotify. Others are equally popular on both.<br>
+Possible reason? Spotify’s younger users prefer newer albums (Release Year).")
+
+y_lab <- "Number of weeks spent on Billboard Top 200"
+x_lab <- "Album Popularity on Spotify (scale of 1-100)"
+```
+
+The Actual Base Plot / Graphic
+
+```{r}
+#| label: base-plot
+
+final_plot_df <- plotdf |> 
+  mutate(image_path = paste0("image_temp__", id, ".png")) |> 
+  mutate(size_var = case_when(
+    id %in% c(29, 16, 9, 17, 3, 2, 37) ~ 2.5,
+    id %in% c(1, 8, 27, 37) ~ 2,
+    .default = 1
+  )) |> 
+  filter(!(id %in% c(21, 18, 19, 35, 25, 6, 32, 12, 13)))
+
+
+# Create the Plot Data Frame with image paths
+g_base <- final_plot_df |>  
+  ggplot(
+    mapping = aes(
+      x = spotify_popularity,
+      y = weeks_on_billboard,
+      image = image_path
+    )
+  ) +
+  ggimage::geom_image() +
+  scale_y_continuous(
+    trans = "log2",
+    breaks = seq(100, 700, by = 100)
+  ) +
+  geom_text(
+    aes(label = paste0(id, ".", album, "\n", clean_name),
+        size = size_var),
+    lineheight = 0.4,
+    nudge_y = -0.1,
+    hjust = 0.5,
+    vjust = 1
+  ) +
+  scale_size(range = c(5, 10)) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = x_lab,
+    y = y_lab
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    panel.grid.major = element_line(
+      colour = bg_col |> darken(0.2),
+      linetype = 3, 
+      linewidth = 0.3
+    ),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    legend.position = "none",
+    axis.line = element_line(
+      colour = bg_col |> darken(0.7),
+      linetype = 1,
+      linewidth = 1,
+      arrow = arrow(length = unit(10, "mm"))
+    ),
+    plot.title = element_text(
+      size = ts * 6,
+      colour = text_hil,
+      hjust = 0.5,
+      family = "title_font",
+      margin = margin(10,0,2,0, "mm")
+    ),
+    plot.subtitle = element_markdown(
+      colour = text_col,
+      hjust = 0,
+      lineheight = 0.3,
+      margin = margin(0,0,5,0, "mm"),
+      size = ts * 2
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      family = "caption_font",
+      size = ts * 2
+    ),
+    axis.text = element_text(
+      family = "body_font",
+      colour = text_col,
+      size = ts * 2,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks = element_line(
+      colour = text_col,
+      linewidth = 0.5
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      size = ts * 2,
+      hjust = 1,
+      margin = margin(0,0,0,0, "mm")
+    )
+  )
+```
+
+Savings the graphics & Removing Temporary Image Files *("Do no harm and leave the world an untouched place")*
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_rolling_stone.png"),
+  plot = g_base,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+```
