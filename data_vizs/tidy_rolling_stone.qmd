@@ -38,7 +38,7 @@ In a new visual essay by [The Pudding](https://pudding.cool/), they compare Roll
 
 What trends can we identify regarding the characteristics of popular artists and genres at different points in time?
 
-![](tidy_rolling_stone.png)
+![A Scatter-plot of Spotify Popularity (on x-axis) and Number of Weeks on Billboard Top 200 (on y-axis) for the top 30 albums in Rolling Stone Data-set for top albums (2003-2020).](tidy_rolling_stone.png){width="1200"}
 
 ### **How I made this graphic?**
 
@@ -194,7 +194,7 @@ font_add_google("Stint Ultra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("News Cycle",
+font_add_google("IBM Plex Sans Condensed",
   family = "body_font"
 ) 
 
@@ -206,10 +206,10 @@ showtext_auto()
 bg_col <- "#eadcf7"
 
 # Colour for the text
-text_col <- bg_col |> darken(0.9) 
+text_col <- bg_col |> darken(0.7) 
 
 # Colour for highlighted text
-text_hil <- bg_col |> darken(0.7)
+text_hil <- bg_col |> darken(0.6)
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -227,6 +227,7 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 Create Some Temporary Image Files storing the Album Art Cover Pics. Credits: [@geniusr] and [@magick]; code inspiration: [mindlessgreen](https://stackoverflow.com/users/1310511/mindlessgreen) on [StackOverflow](https://stackoverflow.com/).
 
 ```{r}
+#| label: create-temporary-image-files
 
 for (i in 1:nrow(plotdf)) {
   
@@ -313,6 +314,8 @@ custom_art(23, "https://upload.wikimedia.org/wikipedia/en/4/4b/Green_Day_-_Dooki
 custom_art(13, "https://upload.wikimedia.org/wikipedia/en/e/e7/X100pre.jpg")
 
 custom_art(3, "https://upload.wikimedia.org/wikipedia/en/3/35/The_Eminem_Show.jpg")
+
+custom_art(10, "https://upload.wikimedia.org/wikipedia/en/2/28/Channel_ORANGE.jpg")
 ```
 
 Annotation Text for the Plot
@@ -323,7 +326,7 @@ Annotation Text for the Plot
 plot_title <- "Billboard rankings vs. Spotify Popularity"
 
 plot_caption <- paste0(
-  "Data: ", 
+  "Data: Rolling Stone Album Rankings", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -332,7 +335,7 @@ plot_caption <- paste0(
 
 label_cols <- c("#0033cc", "#ff3300")
 
-plot_subtitle <- glue::glue("Of the top 30 albums at both platforms (2003-2020), some albums are <b style='color:{label_cols[1]}'>more popular</b> on <br> Billboard (stayed in Billboard Top 200 rankings for more weeks), while <b style='color:{label_cols[2]}'>others</b> enjoy higher <br> popularity on Spotify. Others are equally popular on both.<br>
+plot_subtitle <- glue::glue("Of the top 30 albums at both platforms (2003-2020), some albums are <b style='color:{label_cols[1]}'>more <br>popular on Billboard</b> (stayed in Billboard Top 200 rankings for more weeks), while<br><b style='color:{label_cols[2]}'>others</b>  enjoy higher <b style='color:{label_cols[2]}'>popularity on Spotify</b>. <b>Others</b> are equally popular on both.<br>
 Possible reason? Spotify’s younger users prefer newer albums (Release Year).")
 
 y_lab <- "Number of weeks spent on Billboard Top 200"
@@ -351,8 +354,14 @@ final_plot_df <- plotdf |>
     id %in% c(1, 8, 27, 37) ~ 2,
     .default = 1
   )) |> 
-  filter(!(id %in% c(21, 18, 19, 35, 25, 6, 32, 12, 13)))
-
+  filter(!(id %in% c(21, 18, 19, 35, 25, 6, 32, 12, 13))) |> 
+  mutate(
+    col_var = case_when(
+      id %in% c(29, 28, 16, 17, 7, 9) ~ "a",
+      id %in% c(3, 11, 15, 10, 22) ~ "b",
+      .default = "c"
+    )
+  )
 
 # Create the Plot Data Frame with image paths
 g_base <- final_plot_df |>  
@@ -369,14 +378,17 @@ g_base <- final_plot_df |>
     breaks = seq(100, 700, by = 100)
   ) +
   geom_text(
-    aes(label = paste0(id, ".", album, "\n", clean_name),
-        size = size_var),
-    lineheight = 0.4,
-    nudge_y = -0.1,
+    aes(label = paste0(clean_name, "\n", album),
+        size = size_var,
+        colour = col_var),
+    lineheight = 0.3,
+    nudge_y = -0.09,
     hjust = 0.5,
-    vjust = 1
+    vjust = 1,
+    family = "body_font"
   ) +
-  scale_size(range = c(5, 10)) +
+  scale_size(range = c(15, 25)) +
+  scale_colour_manual(values = c(label_cols[1], label_cols[2], text_col)) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
@@ -392,7 +404,7 @@ g_base <- final_plot_df |>
     panel.grid.major = element_line(
       colour = bg_col |> darken(0.2),
       linetype = 3, 
-      linewidth = 0.3
+      linewidth = 0.75
     ),
     panel.grid.minor = element_blank(),
     plot.background = element_rect(
@@ -403,11 +415,11 @@ g_base <- final_plot_df |>
     axis.line = element_line(
       colour = bg_col |> darken(0.7),
       linetype = 1,
-      linewidth = 1,
+      linewidth = 0.5,
       arrow = arrow(length = unit(10, "mm"))
     ),
     plot.title = element_text(
-      size = ts * 6,
+      size = ts * 5.5,
       colour = text_hil,
       hjust = 0.5,
       family = "title_font",
@@ -416,9 +428,9 @@ g_base <- final_plot_df |>
     plot.subtitle = element_markdown(
       colour = text_col,
       hjust = 0,
-      lineheight = 0.3,
-      margin = margin(0,0,5,0, "mm"),
-      size = ts * 2
+      lineheight = 0.4,
+      margin = margin(0,0,5,10, "mm"),
+      size = ts * 2.4
     ),
     plot.caption = element_textbox(
       colour = text_hil,
@@ -441,8 +453,35 @@ g_base <- final_plot_df |>
       size = ts * 2,
       hjust = 1,
       margin = margin(0,0,0,0, "mm")
-    )
+    ),
+    plot.title.position = "plot"
   )
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: insets
+
+inset_text1 <- str_wrap("The dataset used in this analysis comes from a visual essay by The Pudding, comparing Rolling Stone's \"500 Greatest Albums of All Time\" lists from 2003, 2012, and 2020. Originally, the project began with a spreadsheet by Chris Eckert, which the authors expanded upon to develop their own dataset. Their dataset includes every album in the rankings, along with its name, genre, release year, rank in 2003, 2012, and 2020, the artist’s name, birth year, gender, and more. Additionally, it provides information about the voters for each year's list. [h/t Jason Kottke]", width = 40, whitespace_only = FALSE)
+
+g <- g_base +
+  annotate(
+    geom = "label",
+    x = 88.5,
+    y = 720,
+    label = inset_text1,
+    family = "caption_font",
+    lineheight = 0.3,
+    hjust = 0,
+    vjust = "inward",
+    size = 18,
+    colour = text_col,
+    fill = bg_col,
+    label.padding = unit(1, "mm"),
+    label.size = 0
+  ) 
+
 ```
 
 Savings the graphics & Removing Temporary Image Files *("Do no harm and leave the world an untouched place")*
@@ -452,10 +491,14 @@ Savings the graphics & Removing Temporary Image Files *("Do no harm and leave th
 
 ggsave(
   filename = here::here("data_vizs", "tidy_rolling_stone.png"),
-  plot = g_base,
+  plot = g,
   width = 400,    # Best Twitter Aspect Ratio = 4:5
   height = 500,   
   units = "mm",
-  bg = "white"
+  bg = bg_col
 )
+
+remove_files <- paste0("image_temp__", 1:38,".png")
+
+unlink(remove_files)
 ```
