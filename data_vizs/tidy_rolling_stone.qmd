@@ -2,13 +2,13 @@
 title: "Rolling Stone Album Rankings"
 author: "Aditya Dahiya"
 date: "last-modified"
-subtitle: "Comparison of the salaries of the Government Doctors in different countries"
+subtitle: "Correlation between Spotify Popularity and Weeks spent on Billboard Top 200 (amongst the top 30 albums)"
 categories:
   - "#TidyTuesday"
-  - "Governance"
-  - "Public Health"
-  - "Health Financing"
-image: "tidy_wbi.png"
+  - "A4 Size Viz"
+  - "Music"
+  - "ggimage"
+image: "tidy_rolling_stone.png"
 format:
   html:
     code-fold: true
@@ -38,7 +38,7 @@ In a new visual essay by [The Pudding](https://pudding.cool/), they compare Roll
 
 What trends can we identify regarding the characteristics of popular artists and genres at different points in time?
 
-![A Scatter-plot of Spotify Popularity (on x-axis) and Number of Weeks on Billboard Top 200 (on y-axis) for the top 30 albums in Rolling Stone Data-set for top albums (2003-2020).](tidy_rolling_stone.png){width="1200"}
+[![A Scatter-plot of Spotify Popularity (on x-axis) and Number of Weeks on Billboard Top 200 (on y-axis) for the top 30 albums in Rolling Stone Data-set for top albums (2003-2020).](tidy_rolling_stone.png){width="1200"}](https://aditya-dahiya.github.io/projects_presentations/data_vizs/tidy_rolling_stone.png)
 
 ### **How I made this graphic?**
 
@@ -96,7 +96,7 @@ genius_token <- "" # Obtain from https://genius.com/api-clients
 Exploratory Data Analysis & Data Wrangling
 
 ```{r}
-#| label: eda-dont-run
+#| label: eda
 
 rolling_stone
 
@@ -105,7 +105,7 @@ rolling_stone |>
 
 rolling_stone$peak_billboard_position |> range()
   
-rolling_stone |> summarytools::dfSummary() |> summarytools::view()
+# rolling_stone |> summarytools::dfSummary() |> summarytools::view()
 
 # A scatter plot of rank in each of three years show little to no 
 # correlation with Spotify popularity
@@ -172,7 +172,9 @@ plotdf <- inner_join(df1, df2) |>
   select(-c(sort_name, differential, release_year,
             type, spotify_url, artist_member_count,
             artist_birth_year_sum, debut_album_release_year, 
-            ave_age_at_top_500, years_between, album_id))
+            ave_age_at_top_500, years_between, album_id)) |> 
+  mutate(id = row_number()) |> 
+  relocate(id, .before = everything())
 
 
 ```
@@ -297,6 +299,7 @@ custom_art <- function(i, custom_url) {
     )
 }
 
+# Some Custom Album Arts - where I couldn't find nice ones on Spotify
 custom_art(5, "https://upload.wikimedia.org/wikipedia/en/a/a0/Blonde_-_Frank_Ocean.jpeg")
 
 custom_art(7, "https://upload.wikimedia.org/wikipedia/en/5/51/Kendrick_Lamar_-_Damn.png")
@@ -357,7 +360,7 @@ final_plot_df <- plotdf |>
   filter(!(id %in% c(21, 18, 19, 35, 25, 6, 32, 12, 13))) |> 
   mutate(
     col_var = case_when(
-      id %in% c(29, 28, 16, 17, 7, 9) ~ "a",
+      id %in% c(29, 28, 16, 17, 9) ~ "a",
       id %in% c(3, 11, 15, 10, 22) ~ "b",
       .default = "c"
     )
@@ -377,11 +380,14 @@ g_base <- final_plot_df |>
     trans = "log2",
     breaks = seq(100, 700, by = 100)
   ) +
+  scale_x_continuous(
+    expand = expansion(c(0.07, 0.09))
+  ) +
   geom_text(
     aes(label = paste0(clean_name, "\n", album),
         size = size_var,
         colour = col_var),
-    lineheight = 0.3,
+    lineheight = 0.25,
     nudge_y = -0.09,
     hjust = 0.5,
     vjust = 1,
@@ -423,14 +429,14 @@ g_base <- final_plot_df |>
       colour = text_hil,
       hjust = 0.5,
       family = "title_font",
-      margin = margin(10,0,2,0, "mm")
+      margin = margin(10,0,10,0, "mm")
     ),
     plot.subtitle = element_markdown(
       colour = text_col,
       hjust = 0,
       lineheight = 0.4,
       margin = margin(0,0,5,10, "mm"),
-      size = ts * 2.4
+      size = ts * 2.5
     ),
     plot.caption = element_textbox(
       colour = text_hil,
@@ -465,6 +471,34 @@ Adding annotations to the plot
 
 inset_text1 <- str_wrap("The dataset used in this analysis comes from a visual essay by The Pudding, comparing Rolling Stone's \"500 Greatest Albums of All Time\" lists from 2003, 2012, and 2020. Originally, the project began with a spreadsheet by Chris Eckert, which the authors expanded upon to develop their own dataset. Their dataset includes every album in the rankings, along with its name, genre, release year, rank in 2003, 2012, and 2020, the artist’s name, birth year, gender, and more. Additionally, it provides information about the voters for each year's list. [h/t Jason Kottke]", width = 40, whitespace_only = FALSE)
 
+# A QR Code for the infographic
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/data_vizs/",
+  # The file name of the current .qmd file
+  "tidy_rolling_stone",         
+  ".html"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.8
+    ) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    )
+  )
+
+library(patchwork)
+
 g <- g_base +
   annotate(
     geom = "label",
@@ -480,7 +514,40 @@ g <- g_base +
     fill = bg_col,
     label.padding = unit(1, "mm"),
     label.size = 0
-  ) 
+  )
+
+g_a4 <- g_base +
+  annotate(
+    geom = "label",
+    x = 88.5,
+    y = 600,
+    label = inset_text1,
+    family = "caption_font",
+    lineheight = 0.3,
+    hjust = 0,
+    vjust = "inward",
+    size = 18,
+    colour = text_col,
+    fill = bg_col,
+    label.padding = unit(1, "mm"),
+    label.size = 0
+  ) +
+  inset_element(
+    p = plot_qr,
+    left = 0.785, right = 0.95,
+    bottom = 0.85, top = 1,
+    align_to = "panel",
+    clip = FALSE
+  ) + 
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
 
 ```
 
@@ -498,7 +565,24 @@ ggsave(
   bg = bg_col
 )
 
+
+# Another graphic on A4 Size Page: Infographic
+ggsave(
+  filename = here::here("data_vizs", "a4_tidy_rolling_stone.png"),
+  plot = g_a4,
+  width = 210 * 2,    
+  height = 297 * 2,   
+  units = "mm",
+  bg = bg_col
+)
+
+
+
 remove_files <- paste0("image_temp__", 1:38,".png")
 
 unlink(remove_files)
 ```
+
+### A4 Info-graphic Version of the Plot with QR Code:
+
+![](a4_tidy_rolling_stone.png){width="900"}
