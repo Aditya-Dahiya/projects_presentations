@@ -812,3 +812,48 @@ ggsave(
 ### The A4-sized Info-graphic
 
 [![](a4_tidy_wbi.png){width="800"}](https://aditya-dahiya.github.io/projects_presentations/data_vizs/a4_tidy_wbi.png)
+
+Another Infographic for comparisons:
+
+```{r}
+#| label: eda-2
+
+two_indicators <- wwbi_series |> 
+  filter(str_detect(indicator_name, 
+                    "Pay compression ratio in public sector")) |> 
+  filter(str_detect(indicator_name,
+                    "Judge|Police officer")) |> 
+  select(indicator_code) |> 
+  pull(indicator_code)
+
+var_name <- snakecase::to_snake_case(two_indicators)
+
+xdf1 <- wwbi_data |> 
+  filter(indicator_code %in% two_indicators) |> 
+  mutate(indicator_code = snakecase::to_snake_case(indicator_code)) |> 
+  pivot_wider(
+    id_cols = c(country_code, year),
+    names_from = indicator_code,
+    values_from = value
+  ) |> 
+  left_join(
+    wwbi_country |> 
+      select(country_code, 
+             short_name, 
+             code2 = x2_alpha_code,
+             region,
+             income_group) |> 
+      mutate(code2 = str_to_lower(code2))
+  )
+
+xdf1 |> 
+  ggplot(
+  mapping = aes(
+    x = var_name[1],
+    y = var_name[2],
+    label = short_name
+    )
+  ) +
+  geom_point() +
+  geom_abline()
+```
