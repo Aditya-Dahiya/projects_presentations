@@ -1,0 +1,346 @@
+---
+title: "The Great American Coffee Taste Test"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "................"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_coffee_test.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+# The Great American Coffee Taste Test
+
+In October 2023, [James Hoffmann](https://www.youtube.com/watch?v=bMOOQfeloH0), along with coffee company Cometeer, conducted the "[Great American Coffee Taste Test](https://cometeer.com/pages/the-great-american-coffee-taste-test)" via a livestream on [YouTube](https://www.youtube.com/watch?v=bMOOQfeloH0), engaging approximately 4,000 participants across the USA. During the event, participants received four coffee samples from Cometeer without labels, brewing and tasting them while recording their notes and preferences. The survey data from this event was later [analyzed](https://rmckeon.medium.com/great-american-coffee-taste-test-breakdown-7f3fdcc3c41d) by data blogger [Robert McKeon Aloe](https://rmckeon.medium.com/), who delved into the rich demographics and coffee-related questions provided by the participants.
+
+However, it's important to note that this data is voluntary and doesn't encompass all participants' responses due to incomplete surveys. Additionally, the dataset represents a sample of James Hoffmann's fanbase, limiting its generalizability.
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Extras and Annotations
+library(magick)               # Image processing
+
+# Load Data
+coffee_survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-14/coffee_survey.csv')
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+coffee_survey |> names()
+
+# Additives to coffee
+df1 <- coffee_survey |> 
+  count(additions, sort = T) |> 
+  uncount(weights = n) |> 
+  separate_longer_delim(additions, delim = ", ") |> 
+  count(additions, sort = T) |> 
+  filter(!(additions %in% c("dairy alternative", "or coffee creamer"))) |> 
+  drop_na() |> 
+  mutate(additions = case_when(
+    additions == "Milk" ~ "Milk, Dairy\nor Creamer",
+    additions == "Sugar or sweetener" ~ "Sweetener",
+    additions == "No - just black" ~ "Nothing\n(Just black)",
+    .default = "Others"
+  )) |> 
+  count(additions, wt = n, sort = T)
+df1 <- df1 |>  
+  mutate(additions = fct(additions, levels = df1$additions )) |> 
+  mutate(perc = paste0(round(100 * n / sum(n), 1), "%") )
+
+# Dairy additives to coffee
+df2 <- coffee_survey |>
+  count(dairy, sort = T) |> 
+  drop_na() |> 
+  uncount(weights = n) |> 
+  separate_longer_delim(dairy, delim = ", ") |> 
+  count(dairy, sort = T)
+df2 <- df2 |> 
+  mutate(dairy = fct(dairy, levels = df2$dairy)) |> 
+  mutate(perc = paste0(round(100 * n / sum(n), 1), "%") )
+
+# Sweetener Additives to coffee
+df3 <- coffee_survey |> 
+  count(sweetener, sort = T) |> 
+  drop_na() |> 
+  uncount(weights = n) |> 
+  separate_longer_delim(sweetener, ", ") |> 
+  count(sweetener, sort = T) |> 
+  filter(!(sweetener == "Splenda)")) |> 
+  mutate(sweetener = case_when(
+    sweetener == "Raw Sugar (Turbinado)" ~ "Raw Sugar",
+    sweetener == "Artificial Sweeteners (e.g." ~ "Artificial Sweetener",
+    .default = sweetener
+  ))
+df3 <- df3 |> 
+  mutate(sweetener = fct(sweetener, levels = df3$sweetener)) |> 
+  mutate(perc = paste0(round(100 * n / sum(n), 1), "%") )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Niconne",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("KoHo",
+  family = "body_font"
+) 
+
+ts <- 40
+
+showtext_auto()
+
+bg_col <- lighten("#F6EFD3", 0.7)
+mypal <- c("#F6EFD3", "#D3BEA7", "#482B20", "#E9B486")
+fillpal <- mypal |> lighten(0.5)
+colpal <- mypal |> darken(0.5)
+text_col <-  darken("#6B4533", 0.4)
+text_hil <-  "#6B4533"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- ""
+
+plot_caption <- paste0(
+  "Data: Great American Coffee Taste Test; Robert McKeon Aloe", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+plot_subtitle <- glue::glue("")
+```
+
+Image Annotation (Credits: [Icon Archive](https://www.iconarchive.com/))
+
+```{r}
+img_url <- "https://icons.iconarchive.com/icons/iconarchive/fat-sugar-food/512/Drink-Coffee-icon.png"
+
+library(magick)
+
+img1 <- image_read(img_url) |> 
+  image_background(bg_col)
+
+# Extracted Colour palette
+set.seed(42)
+img1_palette <- img_url |> 
+  colorfindr::get_colors() |> 
+  colorfindr::make_palette(n = 6)
+# colpal <- c("#F6EFD3", "#D3BEA7", "#482B20", "#E9B486")
+# 
+# text_col <-  darken("#6B4533", 0.4)
+# text_hil <-  "#6B4533"
+```
+
+The Actual Base Plot / Graphic
+
+```{r}
+#| label: base-plot
+
+df1 |> 
+  ggplot(
+    mapping = aes(
+      x = 1,
+      y = n,
+      fill = additions
+    )
+  ) +
+  geom_col(
+    colour = bg_col,
+    position = "stack"
+  ) +
+  geom_text(
+    mapping = aes(
+      label = perc
+    ),
+    position = position_stack(vjust = 0.5),
+    hjust = 0.5,
+    family = "body_font",
+    colour = text_col
+  ) +
+  geom_text(
+    mapping = aes(
+      x = 1.5,
+      label = additions
+    ),
+    position = position_stack(vjust = 0.5),
+    lineheight = 0.4,
+    hjust = "outward"
+  ) +
+  scale_y_continuous(expand = expansion(0)) +
+  scale_fill_manual(values = colpal) +
+  coord_polar(
+    theta = "y", 
+    start = 110 * pi/180,
+    direction = -1) +
+  xlim(c(-1, 2)) +
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
+
+
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: insets
+
+# Central image for the plot
+inset1 <- ggplot() +
+  annotation_custom(
+    grob = grid::rasterGrob(img1),
+    xmin = 0, xmax = 1,
+    ymin = 0, ymax = 1
+  ) +
+  theme_void()
+
+inset_text1 <- str_wrap("", width = 40, whitespace_only = FALSE)
+
+# A QR Code for the infographic
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/data_vizs/",
+  # The file name of the current .qmd file
+  "tidy_coffee_test",         
+  ".html"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.8
+    ) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    )
+  )
+
+g <- g_base +
+  annotate(
+    geom = "label",
+    x = 88.5,
+    y = 600,
+    label = inset_text1,
+    family = "caption_font",
+    lineheight = 0.3,
+    hjust = 0,
+    vjust = "inward",
+    size = 18,
+    colour = text_col,
+    fill = bg_col,
+    label.padding = unit(1, "mm"),
+    label.size = 0
+  ) +
+  inset_element(
+    p = plot_qr,
+    left = 0.785, right = 0.95,
+    bottom = 0.85, top = 1,
+    align_to = "panel",
+    clip = FALSE
+  ) + 
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+
+```
+
+Savings the graphics & Removing Temporary Image Files *("Do no harm and leave the world an untouched place")*
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_rolling_stone.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail for the webpage
+
+
+# Delete temporary image file
+unlink("temp_coffee.png")
+```
