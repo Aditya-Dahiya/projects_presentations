@@ -53,7 +53,8 @@ library(patchwork)            # Combining plots
 
 # Extras and Annotations
 library(magick)               # Image processing
-
+library(ggfittext)            # Fitting labels inside bar plots
+ 
 # Load Data
 coffee_survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-14/coffee_survey.csv')
 ```
@@ -63,7 +64,8 @@ Exploratory Data Analysis & Data Wrangling
 ```{r}
 #| label: eda
 
-coffee_survey |> names()
+# Examine the available variables
+# coffee_survey |> names()
 
 # Additives to coffee
 df1 <- coffee_survey |> 
@@ -138,12 +140,30 @@ ts <- 40
 
 showtext_auto()
 
-bg_col <- lighten("#F6EFD3", 0.7)
-mypal <- c("#F6EFD3", "#D3BEA7", "#482B20", "#E9B486")
-fillpal <- mypal |> lighten(0.5)
-colpal <- mypal |> darken(0.5)
-text_col <-  darken("#6B4533", 0.4)
-text_hil <-  "#6B4533"
+bg_col <- "#F2EFE9"
+# Credits for coffeee palette
+coffee_pal <- c("#623C2B", "#AF524E", "#736849", "#EBD188")
+
+text_col <-  coffee_pal[1] |> darken(0.7)
+text_hil <-  coffee_pal[1] |> darken(0.4)
+
+# Palettes for inset graphs
+
+n2 <- 0.1 * 1:nrow(df2)
+n2 <- n2 - median(n2)
+
+pal2 <- vector()
+for (i in 1:nrow(df2)){
+  pal2[i] <- darken(coffee_pal[2], n2[i], method = "absolute")
+}
+
+n3 <- 0.1 * 1:nrow(df3)
+n3 <- n3 - median(n3)
+
+pal3 <- vector()
+for (i in 1:nrow(df3)){
+  pal3[i] <- darken(coffee_pal[3], n3[i], method = "absolute")
+}
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -202,41 +222,52 @@ The Actual Base Plot / Graphic
 ```{r}
 #| label: base-plot
 
-df1 |> 
+p1 <- df1 |> 
   ggplot(
     mapping = aes(
       x = 1,
       y = n,
+      group = additions,
       fill = additions
     )
   ) +
+  # Donut Chart
   geom_col(
     colour = bg_col,
-    position = "stack"
+    position = position_stack(vjust = 0.5)
   ) +
+  scale_fill_manual(values = coffee_pal |> lighten(0.2)) +
+  
+  # Adding labels
   geom_text(
     mapping = aes(
-      label = perc
+      label = perc,
+      colour = (additions == "Nothing\n(Just black)")
     ),
     position = position_stack(vjust = 0.5),
-    hjust = 0.5,
-    family = "body_font",
-    colour = text_col
+    family = "body_font"
   ) +
+  scale_colour_manual(values = c(text_col, "white")) +
+  
+  # Adding percentage markers
+  ggnewscale::new_scale_colour() +
   geom_text(
     mapping = aes(
       x = 1.5,
-      label = additions
+      label = additions,
+      colour = additions
     ),
     position = position_stack(vjust = 0.5),
     lineheight = 0.4,
-    hjust = "outward"
+    hjust = "outward",
+    family = "body_font"
   ) +
+  scale_colour_manual(values = c(darken(coffee_pal, 0.5), bg_col, bg_col)) +
+  
   scale_y_continuous(expand = expansion(0)) +
-  scale_fill_manual(values = colpal) +
   coord_polar(
     theta = "y", 
-    start = 110 * pi/180,
+    start = 90 * pi/180,
     direction = -1) +
   xlim(c(-1, 2)) +
   theme_void() +
@@ -245,6 +276,50 @@ df1 |>
   )
 
 
+df2 |> 
+  ggplot(
+    mapping = aes(
+      x = 1,
+      y = n,
+      fill = dairy,
+      group = dairy
+    )
+  ) +
+  geom_col(
+    position = position_stack(),
+    width = 0.2
+  ) +
+  ggfittext::geom_fit_text(
+    aes(
+      label = perc,
+      colour = (dairy %in% c("Coffee creamer", "Almond milk", 
+                             "Skim milk", "Soy milk"))
+    ), 
+    position = position_stack(vjust = 0.5),
+    angle = 0,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  scale_colour_manual(values = c(text_col, "white")) +
+  geom_text(
+    aes(
+      label = dairy,
+      x = 0.85
+      ),
+    position = position_stack(vjust = 0.5),
+    hjust = 0,
+    angle = -90,
+    family = "body_font",
+    colour = text_col
+  ) +
+  scale_y_reverse(expand = expansion(0)) +
+  scale_x_continuous(expand = expansion(c(1, 0))) +
+  scale_fill_manual(values = pal2) +
+  coord_flip(clip = "off") +
+  theme_void() +
+  theme(legend.position = "none")
+
+p1
 ```
 
 Adding annotations to the plot
