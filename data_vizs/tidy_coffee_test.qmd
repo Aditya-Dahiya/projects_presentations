@@ -2,7 +2,7 @@
 title: "The Great American Coffee Taste Test"
 author: "Aditya Dahiya"
 date: "last-modified"
-subtitle: "................"
+subtitle: "Preferred additions to Coffee in the survey of American coffee drinkers"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_coffee_test.png"
@@ -29,9 +29,9 @@ bibliography: references.bib
 
 # The Great American Coffee Taste Test
 
-In October 2023, [James Hoffmann](https://www.youtube.com/watch?v=bMOOQfeloH0), along with coffee company Cometeer, conducted the "[Great American Coffee Taste Test](https://cometeer.com/pages/the-great-american-coffee-taste-test)" via a livestream on [YouTube](https://www.youtube.com/watch?v=bMOOQfeloH0), engaging approximately 4,000 participants across the USA. During the event, participants received four coffee samples from Cometeer without labels, brewing and tasting them while recording their notes and preferences. The survey data from this event was later [analyzed](https://rmckeon.medium.com/great-american-coffee-taste-test-breakdown-7f3fdcc3c41d) by data blogger [Robert McKeon Aloe](https://rmckeon.medium.com/), who delved into the rich demographics and coffee-related questions provided by the participants.
+In October 2023, [James Hoffmann](https://www.youtube.com/watch?v=bMOOQfeloH0), along with coffee company Cometeer, conducted the "[Great American Coffee Taste Test](https://cometeer.com/pages/the-great-american-coffee-taste-test)" via a livestream on [YouTube](https://www.youtube.com/watch?v=bMOOQfeloH0), engaging approximately 4,000 participants across the USA. During the event, participants received four coffee samples from Cometeer without labels, brewing and tasting them while recording their notes and preferences. The survey data from this event was later [analyzed](https://rmckeon.medium.com/great-american-coffee-taste-test-breakdown-7f3fdcc3c41d) by data blogger [Robert McKeon Aloe](https://rmckeon.medium.com/), who delved into the rich demographics and coffee-related questions provided by the participants. However, it's important to note that this data is voluntary and doesn't encompass all participants' responses due to incomplete surveys. Additionally, the dataset represents a sample of James Hoffmann's fanbase, limiting its generalizability.
 
-However, it's important to note that this data is voluntary and doesn't encompass all participants' responses due to incomplete surveys. Additionally, the dataset represents a sample of James Hoffmann's fanbase, limiting its generalizability.
+![Insights from the Great American Coffee Taste Test tell is that most Americans add nothing to their coffee – just prefer Black coffee. Apart from them, the common additions to coffee, include milk, dairy, creamers, and sweeteners. The diverse range of sweeteners and dairy products preferred by coffee drinkers across the USA, are also shown.](tidy_coffee_test.png){width="900"}
 
 ### **How I made this graphic?**
 
@@ -76,9 +76,9 @@ df1 <- coffee_survey |>
   filter(!(additions %in% c("dairy alternative", "or coffee creamer"))) |> 
   drop_na() |> 
   mutate(additions = case_when(
-    additions == "Milk" ~ "Milk, Dairy\nor Creamer",
-    additions == "Sugar or sweetener" ~ "Sweetener",
-    additions == "No - just black" ~ "Nothing\n(Just black)",
+    additions == "Milk" ~ "Milk, Dairy or Creamer",
+    additions == "Sugar or sweetener" ~ "Sugars and\nSweeteners",
+    additions == "No - just black" ~ "Nothing (Just black)",
     .default = "Others"
   )) |> 
   count(additions, wt = n, sort = T)
@@ -136,7 +136,7 @@ font_add_google("KoHo",
   family = "body_font"
 ) 
 
-ts <- 40
+ts <- 80
 
 showtext_auto()
 
@@ -183,7 +183,7 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- ""
+plot_title <- "Coffee Habits"
 
 plot_caption <- paste0(
   "Data: Great American Coffee Taste Test; Robert McKeon Aloe", 
@@ -193,31 +193,46 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- glue::glue("")
+plot_subtitle <- str_wrap("Insights from the Great American Coffee Taste Test tell is that most Americans add nothing to their coffee – just prefer Black coffee. Apart from them, the common additions to coffee, include milk, dairy, creamers, and sweeteners. The diverse range of sweeteners and dairy products preferred by coffee drinkers across the USA, are also shown below.", 100)
+
+# Custom line-breaks (done in MS Word)
+plot_subtitle <- "Insights from the Great American Coffee Taste Test tell us that most\nAmericans add nothing to their coffee – just prefer Black coffee. Apart\nfrom them, the common additions to coffee, include milk, dairy, creamers,\nand sweeteners. The diverse range of sweeteners\nand dairy products preferred by\ncoffee drinkers across\nthe USA, are also\nshown below."
+
+str_view(plot_subtitle)
 ```
 
 Image Annotation (Credits: [Icon Archive](https://www.iconarchive.com/))
 
 ```{r}
+#| label: coffee-image
 img_url <- "https://icons.iconarchive.com/icons/iconarchive/fat-sugar-food/512/Drink-Coffee-icon.png"
 
 library(magick)
 
 img1 <- image_read(img_url) |> 
-  image_background(bg_col)
+  image_background("transparent")
+
+# Make image a ggplot2 object to use with patchwork
+inset1 <- ggplot() +
+  annotation_custom(
+    grob = grid::rasterGrob(img1),
+    xmin = 0, xmax = 1,
+    ymin = 0, ymax = 1
+  ) +
+  theme_void()
 
 # Extracted Colour palette
-set.seed(42)
-img1_palette <- img_url |> 
-  colorfindr::get_colors() |> 
-  colorfindr::make_palette(n = 6)
+# set.seed(42)
+# img1_palette <- img_url |> 
+#   colorfindr::get_colors() |> 
+#   colorfindr::make_palette(n = 6)
 # colpal <- c("#F6EFD3", "#D3BEA7", "#482B20", "#E9B486")
 # 
 # text_col <-  darken("#6B4533", 0.4)
 # text_hil <-  "#6B4533"
 ```
 
-The Actual Base Plot / Graphic
+The Base Plot - Donut Chart
 
 ```{r}
 #| label: base-plot
@@ -238,45 +253,99 @@ p1 <- df1 |>
   ) +
   scale_fill_manual(values = coffee_pal |> lighten(0.2)) +
   
-  # Adding labels
+  # Adding Percentage markers within donut chart
   geom_text(
     mapping = aes(
       label = perc,
-      colour = (additions == "Nothing\n(Just black)")
+      colour = (additions == "Nothing (Just black)")
     ),
     position = position_stack(vjust = 0.5),
-    family = "body_font"
+    family = "body_font",
+    size = ts / 3,
+    lineheight = 0.35,
+    fontface = "bold"
   ) +
   scale_colour_manual(values = c(text_col, "white")) +
   
-  # Adding percentage markers
+  # Adding labels around the donut chart
   ggnewscale::new_scale_colour() +
   geom_text(
     mapping = aes(
-      x = 1.5,
+      x = 1.6,
       label = additions,
       colour = additions
     ),
     position = position_stack(vjust = 0.5),
-    lineheight = 0.4,
+    lineheight = 0.3,
     hjust = "outward",
-    family = "body_font"
+    family = "body_font",
+    size = ts / 2,
+    fontface = "bold"
   ) +
   scale_colour_manual(values = c(darken(coffee_pal, 0.5), bg_col, bg_col)) +
   
   scale_y_continuous(expand = expansion(0)) +
+  
   coord_polar(
     theta = "y", 
     start = 90 * pi/180,
     direction = -1) +
   xlim(c(-1, 2)) +
-  theme_void() +
+  
+  # Labels for the plot
+  labs(
+    title = plot_title, 
+    caption = plot_caption
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = ts
+  ) +
   theme(
-    legend.position = "none"
+    legend.position = "none",
+    plot.margin = margin(0,0,0,0),
+    plot.title = element_text(
+        size = 7 * ts,
+        hjust = 0.5,
+        colour = text_hil,
+        family = "title_font",
+        margin = margin(10,0,3,0, "mm")
+      ),
+    plot.subtitle = element_text(
+        hjust = 0,
+        lineheight = 0.35,
+        size = ts,
+        colour = text_col,
+        family = "body_font",
+        margin = margin(0,0,0,0, "mm")
+      ),
+    plot.caption = element_textbox(
+        hjust = 0.5,
+        family = "caption_font",
+        size = ts,
+        colour = text_hil,
+        margin = margin(20 ,0,5,0, "mm")
+      ),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    )
   )
+```
 
+Additional Stacked bar Charts & Annotations
 
-df2 |> 
+```{r}
+#| label: stacked-bars
+
+p2 <- df2 |> 
   ggplot(
     mapping = aes(
       x = 1,
@@ -298,114 +367,187 @@ df2 |>
     position = position_stack(vjust = 0.5),
     angle = 0,
     family = "body_font",
-    fontface = "bold"
+    fontface = "bold",
+    grow = TRUE,
+    min.size = ts/10,
+    padding.y = grid::unit(15, "mm")
+    
   ) +
   scale_colour_manual(values = c(text_col, "white")) +
   geom_text(
     aes(
       label = dairy,
-      x = 0.85
+      x = 0.95
       ),
     position = position_stack(vjust = 0.5),
     hjust = 0,
+    vjust = 0.5,
     angle = -90,
-    family = "body_font",
-    colour = text_col
+    family = "caption_font",
+    colour = text_col,
+    size = ts / 4
   ) +
-  scale_y_reverse(expand = expansion(0)) +
+  scale_y_reverse(expand = expansion(0.2)) +
   scale_x_continuous(expand = expansion(c(1, 0))) +
   scale_fill_manual(values = pal2) +
   coord_flip(clip = "off") +
   theme_void() +
-  theme(legend.position = "none")
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
 
-p1
+p3 <- df3 |> 
+  ggplot(
+    mapping = aes(
+      x = 1,
+      y = n,
+      fill = sweetener,
+      group = sweetener
+    )
+  ) +
+  geom_col(
+    position = position_stack(),
+    width = 0.2
+  ) +
+  ggfittext::geom_fit_text(
+    aes(
+      label = perc,
+      colour = (sweetener %in% c("Honey",
+                             "Stevia",
+                             "Maple Syrup",
+                             "Agave Nectar"))
+    ), 
+    position = position_stack(vjust = 0.5),
+    angle = 0,
+    family = "body_font",
+    fontface = "bold",
+    min.size = ts/10,
+    padding.y = grid::unit(15, "mm"),
+    grow = TRUE
+  ) +
+  scale_colour_manual(values = c(text_col, "white")) +
+  geom_text(
+    aes(
+      label = sweetener,
+      x = 0.85
+      ),
+    position = position_stack(vjust = 0.5),
+    hjust = 0,
+    vjust = 0.5,
+    angle = -90,
+    family = "caption_font",
+    colour = text_col,
+    size = ts/4
+  ) +
+  scale_y_reverse(expand = expansion(0.2)) +
+  scale_x_continuous(expand = expansion(c(1, 0))) +
+  scale_fill_manual(values = pal3) +
+  coord_flip(clip = "off") +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+
+p_subtitle <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    hjust = 0,
+    vjust = 1,
+    label = plot_subtitle,
+    family = "body_font",
+    colour = text_col,
+    lineheight = 0.3,
+    size = ts / 2.5
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
 ```
 
 Adding annotations to the plot
 
 ```{r}
-#| label: insets
+#| label: add-annotations
 
-# Central image for the plot
-inset1 <- ggplot() +
-  annotation_custom(
-    grob = grid::rasterGrob(img1),
-    xmin = 0, xmax = 1,
-    ymin = 0, ymax = 1
-  ) +
-  theme_void()
-
-inset_text1 <- str_wrap("", width = 40, whitespace_only = FALSE)
-
-# A QR Code for the infographic
-url_graphics <- paste0(
-  "https://aditya-dahiya.github.io/projects_presentations/data_vizs/",
-  # The file name of the current .qmd file
-  "tidy_coffee_test",         
-  ".html"
-)
-# remotes::install_github('coolbutuseless/ggqr')
-# library(ggqr)
-plot_qr <- ggplot(
-  data = NULL, 
-  aes(x = 0, y = 0, label = url_graphics)
-  ) + 
-  ggqr::geom_qr(
-    colour = text_hil, 
-    fill = bg_col,
-    size = 1.8
-    ) +
-  coord_fixed() +
-  theme_void() +
-  theme(plot.background = element_rect(
-    fill = NA, 
-    colour = NA
-    )
-  )
-
-g <- g_base +
-  annotate(
-    geom = "label",
-    x = 88.5,
-    y = 600,
-    label = inset_text1,
-    family = "caption_font",
-    lineheight = 0.3,
-    hjust = 0,
-    vjust = "inward",
-    size = 18,
-    colour = text_col,
-    fill = bg_col,
-    label.padding = unit(1, "mm"),
-    label.size = 0
+g <- p1 +
+  inset_element(
+    p = inset1,
+    on_top = TRUE,
+    ignore_tag = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = 0.32, right = 0.7,
+    bottom = 0.3, top = 0.7
   ) +
   inset_element(
-    p = plot_qr,
-    left = 0.785, right = 0.95,
-    bottom = 0.85, top = 1,
+    p = p_subtitle,
+    on_top = TRUE,
+    ignore_tag = TRUE,
+    clip = FALSE,
     align_to = "panel",
-    clip = FALSE
-  ) + 
+    left = -1,  right = 1,
+    top = 1.3, bottom = 0.7
+  ) +
+  
+  # Add stacked horizontal Bar Charts
+  inset_element(
+    p = p2,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = 0.45, right = 1.08,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
+  inset_element(
+    p = p3,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = -0.08, right = 0.55,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
   plot_annotation(
     theme = theme(
       plot.background = element_rect(
-        fill = "transparent",
-        colour = "transparent"
+        fill = bg_col,
+        colour = bg_col
       )
     )
   )
-
-
 ```
 
-Savings the graphics & Removing Temporary Image Files *("Do no harm and leave the world an untouched place")*
+Savings the graphics
 
 ```{r}
 #| label: save-image
 
 ggsave(
-  filename = here::here("data_vizs", "tidy_rolling_stone.png"),
+  filename = here::here("data_vizs", "tidy_coffee_test.png"),
   plot = g,
   width = 400,    # Best Twitter Aspect Ratio = 4:5
   height = 500,   
@@ -414,8 +556,8 @@ ggsave(
 )
 
 # Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_coffee_test.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_coffee_test.png"))
 
-
-# Delete temporary image file
-unlink("temp_coffee.png")
 ```
