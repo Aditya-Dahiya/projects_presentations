@@ -92,6 +92,8 @@ Exploratory Data Analysis & Data Wrangling
 
 # rawdf |> visdat::vis_miss()
 
+display_countries <- c("CN", "IN", "US", "ID", "MX", "NG", "PK")
+
 df <- rawdf  |>
   rename(year = date) |> 
   complete(
@@ -108,25 +110,14 @@ df <- rawdf  |>
     sp_dyn_le00_in, 
     sp_pop_totl,
     .direction = "updown"
+    ) |> 
+  mutate(
+    ctry_label = if_else(
+      iso2c %in% display_countries,
+      country,
+      NA
     )
-
-rawdf |> 
-  filter(date == 2020) |> 
-  arrange(desc(sp_pop_totl)) |> 
-  ggplot(
-    aes(
-      x = ny_gdp_pcap_cd,
-      y = sp_dyn_le00_in,
-      size = sp_pop_totl,
-      label = country
-    )
-  ) +
-  geom_point(
-    alpha = 0.5
-  ) +
-  scale_size_area() +
-  scale_x_log10() +
-  geom_text(check_overlap = TRUE)
+  )
 ```
 
 Visualization Parameters
@@ -197,6 +188,135 @@ The base Plot
 
 ```{r}
 #| label: base-plot
+
+library(gganimate)
+
+g <- df |> 
+  arrange(desc(sp_pop_totl)) |> 
+  ggplot(
+    aes(
+      x = ny_gdp_pcap_cd,
+      y = sp_dyn_le00_in,
+      size = sp_pop_totl,
+      label = ctry_label
+    )
+  ) +
+  geom_point(
+    fill = "orange",
+    alpha = 0.5,
+    shape = 21
+  ) +
+  scale_size(
+    range = c(1, 10)
+  ) +
+  scale_x_continuous(
+    labels = scales::label_currency(),
+    transform = "log2",
+    breaks = c(1000, 10000, 100000)
+  ) +
+  scale_y_continuous(
+    limits = c(40, 90)
+  ) +
+  geom_text(
+    size = 3,
+    check_overlap = TRUE
+    ) +
+  labs(
+    title = "Year: {frame_time}",
+    subtitle = "Rising life expectancies with rising wealth for countries",
+    x = "GDP per capita (US Dollars, current)",
+    y = "Life expectancy at birth (years)"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = 12
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_line(
+      colour = "lightgrey",
+      linetype = 3,
+      linewidth = 0.5
+    ),
+    axis.line = element_line(
+      arrow = arrow()
+    )
+  ) +
+  transition_time(as.integer(year)) +
+  ease_aes("linear")
+
+
+# Animate the plot
+animate(
+  plot = g,
+  fps = 5,
+  height = 500,
+  width = 400,
+  end_pause = 20
+)
+```
+
+```{r}
+#| label: india-china
+
+g <- df |>
+  filter(iso2c %in% c("IN", "CN")) |> 
+  mutate(iso2c = str_to_lower(iso2c)) |> 
+  filter(year <= 2020) |> 
+  ggplot(
+    aes(
+      x = ny_gdp_pcap_cd, 
+      y = sp_dyn_le00_in,
+      colour = country
+    )
+  ) +
+  geom_path() +
+  geom_text(
+    aes(label = year),
+    nudge_y = -0.75
+  ) +
+  ggflags::geom_flag(
+    aes(
+      country = iso2c,
+      size = sp_pop_totl
+    ),
+    alpha = 0.5
+  ) +
+  scale_x_continuous(
+    trans = "log2",
+    breaks = c(0, 100, 1000, 10000),
+    labels = scales::label_currency()
+  ) +
+  scale_size(
+    range = c(1, 20)
+  ) +
+  scale_colour_manual(
+    values = c("red", "darkblue")
+  ) +
+  labs(
+    x = "GDP per capita (US$, current)",
+    y = "Life expectancy at birth (years)",
+    title = "India and China in last 40 years",
+    subtitle = "Both countries have risen, albeit with different trajectories"
+  ) +
+  theme_classic(
+    base_size = 40
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot",
+    axis.line = element_line(arrow = arrow()),
+    axis.title = element_text(hjust = 1)
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "wb_gdp_lifeexp.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
 
 ```
 
