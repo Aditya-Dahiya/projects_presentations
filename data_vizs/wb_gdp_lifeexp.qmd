@@ -1,0 +1,254 @@
+---
+title: "GDP vs. Life Expectancy"
+author: "Aditya Dahiya"
+date: "last-modified"
+subtitle: "World Bank data shows a relation between Wealth and Health - correlated, is it causative?"
+categories:
+  - "World Bank Data"
+  - "A4 Size Viz"
+  - "Governance"
+image: "thumbnails/wb_gdp_lifeexp.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+# GDP per capita vs. Life Expectancy
+
+I utilized data from the World Bank's [DataBank](https://databank.worldbank.org/), a comprehensive analysis and visualization tool that houses a diverse collection of time series data spanning various topics. Specifically, I extracted information on Gross Domestic Product (GDP) and life expectancy for multiple countries over several years. Using this data, I created a scatter plot to explore the relationship between a country's GDP and its life expectancy. The scatter plot allows for a visual examination of potential correlations or patterns between these two variables across different nations and over time. DataBank enables users to customize queries, generate tables, charts, and maps effortlessly, making it a valuable resource for data analysis and visualization. This tool facilitates not only the exploration of data but also the sharing and embedding of findings, encouraging collaboration and further analysis. Enjoy using DataBank and feel free to share your insights and feedback!
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Extras and Annotations
+library(magick)               # Image processing
+
+# Credits: Geospatial Science and Human Security at ORNL
+# Credits: @jpiburn, @petrbouchal, @bapfeld
+# install.packages("wbstats")
+library(wbstats)
+
+# indicators <- wbstats::wb_indicators()
+
+# indicators |> 
+#   filter(str_detect(indicator_desc, "Life expectancy")) |> 
+#   View()
+# 
+# indicators |> 
+#   filter(str_detect(indicator_desc, "GDP per capita")) |> View()
+
+# indicators |> 
+#   filter(str_detect(indicator_id, "SP.POP.TOTL"))
+
+selected_indicators <- c(
+  "NY.GDP.PCAP.CD",
+  "SP.POP.TOTL",
+  "SP.DYN.LE00.IN"
+)
+
+rawdf <- wb_data(
+  indicator = selected_indicators,
+  start_date = 1980,
+  end_date = 2023
+  ) |>
+  janitor::clean_names()
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+# rawdf |> visdat::vis_miss()
+
+df <- rawdf  |>
+  rename(year = date) |> 
+  complete(
+    country, 
+    year = 1980:2023, 
+    fill = list(
+      ny_gdp_pcap_cd = NA, 
+      sp_dyn_le00_in = NA, 
+      sp_pop_totl = NA
+      )
+    ) |> 
+  tidyr::fill(
+    ny_gdp_pcap_cd, 
+    sp_dyn_le00_in, 
+    sp_pop_totl,
+    .direction = "updown"
+    )
+
+rawdf |> 
+  filter(date == 2020) |> 
+  arrange(desc(sp_pop_totl)) |> 
+  ggplot(
+    aes(
+      x = ny_gdp_pcap_cd,
+      y = sp_dyn_le00_in,
+      size = sp_pop_totl,
+      label = country
+    )
+  ) +
+  geom_point(
+    alpha = 0.5
+  ) +
+  scale_size_area() +
+  scale_x_log10() +
+  geom_text(check_overlap = TRUE)
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Niconne",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("KoHo",
+  family = "body_font"
+) 
+
+ts <- 80
+
+showtext_auto()
+
+# Colour Palettes
+mypal <- c()
+
+bg_col <- NA              # Background Colour
+text_col <- NA            # Colour for text
+text_hil <- NA            # Colour for highlighted text
+ 
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- ""
+
+plot_caption <- paste0(
+  "Data: ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+plot_subtitle <- str_wrap("", 100)
+
+```
+
+The base Plot
+
+```{r}
+#| label: base-plot
+
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: add-annotations
+
+g <- p1 +
+  inset_element() +
+  inset_element() +
+  
+  # Insert QR Code
+  inset_element(
+    p = p3,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = -0.08, right = 0.55,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col,
+        colour = bg_col
+      )
+    )
+  )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "wb_gdp_lifeexp.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "wb_gdp_lifeexp.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails", 
+                         "wb_gdp_lifeexp.png"))
+
+```
