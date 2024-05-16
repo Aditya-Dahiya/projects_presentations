@@ -127,30 +127,33 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Niconne",
+font_add_google("Poiret One",
   family = "title_font"
 ) 
 
+font_add_google("Amita",
+  family = "title2_font"
+  )
 # Font for the caption
-font_add_google("Stint Ultra Condensed",
+font_add_google("Barlow Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("KoHo",
+font_add_google("Monda",
   family = "body_font"
 ) 
 
-ts <- 80
+ts <- 50
 
 showtext_auto()
 
 # Colour Palettes
-mypal <- c()
+mypal <- c("darkred", "blue")
 
-bg_col <- NA              # Background Colour
-text_col <- NA            # Colour for text
-text_hil <- NA            # Colour for highlighted text
+bg_col <- "white"              # Background Colour
+text_col <- "grey10"            # Colour for text
+text_hil <- "grey30"            # Colour for highlighted text
  
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -170,24 +173,25 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- ""
+plot_title <- "Wealth & Wellness"
 
 plot_caption <- paste0(
-  "Data: ", 
+  "Data: World Bank. Databank.", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-plot_subtitle <- str_wrap("", 100)
+plot_subtitle <- glue::glue("Tracking Prosperity and Well-being:<br>A Comparative Analysis of GDP per<br>Capita and\nLife Expectancy<br>Trends in <b style='color:{mypal[2]}'>India</b> and <b style='color:{mypal[1]}'>China</b><BR>(1980-2020)")
 
+inset_text <- str_wrap("About the Data: DataBank, provided by the World Bank, offers a rich collection of time series data on various topics, allowing users to create customized queries, generate tables, charts, and maps effortlessly. One such dataset focuses on GDP per capita (in current US dollars) and life expectancy at birth for countries around the world. The GDP per capita data is sourced from the World Bank national accounts data and OECD National Accounts data files. It represents the gross domestic product divided by the midyear population, indicating the economic productivity per person. On the other hand, life expectancy at birth data is sourced from the United Nations Population Division, and other reliable sources like census reports and statistical publications from national statistical offices. Life expectancy at birth reflects the number of years a newborn infant would live if prevailing mortality patterns were to stay constant throughout its life. It is calculated as a weighted average, offering a snapshot of a population's mortality pattern at a given time. It is important to note that while life expectancy at birth provides an overall understanding of a population's mortality level, it doesn't reflect the individual mortality pattern one might experience throughout their life. This dataset provides invaluable insights into the economic and health trends of various countries over time. Using this data, one can draw meaningful comparisons and analyze the relationship between economic prosperity, as measured by GDP per capita, and the health of a nation, as measured by life expectancy at birth.", 50, whitespace_only = FALSE)
 ```
 
 The base Plot
 
 ```{r}
-#| label: base-plot
+#| label: base-plot-dont-eval
 
 library(gganimate)
 
@@ -262,7 +266,7 @@ animate(
 g <- df |>
   filter(iso2c %in% c("IN", "CN")) |> 
   mutate(iso2c = str_to_lower(iso2c)) |> 
-  filter(year <= 2020) |> 
+  filter(year <= 2019) |> 
   ggplot(
     aes(
       x = ny_gdp_pcap_cd, 
@@ -271,49 +275,103 @@ g <- df |>
     )
   ) +
   geom_path() +
-  geom_text(
-    aes(label = year),
-    nudge_y = -0.75
-  ) +
   ggflags::geom_flag(
     aes(
       country = iso2c,
       size = sp_pop_totl
+    )
+  ) +
+  geom_text(
+    aes(
+      label = year
     ),
-    alpha = 0.5
+    nudge_y = -0.65,
+    size = 12,
+    family = "body_font"
   ) +
   scale_x_continuous(
     trans = "log2",
-    breaks = c(0, 100, 1000, 10000),
-    labels = scales::label_currency()
+    breaks = c(100, 1000, 10000),
+    labels = scales::label_currency(),
+    limits = c(100, 10000)
+  ) +
+  scale_y_continuous(
+    limits = c(50, 80)
   ) +
   scale_size(
-    range = c(1, 20)
+    range = c(2, 20)
   ) +
   scale_colour_manual(
-    values = c("red", "darkblue")
+    values = mypal[1:2]
   ) +
   labs(
     x = "GDP per capita (US$, current)",
     y = "Life expectancy at birth (years)",
-    title = "India and China in last 40 years",
-    subtitle = "Both countries have risen, albeit with different trajectories"
+    caption = plot_caption
+  ) +
+  annotate(
+    geom = "text",
+    x = 100, y = 80,
+    label = plot_title,
+    hjust = 0,
+    vjust = 1,
+    family = "title2_font",
+    size = 2.4 * ts,
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "richtext",
+    x = 100, y = 77.5,
+    label = plot_subtitle,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    size = ts/1.5,
+    colour = text_col,
+    fill = "transparent",
+    label.size = 0,
+    lineheight = 0.4
+  ) +
+  annotate(
+    geom = "text",
+    x = 1500,
+    y = 64,
+    hjust = 0, 
+    vjust = 1,
+    label = inset_text,
+    family = "title_font",
+    colour = text_col,
+    size = ts/2.8,
+    lineheight = 0.3
   ) +
   theme_classic(
-    base_size = 40
+    base_size = 1.5 * ts,
+    base_family = "body_font"
   ) +
   theme(
     legend.position = "none",
     plot.title.position = "plot",
-    axis.line = element_line(arrow = arrow()),
-    axis.title = element_text(hjust = 1)
+    axis.line = element_line(
+      arrow = arrow(),
+      linewidth = 0.5
+    ),
+    axis.ticks = element_line(
+      linewidth = 0.5
+    ),
+    axis.title = element_text(hjust = 1),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      size = ts,
+      colour = text_hil
+    )
   )
 
 ggsave(
   filename = here::here("data_vizs", "wb_gdp_lifeexp.png"),
   plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 4:5
-  height = 500,   
+  width = 2 * 210,                             # Best Twitter Aspect Ratio = 4:5
+  height = 2 * 297,   
   units = "mm",
   bg = "white"
 )
