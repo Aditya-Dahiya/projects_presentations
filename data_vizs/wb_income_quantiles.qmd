@@ -1,13 +1,14 @@
 ---
-title: "GDP vs. Life Expectancy"
+title: "Rich vs. Poor in the G-20"
 author: "Aditya Dahiya"
-date: "2024-05-16"
-subtitle: "World Bank data shows a relation between Wealth and Health - correlated, is it causative?"
+date: "2024-05-18"
+subtitle: "Comparing the share of wealth held by each income quintile (richest 20% to poorest 20%) in G-20 Nations"
 categories:
   - "World Bank Data"
   - "A4 Size Viz"
   - "Governance"
-image: "thumbnails/wb_income_quantiles.png"
+  - "Inequality"
+image: "thumbnails/wb_gdp_income_quantiles.png"
 format:
   html:
     code-fold: true
@@ -29,9 +30,13 @@ share:
 bibliography: references.bib
 ---
 
-# GDP per capita vs. Life Expectancy
+# Comparative Wealth Inequality across G-20 Nations
 
-I utilized data from the World Bank's [DataBank](https://databank.worldbank.org/), a comprehensive analysis and visualization tool that houses a diverse collection of time series data spanning various topics. Specifically, I extracted information on Gross Domestic Product (GDP) and life expectancy for multiple countries over several years. Using this data, I created a scatter plot to explore the relationship between a country's GDP and its life expectancy. The scatter plot allows for a visual examination of potential correlations or patterns between these two variables across different nations and over time. DataBank enables users to customize queries, generate tables, charts, and maps effortlessly, making it a valuable resource for data analysis and visualization. This tool facilitates not only the exploration of data but also the sharing and embedding of findings, encouraging collaboration and further analysis.
+The graphic presented draws on data from the World Bank [Databank](https://databank.worldbank.org/), a comprehensive resource providing a wide array of economic and social data from household surveys conducted globally. This visual representation illustrates the [distribution of wealth](https://www.worldbank.org/en/topic/poverty/lac-equity-lab1/income-inequality/composition-by-quintile) among different income groups across various countries. Each bar in the graphic represents a country, segmented into [quintiles](https://www.investopedia.com/terms/q/quintile.asp) that display the percentage of total wealth owned by each 20% of the population, ranging from the poorest to the richest.
+
+Notably, countries like **South Africa** **and** **Brazil** are highlighted for their pronounced wealth inequality, where the wealthiest 20% control a substantial portion of the country's wealth, leaving the poorest 20% with a minimal share. In contrast, nations such as **South Korea, France, and Canada** exemplify a more equitable distribution, with wealth more evenly dispersed among all income groups. This graphic underscores the disparities in wealth distribution and offers insights into the economic landscapes of different countries.
+
+[![This graph illustrates the distribution of wealth among different income groups across various countries, segmented by quintiles. It highlights significant disparities in wealth ownership, with countries like South Africa and Brazil showing high inequality, while nations such as South Korea, France, and Canada demonstrate more equitable wealth distribution.](a4_wb_income_quantiles.png){width="600"}](https://raw.githubusercontent.com/Aditya-Dahiya/projects_presentations/main/data_vizs/a4_wb_income_quintiles.png)
 
 ### **How I made this graphic?**
 
@@ -161,6 +166,33 @@ df <- rawdf |>
     country = fct_rev(country),
     iso2c = str_to_lower(iso2c)
   )
+
+# An Additional Dataframe for texxt annotations
+lowest_country <- df |> 
+  filter(quantile == "05th") |> 
+  slice_min(order_by = value, n = 1) |> 
+  pull(iso2c)
+
+# A dataframe for annotations in the plot
+ann_df <- df |> 
+  filter(iso2c == lowest_country) |> 
+  select(quantile, value) |> 
+  mutate(
+    ann_text = c(
+      "2nd poorest\n20%",
+      "Middle 20%\nof population",
+      "2nd richest\n20%",
+      "Share of wealth held by\nrichest 20% of population",
+      "Poorest\n20%"
+    )
+  ) |>
+  arrange(desc(quantile)) |> 
+  mutate(
+    x_start = lag(value),
+    x_start = replace_na(x_start, 0),
+    x_start = cumsum(x_start),
+    x_end = x_start + value,
+    mid_value = (x_start  + x_end)/2)
 ```
 
 Visualization Parameters
@@ -170,20 +202,16 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Nanum Myeongjo",
+font_add_google("Train One",
   family = "title_font"
 ) 
-
-font_add_google("Amita",
-  family = "title2_font"
-  )
 # Font for the caption
 font_add_google("Barlow Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Stint Ultra Condensed",
+font_add_google("Bubbler One",
   family = "body_font"
 ) 
 
@@ -194,7 +222,7 @@ showtext_auto()
 # Colour Palettes
 mypal <- paletteer::paletteer_d("PNWColors::Sunset2")
 
-bg_col <- mypal[5] |> lighten(0.8)       # Background Colour
+bg_col <- "white"                        # Background Colour
 text_col <- mypal[1] |> darken(0.6)      # Colour for text
 text_hil <- mypal[1] |> darken(0.3)      # Colour for highlighted text
  
@@ -216,18 +244,17 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- "Rich vs. Poor in G-20 Nations"
+plot_title <- "Rich vs. Poor in the G-20"
 
 plot_caption <- paste0(
-  "Data: World Bank's Databank.", 
+  "**Data**: World Bank's Databank (2022)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-plot_subtitle <- str_wrap("The distribution of wealth among different income groups in various countries. Each bar represents a country, and the segments within each bar indicate the percentage of total wealth owned by each 20% (quintile) of the population, from the poorest to the richest. The data, derived from household surveys, reflect how income is shared among the population. Countries like South Africa and Brazil exhibit significant inequality, with the wealthiest 20% owning a large portion of the country's wealth, while the poorest 20% own very little. In contrast, countries like South Korea, France, and Canada demonstrate a more equitable distribution of wealth, where the wealth is more evenly spread across all income groups.", 100)
-
+plot_subtitle <- str_wrap("The distribution of wealth among different income groups in various countries. Each bar represents a country, and the segments within each bar indicate the percentage of total wealth owned by each 20% (quintile) of the population, from the poorest to the richest. The data, derived from household surveys, reflect how income is shared among the population. Countries like South Africa and Brazil exhibit significant inequality, with the wealthiest 20% owning a large portion of the country's wealth, while the poorest 20% own very little. In contrast, countries like South Korea, France, and Canada demonstrate a more equitable distribution of wealth, where the wealth is more evenly spread across all income groups.", 90)
 ```
 
 The base plot
@@ -235,7 +262,7 @@ The base plot
 ```{r}
 #| label: base-plot
 
-df |> 
+g_base <- df |> 
   ggplot(
     aes(
       x = value,
@@ -246,7 +273,8 @@ df |>
   geom_col(
     position = position_stack(),
     alpha = 0.5,
-    colour = bg_col
+    colour = bg_col,
+    width = 0.8
   ) +
   geom_text(
     aes(
@@ -254,37 +282,101 @@ df |>
       colour = quantile
     ),
     position = position_stack(),
-    hjust = 1, vjust = 1,
-    size = 3
+    hjust = 1, vjust = 0.5,
+    size = ts / 5,
+    family = "body_font",
+    check_overlap = TRUE
   ) +
-  scale_y_discrete() +
+  
+  # Flags along Y-axis
+  ggflags::geom_flag(
+    mapping = aes(
+      country = iso2c,
+      x = -5
+    ),
+    size = 20
+  ) +
+  
+  # Annotations
+  geom_errorbar(
+    data = ann_df,
+    mapping = aes(
+      y = 0, 
+      xmin = x_start, 
+      xmax = x_end,
+      colour = quantile),
+    linetype = 1,
+    position = position_stack(),
+    alpha = 0.5,
+    linewidth = 1,
+    width = 0.2
+  ) +
+  geom_text(
+    data = ann_df,
+    mapping = aes(
+      x = mid_value,
+      y = -0.5,
+      label = ann_text,
+      colour = quantile
+    ),
+  hjust = 0.5,  
+  family = "caption_font",
+  lineheight = 0.3,
+  size = ts / 4
+  ) +
+  
+  # Scales
+  scale_y_discrete(
+    expand = expansion(c(0.15, 0))
+  ) +
   scale_x_continuous(
     position = "top",
     breaks = seq(0, 100, 20),
     labels = label_number(suffix = "%"),
-    expand = expansion(c(0.1, 0))
+    expand = expansion(c(0.04, 0))
   ) +
   scale_fill_manual(values = mypal) +
   scale_colour_manual(values = mypal |> darken(0.5)) +
+  
+  # Labels
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
-    x = NULL, y = NULL
+    x = "Precentage of wealth held by each quintile", y = NULL
   ) +
-  theme_minimal() +
+  
+  # Themes
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
   theme(
     legend.position = "none",
-    axis.line.x = element_line(
-      linetype = 3
+    axis.line.x = element_blank(),
+    axis.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      face = "bold",
+      size = 2 * ts,
+      hjust = 1
     ),
+    axis.text.y = element_text(
+      colour = text_col,
+      face = "bold",
+      margin = margin(0,0,0,0, "mm"),
+      size = 1.2 * ts
+    ),
+    axis.text.x = element_text(
+      colour = text_col,
+      face = "bold",
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks = element_blank(),
     panel.grid.major.y = element_blank(),
     panel.grid.minor.y = element_blank(),
     panel.grid.minor.x = element_blank(),
-    panel.grid.major.x = element_line(
-      linetype = 3,
-      colour = text_col
-    ),
+    panel.grid.major.x = element_blank(),
     plot.background = element_rect(
       fill = bg_col,
       colour = "transparent"
@@ -292,17 +384,21 @@ df |>
     plot.title = element_text(
       hjust = 0.5,
       family = "title_font",
-      colour = text_hil
+      colour = text_hil,
+      size = 3 * ts,
+      margin = margin(15,0,5,0, "mm")
     ),
     plot.subtitle = element_text(
       hjust = 0,
       family = "body_font",
       colour = text_col,
-      lineheight = 0.4
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
-      colour = text_hil
+      colour = text_hil,
+      family = "caption_font"
     ),
     plot.title.position = "plot"
   )
@@ -327,9 +423,9 @@ plot_qr <- ggplot(
   aes(x = 0, y = 0, label = url_graphics)
   ) + 
   ggqr::geom_qr(
-    colour = text_hil, 
+    colour = text_hil |> lighten(0.1), 
     fill = bg_col,
-    size = 2
+    size = 2.5
     ) +
   coord_fixed() +
   theme_void() +
@@ -348,9 +444,9 @@ plot_qr <- ggplot(
 g <- g_base +
   inset_element(
     p = plot_qr,
-    left = 0.75, right = 0.90,
-    bottom = 0.5, top = 0.6,
-    align_to = "panel",
+    left = 0.8, right = 0.99,
+    bottom = 0.77, top = 0.9,
+    align_to = "full",
     clip = FALSE
   ) + 
   plot_annotation(
@@ -361,9 +457,6 @@ g <- g_base +
       )
     )
   )
-
-
-
 ```
 
 Savings the graphics
@@ -382,10 +475,10 @@ ggsave(
 
 
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "wb_income_quantiles.png")) |> 
+image_read(here::here("data_vizs", "a4_wb_income_quantiles.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", 
                          "thumbnails", 
-                         "wb_gdp_lifeexp.png"))
+                         "wb_gdp_income_quantiles.png"))
 
 ```
