@@ -49,67 +49,127 @@ library(patchwork)            # Combining plots
 # Mapping tools
 library(sf)                   # All spatial objects in R
 library(airportr)             # Airports Data for the world
-library(sf)
-library(rnaturalearth)
+library(rnaturalearth)        # World Map
+
+# Data on Airports: R Package airportr
+# https://cran.r-project.org/web/packages/airportr/vignettes/Introduction_to_Airportr.html  
+
 
 ```
 
-Get New York City Map Data
+Get World Map and Map of India
 
 ```{r}
-#| label: osm-nyc
+#| label: world-and-india-map
 
-library(osmdata)
 
-# Bounding Box (Latitude and Longitude limits) for New York City Area
-nyc_bbox <- c(-74.195, 40.55, -73.74, 40.9)
+```
 
-# A rectangle to draw around the New York City
-nyc_rect <- geometric_rectangle(nyc_bbox[2], nyc_bbox[4],
-                                nyc_bbox[1], nyc_bbox[3])
+Data Analysis, Wrangling and web-scraping for additional datapoints
 
-# Data to add Pointers for the main airports
-com_airports <- tibble(
-  airport = c("John F. Kennedy International Airport",
-              "Newark Liberty International Airport",
-              "LaGuardia Airport",
-              "Long Island MacArthur Airport",
-              "Stewart International Airport",
-              "Trenton–Mercer Airport",
-              "Floyd Bennett Field",
-              "Teterboro Airport"),
-  lon = c(-73.7817205, -74.17369618, -73.87422493,
-          -73.0974269, -74.10118458, -74.81378462,
-          -73.8886878, -74.06131113),
-  lat = c(40.6433708, 40.69135938, 40.77570745,
-          40.7980748, 41.49799333, 40.27745111,
-          40.5899426, 40.85165153)
-) |> 
+```{r}
+#| label: eda-finalize-data
+
+
+# Names of airports around the world
+df <- airportr::airports |> 
+  janitor::clean_names() |> 
+  select(name, iata, city, country, 
+         cc2 = country_code_alpha_2, latitude,
+         lat = latitude, lon = longitude) |> 
+  rename(airport = name) |> 
+  mutate(latitude = lat, longitude = lon) |> 
   st_as_sf(coords = c("lon", "lat"), crs = 4326)
 
-# Getting NYC streets data
-nyc_roads <- opq(bbox = nyc_bbox) |> 
-  add_osm_feature(key = "highway", 
-                  value = c("motoryway", "trunk",
-                            "primary", "secondary")) |> 
-  osmdata_sf()
 
-# Getting NYC Airports Data
-nyc_air <- opq(bbox = nyc_bbox) |> 
-  add_osm_feature(key = "aeroway") |> 
-  osmdata_sf()
+# List of 10 longest flights in the world
+longest_flights <- tibble(
+  from = c("JFK", "EWR", "AKL", "LHR", "DFW",
+           "AKL", "AKL", "LAX", "BLR", "IAH"),
+  to = c("SIN", "SIN", "DOH", "PER", "MEL",
+         "JFK", "DXB", "SIN", "SFO", "SYD"),
+  airlines = c("Singapore Airlines", "Singapore Airlines",
+               "Qatar Airways", "Qantas Airways",
+               "Qantas Airways", "Air New Zealand",
+               "Emirates", "Singapore Airlines", 
+               "Air India", "United Airlines"),
+  distance = c(15332, 15329, 14526, 14499, 14468,
+               14209, 14193, 14096, 13982, 13829)
+)
 
-# Getting Administrative Boundaries of NYC
-nyc_boundary <- opq(bbox = nyc_bbox) |> 
-  add_osm_feature(key = "boundary", 
-                  value = "administrative") |> 
-  osmdata_sf()
 
-# Getting NYC Coastline
-nyc_coastline <- opq(bbox = nyc_bbox) |> 
-  add_osm_feature(key = "natural", 
-                  value = "coastline") |> 
-  osmdata_sf()
+# Extracting the busiest airports in the world
+library(rvest)
+# Define the URL of the Wikipedia page
+url <- "https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic"
+# Read the HTML content of the page and
+# Extract the table with the 2023 statistics
+busiest_airports <- read_html(url) |> 
+  html_node(xpath = '//*[@id="mw-content-text"]/div[1]/table[1]') %>% 
+  html_table(fill = TRUE) |> 
+  as_tibble() |> 
+  janitor::clean_names() |> 
+  separate_wider_delim(
+    cols = code_iata_icao,
+    delim = "/",
+    names = c("iata", "icao")
+  ) |> 
+  select(-rankchange, -percent_change) |> 
+  mutate(totalpassengers = parse_number(totalpassengers))
+
+
+# Plotting the longest routes in the world
+longest_routes <- longest_flights |> 
+  left_join(df |> select(from = iata, 
+                         from_lat = latitude, 
+                         from_lon = longitude) |> 
+              as_tibble() |> 
+              select(-geometry)) |> 
+  left_join(df |> select(to = iata, 
+                         to_lat = latitude, 
+                         to_lon = longitude) |> 
+              as_tibble() |> 
+              select(-geometry))
+
+longest_route_airports <- unique(longest_routes$from, longest_routes$to)
+
+
+# Technique Credits: https://github.com/xmc811/flightplot/blob/master/R/main.R
+# Credits: Mingchu Xu
+# https://www.linkedin.com/in/mingchu-xu-467a0946/
+# On Twitter: @xmc811
+routes <- geosphere::gcIntermediate(
+  p1 = longest_routes |> select(from_lon, from_lat),
+  p2 = longest_routes |> select(to_lon, to_lat),
+  n = 1000,
+  breakAtDateLine = TRUE,
+  addStartEnd = TRUE,
+  sp = TRUE) |> 
+  sf::st_as_sf()
+
+# Test Plot
+# ggplot() +
+#   geom_sf(
+#     data = ne_countries(returnclass = "sf") |> 
+#       filter(sovereignt != "Antarctica"),
+#     fill  = "white"
+#   ) +
+#   geom_sf(
+#     data = routes
+#   ) +
+#   coord_sf(crs = "ESRI:54030") +
+#   ggthemes::theme_map()
+
+# Joining Airports Dataset with the busiest airports dataset
+plotdf <- df |> 
+  left_join(busiest_airports) |> 
+  mutate(
+    busiest = iata %in% busiest_airports$iata,
+    longest = iata %in% longest_route_airports,
+    alpha_var = iata %in% c(busiest_airports$iata,
+                        longest_route_airports)
+  ) |> 
+  mutate(totalpassengers = replace_na(totalpassengers, 1e7))
 ```
 
 Visualization Parameters
@@ -165,301 +225,71 @@ Plot Text
 ```{r}
 #| label: plot-text
 
-plot_title <- "Navigating New York City's Airspace"
+plot_title <- ""
 
 plot_caption <- paste0(
-  "**Data:** Federal Aviation Administration (USA): Obstacles Team AJV-A32", 
+  "**Data:** ", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-subtitle_text <- "A Map of aerial obstructions for safe flight operations. This detailed map showcases over 2000 FAA-recorded aerial obstructions in New York City, including buildings, poles, towers, aviation waypoints, control towers, etc. Color-coded by height above ground level and differentiated in shape by obstruction type, the map provides an overview of what pilots encounter while navigating the airspace above the bustling metropolis."
-plot_subtitle <- str_wrap(subtitle_text, width = 110)
-plot_subtitle |> str_view()
+plot_subtitle <- str_wrap(
+  "", 
+  width = 110
+  )
 
-text_annotation_1 <- "About the Data: The Federal Aviation Administration's Obstacles Team collects and verifies data on man-made aerial obstructions that may affect safe flight navigation. This data, updated every 56 days, includes information such as structure type, height above ground and sea level, lighting, marking, and accuracy code, providing crucial information for safe and efficient flight operations within the National Airspace System. Access the full dataset at https://www.faa.gov/air_traffic/flight_info/aeronav/obst_data/"
+text_annotation_1 <- "About the Datasets: "
 ```
 
-Data Analysis and Wrangling
-
-```{r}
-#| label: data-wrangling
-
-# Air Obstacles in New York City
-nyc_arobs <- rawdf |> 
-  clean_names() |> 
-  mutate(
-    agl = as.numeric(agl),
-    amsl = as.numeric(amsl)
-  ) |> 
-  filter(latdec > nyc_bbox[2] & latdec < nyc_bbox[4]) |> 
-  filter(londec > nyc_bbox[1] & londec < nyc_bbox[3]) |> 
-  mutate(
-    type = case_when(
-      type %in% c("BLDG", "BLDG-TWR") ~ "Buildings",
-      type %in% c("TOWER", "POLE", "T-L TWR", 
-                  "UTILITY POLE", "ANTENNA") ~ "Towers & Poles",
-      type %in% c("CTRL TWR", 
-                  "NAVAID") ~ "Control Towers & Navigational Aids",
-      .default = "Other Structures"
-    ),
-    type = fct(type, levels = c(
-      "Buildings",
-      "Towers & Poles",
-      "Control Towers & Navigational Aids",
-      "Other Structures"
-    ))
-  ) |> 
-  select(oas, state, city, lat = latdec, lon = londec,
-         type, agl, amsl) |> 
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-
-
-```
-
-NYC Aerial Obstructions plot
+Base Plot
 
 ```{r}
 #| label: main-dataviz
 
-g_base <- ggplot() +
-  
-  # Outer Rectangle of the map
-  # geom_sf(
-  #   data = nyc_rect,
-  #   colour = text_col,
-  #   linewidth = 1, 
-  #   linetype = 1
-  # ) +
-  
-  # Airports of NYC
-  geom_sf(
-    data = nyc_air$osm_polygons,
-    fill = "#f5f590",
-    alpha = 0.5
-  ) +
-  
-  # Coastline of New York City and surrounding areas
-  geom_sf(
-    data = nyc_coastline$osm_lines,
-    linewidth = 0.2,
-    linetype = 1
-  ) +
-  
-  # Plotting major roads of New York Cities
-  geom_sf(
-    data = nyc_roads$osm_lines |> 
-            filter(highway %in% c(
-              "motorway", "trunk", "primary"
-            )),
-    colour = "grey10",
-    alpha = 0.3,
-    linewidth = 0.2,
-    linetype = 1
-  ) +
-  
-  # Plotting minor roads of New York Cities
-  geom_sf(
-    data = nyc_roads$osm_lines |> 
-            filter(highway == "secondary"),
-    colour = "grey10",
-    alpha = 0.15,
-    linewidth = 0.1,
-    linetype = 1
-  ) +
-  
-  # Plotting the Aerial Obstructions
-  geom_sf(
-    data = nyc_arobs,
-    mapping = aes(
-      colour = amsl,
-      shape = type,
-      size = type
-    ),
-    alpha = 0.8
-  ) +
-  
-  # Add names of the major airports
-  geom_sf_text(
-    data = com_airports,
-    mapping = aes(label = str_wrap(airport, 15)),
-    lineheight = 0.3,
-    family = "caption_font",
-    face = "bold",
-    colour = text_col,
-    size = ts / 3,
-    hjust = 0.25,
-    vjust = 0.5
-  ) +
+g_base
 
-  # Colour, shape and size scales
-  paletteer::scale_colour_paletteer_c(
-    # "ggthemes::Red-Gold",
-    # "ggthemes::Classic Red",
-    # "grDevices::Purple-Blue",
-    "grDevices::Purple-Yellow",
-    # "grDevices::Plasma",
-    # "grDevices::Mako",
-    # "grDevices::ag_Sunset",
-    direction = -1,
-    name = "Height above sea level (in feet)",
-    trans = "log2",
-    breaks = c(0, 10, 100, 500, 1500)
+# Final Plot: A Composite world map with all Airports and 
+# the busiest Airports in big size (with name and annual passengers)
+# And, in a different colour, the 10 longest flights
+
+
+
+ggplot() +
+  geom_sf(
+    data = ne_countries(returnclass = "sf") |> 
+      filter(sovereignt != "Antarctica"),
+    fill  = "white"
   ) +
-  scale_shape_manual(
-    name = "Type of aerial obstruction",
-    values = c(1, 15, 13, 3)
-  ) +
-  scale_size_manual(
-    name = "Type of aerial obstruction",
-    values = c(1.5, 1, 5, 1.5)
-  ) +
-  scale_y_continuous(
-    breaks = seq(40.6, 40.9, 0.1)
-  ) +
-  scale_x_continuous(
-    position = "top"
-  ) +
-  guides(
-    colour = guide_colourbar(
-      theme = theme(
-        legend.key.width = unit(80, "mm"),
-        legend.key.height = unit(3, "mm"),
-        legend.text = element_text(
-          colour = text_col, 
-          margin = margin(1, 0, 1, 0, "mm"),
-          vjust = 0.5
-        )
-      )
-    )
-  ) +
-  
-  # Coordinates and limits for the plot
-  coord_sf(
-    expand = FALSE, 
-    xlim = c(nyc_bbox[1], nyc_bbox[3]),
-    ylim = c(nyc_bbox[2], nyc_bbox[4])
-  ) +
-  
-  # Lables and Annotations
-  labs(
-    title = plot_title,
-    subtitle = plot_subtitle,
-    caption = plot_caption,
-    x = NULL, y = NULL
-  ) +
-  
-  # Themes
-  theme_minimal(
-    base_size = ts,
-    base_family = "body_font"
-  ) +
-  theme(
-    legend.position = "bottom",
-    legend.direction = "horizontal",
-    legend.box = "vertical",
-    legend.margin = margin(0,0,0,0, "mm"),
-    legend.spacing = unit(0, "mm"),
-    legend.title.position = "top",
-    legend.box.just = "left",
-    legend.justification = "left",
-    legend.background = element_rect(fill = NA, colour = NA),
-    legend.box.background = element_rect(fill = NA, colour = NA),
-    legend.box.spacing = unit(0, "mm"),
-    legend.box.margin = margin(0, 0, 0, 0, "mm"),
-    legend.text = element_text(
-      colour = text_col, 
-      margin = margin(0, 0, 0, 0, "mm"),
-      vjust = 0.5
+  geom_sf(
+    data = plotdf,
+    mapping = aes(
+      colour = busiest,
+      size = alpha_var,
+      alpha = alpha_var
     ),
-    legend.title = element_text(
-      size = ts,
-      colour = text_col,
-      margin = margin(3, 0, 1, 0, "mm")
-    ),
-    axis.text.y = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      colour = text_col,
-      size = ts / 2,
-      angle = 90, 
-      hjust = 1, 
-      vjust = 0
-    ),
-    axis.text.x = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      colour = text_col,
-      size = ts / 2, 
-      vjust = 0,
-      hjust = 0.5
-    ),
-    panel.grid = element_line(
-      colour = text_col |> lighten(0.5),
-      linewidth = 0.1,
-      linetype = 3
-    ),
-    axis.ticks = element_blank(),
-    axis.title = element_blank(),
-    axis.line = element_blank()
+    pch = 20
   ) +
-  theme(
-    plot.background = element_rect(
-      fill = bg_col,
-      linewidth = NA, 
-      colour = NA
-    ),
-    plot.title = element_text(
-      size = 3 * ts,
-      face = "bold",
-      colour = text_hil,
-      family = "title_font",
-      margin = margin(10, 0, 2, 0,"mm"),
-      hjust = 0.5
-    ),
-    plot.subtitle = element_text(
-      hjust = 0, 
-      lineheight = 0.3,
-      colour = text_col,
-      family = "body_font",
-      margin = margin(2, 0, 5, 0, "mm"),
-      size = 0.8 * ts
-    ),
-    plot.caption = ggtext::element_textbox(
-      hjust = 0,
-      family = "caption_font",
-      colour = text_hil,
-      margin = margin(4, 0, 1, 0, "mm")
-    ), 
-    plot.title.position = "plot"
-  )
+  geom_sf(
+    data = routes,
+    alpha = 0.5,
+    linewidth = 1,
+    colour = "darkgrey"
+  ) +
+  scale_alpha_manual(values = c(0.2, 0.5)) +
+  scale_size_manual(values = c(1, 3)) +
+  scale_colour_manual(values = c("black", "red")) +
+  coord_sf(crs = "ESRI:54030") +
+  ggthemes::theme_map()
+
 ```
 
-Add-on maps, insets and annotations
+Add-ons: Insets and annotations
 
 ```{r}
 #| label: insets
 
-g2 <- ggplot() +
-  annotate(
-    geom = "label",
-    x = 0,
-    y = 0,
-    label = str_wrap(
-      text_annotation_1,
-      width = 40,
-      whitespace_only = F
-      ),
-    lineheight = 0.3,
-    size = ts / 5,
-    fill = bg_col,
-    alpha = 0.5,
-    colour = text_col,
-    label.size = NA,
-    family = "caption_font",
-    hjust = 0
-  ) + 
-  theme_void()
 
 # QR Code for the plot
 url_graphics <- paste0(
@@ -489,7 +319,7 @@ plot_qr <- ggplot(
 
 ```
 
-Compiling Plots with Patchwork
+Compiling Final Plot
 
 ```{r}
 #| label: patchwork
@@ -537,7 +367,7 @@ Savings the graphics
 #| label: save-image
 
 ggsave(
-  filename = here::here("data_vizs", "nyc_air_obstacles.png"),
+  filename = here::here("data_vizs", "a4_airports_flights.png"),
   plot = g,
   width = 210,    # Default A4 size page
   height = 297,   # Default A4 size page
@@ -548,8 +378,9 @@ ggsave(
 
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "nyc_air_obstacles.png")) |> 
+image_read(here::here("data_vizs", "a4_airports_flights.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "nyc_air_obstacles.png"))
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "airports_flights.png"))
 
 ```
