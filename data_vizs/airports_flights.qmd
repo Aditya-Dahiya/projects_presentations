@@ -62,7 +62,21 @@ Get World Map and Map of India
 ```{r}
 #| label: world-and-india-map
 
+world_map <- rnaturalearth::ne_countries(
+  scale = "small",
+  returnclass = "sf"
+) |> 
+  filter(sovereignt != "Antarctica")
 
+india_map <- read_sf(
+  here::here(
+    "data", "india_map", "India_State_Boundary.shp"
+    )
+  ) |> 
+  st_simplify(dTolerance = 1000) |> 
+  st_simplify(dTolerance = 500) |> 
+  rmapshaper::ms_dissolve() |>           # removing internal state borders
+  rmapshaper::ms_simplify(keep = 0.2)
 ```
 
 Data Analysis, Wrangling and web-scraping for additional datapoints
@@ -145,7 +159,8 @@ routes <- geosphere::gcIntermediate(
   breakAtDateLine = TRUE,
   addStartEnd = TRUE,
   sp = TRUE) |> 
-  sf::st_as_sf()
+  sf::st_as_sf() |> 
+  mutate(rank = row_number())
 
 # Test Plot
 # ggplot() +
@@ -169,7 +184,10 @@ plotdf <- df |>
     alpha_var = iata %in% c(busiest_airports$iata,
                         longest_route_airports)
   ) |> 
-  mutate(totalpassengers = replace_na(totalpassengers, 1e7))
+  mutate(totalpassengers = replace_na(totalpassengers, 1e7)) |> 
+  arrange(alpha_var)
+
+
 ```
 
 Visualization Parameters
@@ -179,7 +197,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Cormorant Upright",
+font_add_google("Farsan",
   family = "title_font"
 ) 
 
@@ -189,23 +207,27 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Marcellus",
+font_add_google("Saira Condensed",
   family = "body_font"
 ) 
 
 showtext_auto()
 
 # Background Colour
-bg_col <- "white"
+mypal <- c("#188a8d", "#def3f6", "white", "grey10", "#f77919")
+orange_palette <- paletteer::paletteer_c("grDevices::Oranges", n = 30)[8:17]
 
+bg_col <- mypal[2] |> lighten(0.5)
 # Colour for the text using FAA's offical website colour
-text_col <- "#09283c"  
+text_col <- mypal[4]  
 
 # Colour for highlighted text
-text_hil <- "#15396c"
+text_hil <- "grey20"
+text_hil2 <- mypal[5]
+routes_col <- darken(mypal[5], 0.5)
 
 # Define Base Text Size
-ts <- 40 
+ts <- 70 
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -225,22 +247,18 @@ Plot Text
 ```{r}
 #| label: plot-text
 
-plot_title <- ""
+plot_title <- "Airports Worldwide: Busiest Hubs and Longest Routes"
 
 plot_caption <- paste0(
-  "**Data:** ", 
-  " |  **Code:** ", 
+  "**Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-plot_subtitle <- str_wrap(
-  "", 
-  width = 110
-  )
+plot_subtitle <- glue::glue("The global distribution of 7,698 airports across 237 countries and territories, based on data from the OpenFlights database. Highlighted are <b style='color:{mypal[5]}'>the 50 busiest airports</b> of<br>2023 by passenger traffic, marked with larger dots. Additionally, the map shows the <b style='color:{orange_palette[10]}'>10 longest flight routes</b> in the world. Interestingly, the longest flights typically<br>originate from these busiest airports, which are predominantly located in developed countries or significant transit hubs like the UAE.")
 
-text_annotation_1 <- "About the Datasets: "
+text_annotation_1 <- "About the Data: The data for the map is sourced from the {rnaturalearth} R-package, the airport locations are from the OpenFlights database, accessed through the {airportr} R-package, which provides comprehensive information on global airports, flights, and airlines. The 50 busiest airports for the year 2023 were identified using passenger traffic data from a specific Wikipedia page, while the 10 longest flights for 2023 were sourced from Wikipedia too. For visualizing the longest flight routes, R's {geosphere} package was employed, which allows for advanced geocomputation using technique by Mingchu Xu (X: @xmc811). These techniques collectively enable a detailed and accurate depiction of global airport locations, major airports by passenger traffic, and extensive flight routes."
 ```
 
 Base Plot
@@ -248,54 +266,245 @@ Base Plot
 ```{r}
 #| label: main-dataviz
 
-g_base
-
 # Final Plot: A Composite world map with all Airports and 
 # the busiest Airports in big size (with name and annual passengers)
 # And, in a different colour, the 10 longest flights
 
-
-
-ggplot() +
+g_base <-  ggplot() +
   geom_sf(
-    data = ne_countries(returnclass = "sf") |> 
-      filter(sovereignt != "Antarctica"),
-    fill  = "white"
+    data = world_map,
+    fill  = mypal[3],
+    colour = "grey50",
+    linewidth = 0.2
   ) +
   geom_sf(
-    data = plotdf,
-    mapping = aes(
-      colour = busiest,
-      size = alpha_var,
-      alpha = alpha_var
-    ),
-    pch = 20
+    data = india_map,
+    fill = mypal[3],
+    colour = "grey50",
+    linewidth = 0.2
   ) +
   geom_sf(
     data = routes,
+    mapping = aes(colour = as_factor(rank)),
     alpha = 0.5,
-    linewidth = 1,
-    colour = "darkgrey"
+    linewidth = 1
   ) +
-  scale_alpha_manual(values = c(0.2, 0.5)) +
-  scale_size_manual(values = c(1, 3)) +
-  scale_colour_manual(values = c("black", "red")) +
-  coord_sf(crs = "ESRI:54030") +
-  ggthemes::theme_map()
-
+  scale_colour_manual(values = orange_palette) +
+  ggnewscale::new_scale_colour() +
+  geom_sf(
+    data = plotdf,
+    mapping = aes(
+      fill = busiest,
+      size = busiest,
+      alpha = alpha_var
+    ),
+    colour = mypal[4],
+    pch = 21
+  ) +
+  scale_fill_manual(values = c(mypal[4], mypal[5])) +
+  scale_alpha_manual(values = c(0.2, 0.9)) +
+  scale_size_manual(values = c(1, 5)) +
+  # coord_sf(crs = "ESRI:54030") +
+  coord_sf(ylim = c(-90, 90)) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = bg_col,
+      colour = "transparent"
+    ),
+    legend.position = "none",
+    plot.title = element_text(
+      family = "title_font",
+      hjust = 0,
+      colour = text_hil,
+      size = 3.6 * ts,
+      margin = margin(10,0,5,0, "mm")
+    ),
+    plot.subtitle = element_markdown(
+      family = "body_font",
+      lineheight = 0.3,
+      hjust = 0,
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 1,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(30,0,0,0, "mm")
+    )
+  )
 ```
 
-Add-ons: Insets and annotations
+Insets and Annotation
 
 ```{r}
 #| label: insets
 
+# Busiest Airports - Horizontal Bar Plot
+
+inset1 <- busiest_airports |> 
+  filter(rank <= 10) |> 
+  mutate(iso2c = c("US", "AE", "US", "UK", "JP",
+                   "US", "TR", "US", "US", "IN")) |>
+  mutate(iso2c = str_to_lower(iso2c)) |> 
+  ggplot(
+    aes(
+      x = totalpassengers,
+      y = fct_rev(as_factor(rank))
+    )
+  ) +
+  geom_col(fill = mypal[5], alpha = 0.8) +
+  geom_richtext(
+    aes(
+      x = 0,
+      label = paste0(airport, ", ", location, ", **", country, "**")
+    ),
+    hjust = 0,
+    nudge_x = 1e6,
+    family = "caption_font",
+    fill = "transparent",
+    label.size = NA,
+    colour = text_col,
+    size = 18
+  ) +
+  geom_text(
+    aes(label = number(totalpassengers, big.mark = ",")),
+    hjust = 1,
+    nudge_x = -1e6,
+    family = "caption_font",
+    size = 18
+  ) +
+  scale_x_continuous(
+    expand = expansion(0),
+    labels = label_number(scale_cut = cut_short_scale())
+  ) +
+  scale_y_discrete(expand = c(0,0)) +
+  coord_cartesian(clip = "off") +
+  labs(
+    y = "Airport Ranking",
+    x = NULL,
+    title = "World's Busiest Airports (by passengers, 2023)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    plot.background = element_rect(
+      fill = "transparent", 
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linewidth = 0.3, linetype = 3
+    ),
+    axis.line = element_blank(),
+    plot.title = element_text(
+      margin = margin(0,0,2,0,"mm"),
+      colour = text_col),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.35
+      ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col, 
+      lineheight = 0.35
+      ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    panel.border = element_blank(),
+    plot.margin = unit(c(0,0,0,0), "mm"),
+    panel.spacing = unit(0, "mm")
+  )
+
+inset2 <- longest_flights |> 
+  left_join(df |> rename(from = iata, from_city = city)) |> 
+  left_join(df |> rename(to_city = city), join_by(to == iata)) |> 
+  arrange(desc(distance)) |> 
+  mutate(rank = row_number()) |>
+  select(rank, from_city, to_city, airlines, distance) |> 
+  mutate(
+    from_city = if_else(
+      str_detect(from_city, "Dallas"), 
+      "Dallas", 
+      from_city)
+  ) |> 
+  ggplot(
+    aes(
+      y = fct_rev(as_factor(rank)),
+      x = distance - 12000,
+      fill = as_factor(rank),
+      colour = as_factor(rank)
+    )
+  ) +
+  geom_col(width = 0.05) +
+  geom_point(aes(x = 0), size = 3) +
+  geom_point(size = 3) +
+  geom_text(
+    aes(x = 0, label = from_city),
+    hjust = 1,
+    nudge_x = -50,
+    family = "caption_font",
+    size = 20
+  ) +
+  geom_text(
+    aes(label = to_city, x = distance - 12000),
+    hjust = 0,
+    nudge_x = +50,
+    family = "caption_font",
+    size = 20
+  ) +
+  geom_richtext(
+    aes(x = 100, label = paste0(airlines, 
+                                "  ---  **", 
+                                distance, 
+                                " km**")),
+    family = "body_font",
+    hjust = 0,
+    nudge_y = +0.2,
+    label.size = NA,
+    fill = "transparent",
+    size = 15
+  ) +
+  labs(title = "Longest Operational Flights (2023)") +
+  scale_x_continuous(expand = expansion(c(0.2, 0.2))) +
+  scale_fill_manual(values = orange_palette) +
+  scale_colour_manual(values = orange_palette) +
+  coord_cartesian(clip = "off") +
+  theme_void(base_family = "body_font", base_size = ts) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      colour = text_col
+    )
+  )
 
 # QR Code for the plot
 url_graphics <- paste0(
   "https://aditya-dahiya.github.io/projects_presentations/data_vizs/",
   # The file name of the current .qmd file
-  "nyc_air_obstacles",         
+  "airports_flights",         
   ".html"
 )
 # remotes::install_github('coolbutuseless/ggqr')
@@ -307,7 +516,7 @@ plot_qr <- ggplot(
   ggqr::geom_qr(
     colour = text_hil, 
     fill = bg_col,
-    size = 0.65
+    size = 1.8
     ) +
   coord_fixed() +
   theme_void() +
@@ -317,6 +526,29 @@ plot_qr <- ggplot(
     )
   )
 
+text_inset <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = str_wrap(text_annotation_1, 60),
+    family = "caption_font",
+    hjust = 0,
+    size = 18,
+    colour = text_col,
+    lineheight = 0.3
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
 ```
 
 Compiling Final Plot
@@ -326,26 +558,51 @@ Compiling Final Plot
 
 g <- g_base +
   
-  # Add inset to the plot
+  # Add inset1 to the plot
   inset_element(
-    p = g2, 
-    left = -0.12, 
-    right = 0.22,
-    bottom = 0.75,
-    top = 1, 
-    align_to = "plot",
-    clip = TRUE
+    p = inset1, 
+    left = 0.33, 
+    right = 0.78,
+    bottom = 0,
+    top = 0.3, 
+    align_to = "full",
+    clip = FALSE,
+    on_top = TRUE
+  ) +
+  
+  # Add inset2 to the plot
+  inset_element(
+    p = inset2, 
+    left = 0, 
+    right = 0.33,
+    bottom = 0,
+    top = 0.3, 
+    align_to = "full",
+    clip = FALSE,
+    on_top = TRUE
+  ) +
+  
+  # Add text inset to the plot
+  inset_element(
+    p = text_inset, 
+    left = 0.58, 
+    right = 1,
+    bottom = 0.08,
+    top = 0.28, 
+    align_to = "full",
+    clip = TRUE,
+    on_top = TRUE
   ) +
   
   # Add QR Code to the plot
   inset_element(
     p = plot_qr, 
-    left = 0.9, 
-    right = 1,
-    bottom = -0.33,
-    top = 0.02, 
-    align_to = "plot",
-    clip = TRUE
+    left = 0.85, 
+    right = 0.95,
+    bottom = 0.8,
+    top = 0.95, 
+    align_to = "full",
+    clip = FALSE
   ) +
   
   # Basix Plot Annotations
@@ -359,6 +616,15 @@ g <- g_base +
     )
   )
 
+ggsave(
+  filename = here::here("data_vizs", "a4_airports_flights.png"),
+  plot = g,
+  width = 2 * 297,    # Default A4 size page
+  height = 2 * 210,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
+
 ```
 
 Savings the graphics
@@ -366,14 +632,6 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
-ggsave(
-  filename = here::here("data_vizs", "a4_airports_flights.png"),
-  plot = g,
-  width = 210,    # Default A4 size page
-  height = 297,   # Default A4 size page
-  units = "mm",
-  bg = bg_col
-)
 
 
 library(magick)
