@@ -25,7 +25,16 @@ share:
   linkedin: true
   email: true
   mastodon: true
+bibliography: references.bib
 ---
+
+## Mapping the World's Airports including the busiest; and the longest flights
+
+This comprehensive map provides a visual representation of the global aviation landscape, showcasing 7,698 airports across 237 countries and territories. The airport data is sourced from the [OpenFlights](https://openflights.org/) [database](https://openflights.org/data), accessible via the `airportr` package [@airportr], which offers detailed information on over 15 million flights and more than 4,000 airlines. Additionally, the map highlights the [50 busiest airports of 2023](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic), marked with **larger orange dots**, using passenger traffic data from [Wikipedia](https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic). The 10 [longest flight routes](https://www.oag.com/blog/exploring-the-worlds-10-longest-non-stop-airline-routes) (data from [OAG](https://www.oag.com/)) are also depicted, plotted using R's `geosphere` package [@geosphere].
+
+This visualization reveals that the longest flights often originate from the busiest airports, predominantly located in developed countries or major transit hubs like the UAE.
+
+[![The global distribution of 7,698 airports across 237 countries and territories, based on data from the OpenFlights database. Highlighted are the 50 busiest airports of2023 by passenger traffic, marked with larger dots. Additionally, the map shows the 10 longest flight routes in the world. Interestingly, the longest flights typically originate from these busiest airports, which are predominantly located in developed countries or significant transit hubs like the UAE.](a4_airports_flights.png){width="900"}](https://raw.githubusercontent.com/Aditya-Dahiya/projects_presentations/main/data_vizs/a4_airports_flights.png)
 
 ### **How I made this graphic?**
 
@@ -63,7 +72,7 @@ Get World Map and Map of India
 #| label: world-and-india-map
 
 world_map <- rnaturalearth::ne_countries(
-  scale = "small",
+  scale = "large",
   returnclass = "sf"
 ) |> 
   filter(sovereignt != "Antarctica")
@@ -73,9 +82,8 @@ india_map <- read_sf(
     "data", "india_map", "India_State_Boundary.shp"
     )
   ) |> 
-  st_simplify(dTolerance = 1000) |> 
-  st_simplify(dTolerance = 500) |> 
-  rmapshaper::ms_dissolve() |>           # removing internal state borders
+  st_simplify(dTolerance = 100) |> 
+  rmapshaper::ms_dissolve() |>     # removing internal state borders
   rmapshaper::ms_simplify(keep = 0.2)
 ```
 
@@ -214,17 +222,22 @@ font_add_google("Saira Condensed",
 showtext_auto()
 
 # Background Colour
-mypal <- c("#188a8d", "#def3f6", "white", "grey10", "#f77919")
-orange_palette <- paletteer::paletteer_c("grDevices::Oranges", n = 30)[8:17]
+mypal <- c("#188a8d", "#ebfcfa", "white", "#013840", "#f77919")
+# orange_palette <- paletteer::paletteer_c(
+#   "grDevices::Oranges", 
+#   n = 30)[8:17]
+
+orange_palette <- paletteer::paletteer_d(
+  "MetBrewer::Signac", 
+  direction = -1)[1:10]
 
 bg_col <- mypal[2] |> lighten(0.5)
 # Colour for the text using FAA's offical website colour
 text_col <- mypal[4]  
 
 # Colour for highlighted text
-text_hil <- "grey20"
+text_hil <- "#005f6b"
 text_hil2 <- mypal[5]
-routes_col <- darken(mypal[5], 0.5)
 
 # Define Base Text Size
 ts <- 70 
@@ -238,8 +251,8 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 ```
 
 Plot Text
@@ -256,7 +269,7 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- glue::glue("The global distribution of 7,698 airports across 237 countries and territories, based on data from the OpenFlights database. Highlighted are <b style='color:{mypal[5]}'>the 50 busiest airports</b> of<br>2023 by passenger traffic, marked with larger dots. Additionally, the map shows the <b style='color:{orange_palette[10]}'>10 longest flight routes</b> in the world. Interestingly, the longest flights typically<br>originate from these busiest airports, which are predominantly located in developed countries or significant transit hubs like the UAE.")
+plot_subtitle <- glue::glue("The global distribution of 7,698 airports across 237 countries and territories, based on data from the OpenFlights database. Highlighted are <b style='color:{mypal[5]}'>the 50 busiest airports</b> of<br>2023 by passenger traffic, marked with larger dots. Additionally, the map shows the <b>10 longest flight routes</b> in the world. Interestingly, the longest flights typically<br>originate from these busiest airports, which are predominantly located in developed countries or significant transit hubs like the UAE.")
 
 text_annotation_1 <- "About the Data: The data for the map is sourced from the {rnaturalearth} R-package, the airport locations are from the OpenFlights database, accessed through the {airportr} R-package, which provides comprehensive information on global airports, flights, and airlines. The 50 busiest airports for the year 2023 were identified using passenger traffic data from a specific Wikipedia page, while the 10 longest flights for 2023 were sourced from Wikipedia too. For visualizing the longest flight routes, R's {geosphere} package was employed, which allows for advanced geocomputation using technique by Mingchu Xu (X: @xmc811). These techniques collectively enable a detailed and accurate depiction of global airport locations, major airports by passenger traffic, and extensive flight routes."
 ```
@@ -275,7 +288,7 @@ g_base <-  ggplot() +
     data = world_map,
     fill  = mypal[3],
     colour = "grey50",
-    linewidth = 0.2
+    linewidth = 0.1
   ) +
   geom_sf(
     data = india_map,
@@ -286,7 +299,7 @@ g_base <-  ggplot() +
   geom_sf(
     data = routes,
     mapping = aes(colour = as_factor(rank)),
-    alpha = 0.5,
+    alpha = 0.9,
     linewidth = 1
   ) +
   scale_colour_manual(values = orange_palette) +
@@ -330,11 +343,11 @@ g_base <-  ggplot() +
       hjust = 0,
       colour = text_hil,
       size = 3.6 * ts,
-      margin = margin(10,0,5,0, "mm")
+      margin = margin(5,0,5,0, "mm")
     ),
     plot.subtitle = element_markdown(
       family = "body_font",
-      lineheight = 0.3,
+      lineheight = 0.38,
       hjust = 0,
       colour = text_col,
       margin = margin(0,0,0,0, "mm")
@@ -342,7 +355,7 @@ g_base <-  ggplot() +
     plot.caption = element_textbox(
       hjust = 1,
       family = "caption_font",
-      colour = text_hil,
+      colour = text_col,
       margin = margin(30,0,0,0, "mm")
     )
   )
@@ -366,7 +379,7 @@ inset1 <- busiest_airports |>
       y = fct_rev(as_factor(rank))
     )
   ) +
-  geom_col(fill = mypal[5], alpha = 0.8) +
+  geom_col(fill = mypal[5], alpha = 0.5) +
   geom_richtext(
     aes(
       x = 0,
@@ -615,6 +628,13 @@ g <- g_base +
       )
     )
   )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
 
 ggsave(
   filename = here::here("data_vizs", "a4_airports_flights.png"),
@@ -624,15 +644,6 @@ ggsave(
   units = "mm",
   bg = bg_col
 )
-
-```
-
-Savings the graphics
-
-```{r}
-#| label: save-image
-
-
 
 library(magick)
 # Saving a thumbnail for the webpage
