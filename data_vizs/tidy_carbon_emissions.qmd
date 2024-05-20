@@ -1,0 +1,272 @@
+---
+title: "Carbon Majors Emissions Data"
+author: "Aditya Dahiya"
+date: "2024-05-21"
+subtitle: "Preferred additions to Coffee in the survey of American coffee drinkers"
+categories:
+  - "#TidyTuesday"
+  - "Donut Chart"
+image: "thumbnails/tidy_coffee_test.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The [Carbon Majors Emissions Data](https://carbonmajors.org/) provides a comprehensive [database](https://carbonmajors.org/Downloads) of historical emissions from some of the world's largest producers of oil, gas, coal, and cement. This dataset, compiled by Carbon Majors and acknowledged by [Data is Plural](https://www.data-is-plural.com/archive/2024-05-15-edition/), includes data from as far back as 1854. It covers 122 entities, which comprise 75 investor-owned companies, 36 state-owned companies, and 11 nation states. Among these are 82 oil producers, 81 gas producers, 49 coal producers, and 6 cement producers. The data is used to quantify both direct operational emissions and emissions from the combustion of marketed products attributable to these entities. This extensive dataset captures over 1.42 trillion tonnes of CO~2~, representing 72% of global fossil fuel and cement emissions since the Industrial Revolution began in 1751. The available data is categorized with medium granularity, detailing information by year, entity, entity type, commodity, commodity production, commodity unit, and total emissions.
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Extras and Annotations
+library(magick)               # Image processing
+library(ggfittext)            # Fitting labels inside bar plots
+
+
+# Load data
+emissions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-21/emissions.csv')
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+# Number of entitites per year - as a graph
+emissions |> 
+  count(year) |> 
+  ggplot(aes(x = year, y = n)) +
+  geom_point() + 
+  geom_line()
+
+# Emissions total per year
+
+emissions |> 
+  group_by(year) |> 
+  summarise(total_emissions = sum(total_emissions_MtCO2e)) |> 
+  ggplot(aes(x = year, y = total_emissions)) +
+  geom_point() +
+  geom_line()
+
+emissions |> 
+  count(commodity)
+
+df <- emissions |> 
+  group_by(year, commodity) |> 
+  summarise(total_emissions = sum(total_emissions_MtCO2e)) |> 
+  ungroup() |>
+  group_by(year) |> 
+  mutate(
+    perc = total_emissions/sum(total_emissions),
+    
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Niconne",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("KoHo",
+  family = "body_font"
+) 
+
+ts <- 80
+
+showtext_auto()
+
+bg_col <- "white"
+# Credits for coffeee palette
+coffee_pal <- c("#623C2B", "#AF524E", "#736849", "#EBD188")
+
+text_col <-  coffee_pal[1] |> darken(0.7)
+text_hil <-  coffee_pal[1] |> darken(0.4)
+
+# Palettes for inset graphs
+
+n2 <- 0.1 * 1:nrow(df2)
+n2 <- n2 - median(n2)
+
+pal2 <- vector()
+for (i in 1:nrow(df2)){
+  pal2[i] <- darken(coffee_pal[2], n2[i], method = "absolute")
+}
+
+n3 <- 0.1 * 1:nrow(df3)
+n3 <- n3 - median(n3)
+
+pal3 <- vector()
+for (i in 1:nrow(df3)){
+  pal3[i] <- darken(coffee_pal[3], n3[i], method = "absolute")
+}
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- ""
+
+plot_caption <- paste0(
+  "Data: ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+plot_subtitle <- str_wrap("", 100)
+
+str_view(plot_subtitle)
+```
+
+Image Annotation (Credits: [Icon Archive](https://www.iconarchive.com/))
+
+```{r}
+#| label: image-annotation
+
+
+df |> 
+  filter(year == 1990) |> 
+  ggplot(
+    mapping = aes(
+      x = 1.5,
+      y = total_emissions,
+      fill = commodity,
+      group = commodity
+    )
+  ) +
+  geom_col(
+    colour = bg_col
+  ) +
+  geom_text(
+    mapping = aes(label = year),
+    x = 0.5,
+    y = 0
+  ) +
+  geom_text(
+    mapping = aes(label = )
+  ) +
+  
+  # Scales and Coordinates
+  coord_polar(theta = "y") +
+  scale_x_continuous(limits = c(0, 2))
+```
+
+The Base Plot - Donut Chart
+
+```{r}
+#| label: base-plot
+
+```
+
+Additional Annotations
+
+```{r}
+#| label: stacked-bars
+
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: add-annotations
+
+g <- p1 +
+  
+  # Add stacked horizontal Bar Charts
+  inset_element(
+    p = p2,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = 0.45, right = 1.08,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col,
+        colour = bg_col
+      )
+    )
+  )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_carbon_emissions.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_carbon_emissions.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_carbon_emissions.png"))
+
+```
