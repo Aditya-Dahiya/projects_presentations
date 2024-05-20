@@ -32,6 +32,8 @@ share:
 
 Welcome to our interactive exploration of global population distribution, visualized through an animated donut chart. Using midyear estimates from the [World Bank](https://databank.worldbank.org/) [DataBank](https://data.worldbank.org/indicator/SP.POP.TOTL) and inspired by the compelling [visual style](https://x.com/VisualCap/status/1788403705873674494?s=03) of J[ames Eagle](https://x.com/JamesEagle17)'s [analysis on internet browser popularity](https://www.visualcapitalist.com/cp/the-rise-and-fall-of-popular-web-browsers-since-1994/), this chart illustrates the percentage share of the total world population across seven distinct regions: East Asia & Pacific, Middle East & North Africa, Europe & Central Asia, South Asia, Latin America & Caribbean, Sub-Saharan Africa, and North America. This engaging animation provides a dynamic perspective on demographic trends, reflecting data sourced from the United Nations Population Division, national statistical offices, and other reputable agencies. It shows how the world's population is distributed and how these regions contribute to the global demographic landscape.
 
+![Animated Donut (Pie) Chart of the population-share of 7 different regions in the World's Total Population. Notice the rising share of South Asia and Africa, and the falling share of the western world.](world_population_animated_donut.gif)
+
 ### **How I made this graphic?**
 
 Loading required libraries and data import
@@ -143,7 +145,10 @@ df <- rawdf |>
   ungroup() |> 
   mutate(print_pop = number(population, 
                             accuracy = 0.01,
-                            scale_cut = cut_short_scale()))
+                            scale_cut = cut_short_scale())) |> 
+  group_by(year) |> 
+  mutate(totalpop = sum(population)) |> 
+  ungroup()
 ```
 
 The static plot & animating it
@@ -175,7 +180,7 @@ g <- df |>
       colour = region),
     position = position_stack(vjust = 0.5),
     family = "body_font",
-    font_face = "bold",
+    fontface = "bold",
     size = 6
   ) +
   geom_text(
@@ -199,10 +204,21 @@ g <- df |>
   geom_text(
     aes(
       label = as.factor(year),
-      x = -0.5,
+      x = -0.4,
       y = 0
     ),
-    size = 16,
+    size = 10,
+    family = "title_font",
+    colour = text_hil
+  ) +
+  
+  geom_text(
+    aes(
+      label = paste0("Total: ", round(totalpop / 1e9, 1), " Billion"),
+      x = -0.8,
+      y = 0
+    ),
+    size = 5,
     family = "title_font",
     colour = text_hil
   ) +
@@ -210,7 +226,7 @@ g <- df |>
   # Scales
   scale_y_continuous(expand = expansion(0)) +
   scale_x_continuous(
-    limits = c(-0.5, 2)
+    limits = c(-0.8, 2)
   ) +
   scale_fill_manual(values = mypal_fill) +
   scale_colour_manual(values = mypal_col) +
@@ -254,8 +270,14 @@ g <- df |>
 
 
 g_anim <- g +
-  transition_time(year) +
+  transition_states(year) +
   ease_aes("linear")
+```
+
+Savings the animation
+
+```{r}
+#| label: save-image
 
 anim_save(
   filename = here::here(
@@ -269,16 +291,5 @@ anim_save(
   end_pause = 10,
   height = 600,
   width = 480
-  
-)
-```
-
-Savings the animation
-
-```{r}
-#| label: save-image
-
-ggsave(
-  
 )
 ```
