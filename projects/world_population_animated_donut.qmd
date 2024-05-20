@@ -1,0 +1,284 @@
+---
+title: "World Population (1960-2023)"
+author: "Aditya Dahiya"
+date: "2024-04-25"
+subtitle: "An animated donut chart for the World Population by regions using World Bank Data"
+categories:
+  - "Interactive"
+  - "Data Visualization"
+  - "Animation"
+image: "world_population_animated_donut.gif"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/world_population_animated_donut.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+# World Population (1960-2023)
+
+Welcome to our interactive exploration of global population distribution, visualized through an animated donut chart. Using midyear estimates from the [World Bank](https://databank.worldbank.org/) [DataBank](https://data.worldbank.org/indicator/SP.POP.TOTL) and inspired by the compelling [visual style](https://x.com/VisualCap/status/1788403705873674494?s=03) of J[ames Eagle](https://x.com/JamesEagle17)'s [analysis on internet browser popularity](https://www.visualcapitalist.com/cp/the-rise-and-fall-of-popular-web-browsers-since-1994/), this chart illustrates the percentage share of the total world population across seven distinct regions: East Asia & Pacific, Middle East & North Africa, Europe & Central Asia, South Asia, Latin America & Caribbean, Sub-Saharan Africa, and North America. This engaging animation provides a dynamic perspective on demographic trends, reflecting data sourced from the United Nations Population Division, national statistical offices, and other reputable agencies. It shows how the world's population is distributed and how these regions contribute to the global demographic landscape.
+
+### **How I made this graphic?**
+
+Loading required libraries and data import
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(wbstats)              # Fetching World Bank Data
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(gganimate)            # For animation
+
+
+rawdf <- wb_data(
+  indicator = "SP.POP.TOTL",
+  country = "regions_only",
+  start_date = 1960,
+  end_date = 2023,
+  return_wide = FALSE,
+  gapfill = TRUE,
+  mrv = 65
+) |> 
+  select(
+    region = country,
+    year = date,
+    population = value
+  ) 
+
+region_levels <- c(
+  "South Asia",
+  "Sub-Saharan Africa",
+  "Latin America & Caribbean",
+  "Middle East & North Africa",
+  "East Asia & Pacific",
+  "Europe & Central Asia",
+  "North America"
+)
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Dosis",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- paletteer::paletteer_d("feathers::bee_eater")
+mypal <- paletteer::paletteer_d("futurevisions::grand_tour")
+mypal_fill <- paletteer::paletteer_d("ghibli::PonyoLight")
+mypal_medium <- paletteer::paletteer_d("ghibli::PonyoMedium")
+mypal_col <- paletteer::paletteer_d("ghibli::PonyoDark")
+
+# Background Colour
+bg_col <- "white"
+
+# Colour for the text
+text_col <- "grey20"
+
+# Colour for highlighted text
+text_hil <- "grey30" 
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- "Global Population Distribution"
+
+plot_subtitle <- "(1960 to 2023)"
+
+plot_caption <- "Data: World Bank.  |   Graphics: @adityadahiyaias on X"
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+
+df <- rawdf |> 
+  group_by(year) |> 
+  mutate(percentage = population / sum(population)) |> 
+  mutate(region = fct(region, levels = region_levels)) |> 
+  ungroup() |> 
+  mutate(print_pop = number(population, 
+                            accuracy = 0.01,
+                            scale_cut = cut_short_scale()))
+```
+
+The static plot & animating it
+
+```{r}
+#| label: static-plot-animate
+
+g <- df |> 
+  ggplot(
+    aes(
+      x = 1,
+      y = percentage,
+      fill = region,
+      group = region
+    )
+  ) + 
+  geom_col(
+    colour = "white",
+    position = position_stack()
+  ) +
+  
+  # Text in the plot / animation
+  geom_text(
+    mapping = aes(
+      label = paste0(
+        round(100*percentage, 0),
+        "%"
+        ),
+      colour = region),
+    position = position_stack(vjust = 0.5),
+    family = "body_font",
+    font_face = "bold",
+    size = 6
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(
+        str_wrap(region, 15),
+        "\n",
+        print_pop
+        ),
+      x = 1.6,
+      colour = region
+    ),
+    position = position_stack(vjust = 0.5),
+    hjust = "outward",
+    lineheight = 1,
+    family = "body_font",
+    size = 3
+  ) +
+  
+  # Central Year Annotation
+  geom_text(
+    aes(
+      label = as.factor(year),
+      x = -0.5,
+      y = 0
+    ),
+    size = 16,
+    family = "title_font",
+    colour = text_hil
+  ) +
+  
+  # Scales
+  scale_y_continuous(expand = expansion(0)) +
+  scale_x_continuous(
+    limits = c(-0.5, 2)
+  ) +
+  scale_fill_manual(values = mypal_fill) +
+  scale_colour_manual(values = mypal_col) +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle
+  ) +
+  coord_polar(theta = "y") +
+  theme_minimal(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    plot.title = element_text(
+      hjust = 0.5, 
+      family = "title_font",
+      colour = text_hil,
+      margin = margin(0,0,0,0),
+      size = 30,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,0,0),
+      colour = text_hil,
+      family = "title_font",
+      hjust = 0.5,
+      size = 15
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(0,0,0,0)
+    )
+  )
+
+
+g_anim <- g +
+  transition_time(year) +
+  ease_aes("linear")
+
+anim_save(
+  filename = here::here(
+    "projects", 
+    "world_population_animated_donut.gif"
+    ),
+  animation = g_anim,
+  fps = 5,
+  duration = 20,
+  start_pause = 3,
+  end_pause = 10,
+  height = 600,
+  width = 480
+  
+)
+```
+
+Savings the animation
+
+```{r}
+#| label: save-image
+
+ggsave(
+  
+)
+```
