@@ -293,3 +293,183 @@ anim_save(
   width = 480
 )
 ```
+
+## A separate analysis for yearly population changes
+
+The data used for these line charts is sourced from the World Bank DataBank, which compiles midyear population estimates based on the de facto definition of population, encompassing all residents regardless of legal status or citizenship. This data, spanning from 1961 to 2023, includes inputs from various reputable sources such as the United Nations Population Division, national statistical offices, Eurostat, and the U.S. Census Bureau. The graphic illustrates the yearly percentage changes in population for different countries, highlighting significant demographic shifts. The analysis reveals notable population increases in countries like the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely driven by immigration. Conversely, the charts emphasize sharp population declines due to war or natural disasters in countries such as Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022). These trends provide a stark visualization of how political instability, conflict, and crises can dramatically impact population dynamics.
+
+```{r}
+#| label: parameters2
+
+
+# Font for titles
+font_add_google("Dosis",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+ts = 80
+
+plot_title <- "Global Population Trends: Surges and Declines (1961-2023)"
+
+plot_subtitle <- str_wrap("The line charts highlight important demographic changes, with rapid population increases in the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely due to immigration. In contrast, marked population declines are observed in countries like Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022), primarily resulting from wars. These patterns highlight the profound impact of socio-political and environmental factors on population dynamics.", 130)
+
+
+plot_caption <- paste0(
+  "**Data:** World Bank Databank. |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+inset_text <- "The data for these line charts is derived from the World Bank DataBank, specifically the dataset on total population (ID: SP.POP.TOTL). This dataset is based on the de facto definition of population, counting all residents regardless of legal status or citizenship, and provides midyear estimates. The primary sources include the United Nations Population Division's World Population Prospects (2022 Revision), census reports, statistical publications from national statistical offices, Eurostat's demographic statistics, the United Nations Statistical Division's Population and Vital Statistics Report, the U.S. Census Bureau's International Database, and the Secretariat of the Pacific Community's Statistics and Demography Programme. These comprehensive and reputable sources ensure the reliability and accuracy of the population data presented in the charts."
+
+
+```
+
+```{r}
+#| label: data-wrangling
+
+rawdf <- wb_data(
+  indicator = "SP.POP.TOTL",
+  start_date = 1960,
+  end_date = 2023,
+  return_wide = FALSE,
+  gapfill = TRUE,
+  mrv = 65
+)
+
+high_pop_countries <- rawdf |> 
+  filter(date == 2022) |> 
+  filter(value > 1e5) |> 
+  pull(country)
+
+
+df <- rawdf |> 
+  select(
+    country, year = date,
+    value, iso2c
+  ) |> 
+  mutate(iso2c = str_to_lower(iso2c)) |>
+  group_by(country) |> 
+  mutate(increase = 100*(value - lead(value))/value) |> 
+  mutate(disp_val = (increase > 13 | increase < -5)) |> 
+  filter(country %in% high_pop_countries)
+
+
+```
+
+```{r}
+#| label: visualize
+
+g <- df |> 
+  ggplot(aes(x = year, 
+             y = increase,
+             group = country)) +
+  geom_line(colour = "grey50", alpha = 0.25) +
+  geom_point(
+    data = df |> filter(disp_val),
+    mapping = aes(colour = country),
+    size = 3, 
+    alpha = 0.5
+  ) +
+  ggrepel::geom_text_repel(
+    data = df |> filter(disp_val),
+    mapping = aes(
+      label = paste0(country, "\n(", round(increase, 1), "%,", year, ")"),
+      colour = country
+    ),
+    lineheight = 0.3,
+    family = "body_font",
+    size = ts / 4
+  ) +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous(
+    expand = expansion(0), 
+    breaks = seq(1960, 2020, 10),
+    limits = c(1961, 2023)
+  ) +
+  scale_y_continuous(
+    labels = label_number(suffix = "%")
+  ) +
+  labs(
+    x = NULL, y = "Yearly population change (%)",
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = ts
+  ) +
+  theme(
+    legend.position = "none",
+    axis.line.y = element_line(
+      arrow = arrow(ends = "both", length = unit(10, "mm")),
+      linewidth = 1,
+      colour = text_hil
+    ),
+    panel.grid.major.y = element_line(
+      colour = "grey90",
+      linewidth = 0.5
+    ),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(
+      hjust = 0.5,
+      family = "title_font",
+      size = 2 * ts,
+      colour = text_hil
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.35,
+      hjust = 0,
+      colour = text_col
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    )
+  ) 
+
+ggsave(
+  plot = g,
+  filename = here::here("data_vizs", "a4_world_population_change.png"),
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm"
+)
+```
