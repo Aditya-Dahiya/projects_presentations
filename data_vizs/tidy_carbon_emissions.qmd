@@ -6,7 +6,8 @@ subtitle: "Historical Carbon Emissions"
 categories:
   - "#TidyTuesday"
   - "Donut Chart"
-image: "thumbnails/tidy_carbon_emissions.png"
+  - "Animation"
+image: "tidy_carbon_emissions.gif"
 format:
   html:
     code-fold: true
@@ -30,9 +31,9 @@ bibliography: references.bib
 
 The [Carbon Majors Emissions Data](https://carbonmajors.org/) provides a comprehensive [database](https://carbonmajors.org/Downloads) of historical emissions from some of the world's largest producers of oil, gas, coal, and cement. This dataset, compiled by Carbon Majors and acknowledged by [Data is Plural](https://www.data-is-plural.com/archive/2024-05-15-edition/), includes data from as far back as 1854. It covers 122 entities, which comprise 75 investor-owned companies, 36 state-owned companies, and 11 nation states. Among these are 82 oil producers, 81 gas producers, 49 coal producers, and 6 cement producers. The data is used to quantify both direct operational emissions and emissions from the combustion of marketed products attributable to these entities. This extensive dataset captures over 1.42 trillion tonnes of CO~2~, representing 72% of global fossil fuel and cement emissions since the Industrial Revolution began in 1751. The available data is categorized with medium granularity, detailing information by year, entity, entity type, commodity, commodity production, commodity unit, and total emissions.
 
-The analysis of the Carbon Majors Emissions Data reveals significant trends in the sources of CO2 emissions over time. Historically, coal has been the predominant source of CO2 emissions, maintaining this status for much of human history. However, starting in the late 1970s, the share of emissions from oil, natural gas liquids (NGL), and natural gas began to rise significantly. This shift indicates a diversification in energy sources and their corresponding emissions. Interestingly, since the early 2000s, there has been a notable resurgence in coal emissions, driven primarily by increased demand for bituminous coal in Asia. In contrast, sub-bituminous and lignite coals, which are of lower quality, have largely been phased out, highlighting a shift towards higher-grade coal in the global energy market.
+![This animated donut chart illustrates the changing year-wise share of CO2 emissions from coal (6 different types of Coal), oil, and natural gas, highlighting key shifts in energy sources over time.](tidy_carbon_emissions.gif)
 
-*Historic CO~2~ trends show coal as the long-time leader, but oil and gas have surged since the late 1970s. A new coal boom in Asia since 2000s. #FossilFuels #ClimateAction*
+The analysis of the Carbon Majors Emissions Data reveals significant trends in the sources of CO~2~ emissions over time. Historically, coal has been the predominant source of CO~2~ emissions, maintaining this status for much of human history. However, starting in the late 1970s, the share of emissions from oil, natural gas liquids (NGL), and natural gas began to rise significantly. This shift indicates a diversification in energy sources and their corresponding emissions. Interestingly, since the early 2000s, there has been a notable resurgence in coal emissions, driven primarily by increased demand for bituminous coal in Asia. In contrast, sub-bituminous and lignite coals, which are of lower quality, have largely been phased out, highlighting a shift towards higher-grade coal in the global energy market.
 
 ### **How I made this graphic?**
 
@@ -341,6 +342,7 @@ The Base Animation
 #| label: base-animation
 
 g <- df |> 
+  
   # Starting the plot
   ggplot(
     mapping = aes(
@@ -376,7 +378,7 @@ g <- df |>
     y = 0,
     family = "body_font",
     colour = text_col,
-    size = 4
+    size = 5
   ) +
   
   # Text Labels 
@@ -412,9 +414,9 @@ g <- df |>
   # Scales and Coordinates
   scale_colour_manual(values = darken(mypal, 0.75)) +
   
-  coord_polar(theta = "y") +
+  coord_polar(theta = "y", clip = "off") +
   scale_x_continuous(limits = c(0, 2)) +
-  scale_size_continuous(range = c(2, 4)) +
+  scale_size_continuous(range = c(3, 6)) +
   theme_void(
     base_family = "body_font"
   ) +
@@ -422,61 +424,27 @@ g <- df |>
     legend.position = "none",
     plot.title = element_text(
       hjust = 0.5,
-      margin = margin(5,0,2,0, "mm"),
+      margin = margin(10,0,2,0, "mm"),
       colour = text_hil,
-      size = 24
+      size = 36
     ),
     plot.subtitle = element_text(
       hjust = 0.5,
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(4,0,0,0, "mm"),
+      size = 12,
+      colour = text_hil
     ),
     plot.caption = element_text(
       hjust = 0.5,
-      margin = margin(0,0,2,0, "mm")
+      margin = margin(0,0,2,0, "mm"),
+      size = 12,
+      colour = text_hil
     )
   )
 
 g_anim <- g +
   transition_manual(year) +
   ease_aes("linear")
-
-animate(g_anim, fps = 5, duration = 30,
-        height = 600, width = 600)
-```
-
-Additional Annotations
-
-```{r}
-#| label: stacked-bars
-
-```
-
-Adding annotations to the plot
-
-```{r}
-#| label: add-annotations
-
-g <- p1 +
-  
-  # Add stacked horizontal Bar Charts
-  inset_element(
-    p = p2,
-    on_top = TRUE,
-    clip = FALSE,
-    align_to = "panel",
-    left = 0.45, right = 1.08,
-    top = 0.27,
-    bottom = -0.3
-  ) +
-  
-  plot_annotation(
-    theme = theme(
-      plot.background = element_rect(
-        fill = bg_col,
-        colour = bg_col
-      )
-    )
-  )
 ```
 
 Savings the graphics
@@ -484,13 +452,17 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
-ggsave(
-  filename = here::here("data_vizs", "tidy_carbon_emissions.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 4:5
-  height = 500,   
-  units = "mm",
-  bg = bg_col
+anim_save(
+  filename = here::here(
+    "data_vizs", 
+    "tidy_carbon_emissions.gif"
+    ),
+  animation = g_anim, 
+  fps = 10, 
+  duration = 30,
+  end_pause = 40,
+  height = 600, 
+  width = 600
 )
 
 # Saving a thumbnail for the webpage
