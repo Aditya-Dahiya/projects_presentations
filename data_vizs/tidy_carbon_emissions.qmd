@@ -51,11 +51,7 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
-
-# Extras and Annotations
-library(magick)               # Image processing
-library(ggfittext)            # Fitting labels inside bar plots
-
+library(gganimate)            # For animation
 
 # Load data
 emissions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-21/emissions.csv')
@@ -231,15 +227,15 @@ plot_caption <- paste0(
   "Data: CarbonMajors    |    Code: @aditya-dahiya (GitHub)"
   )
 
-plot_subtitle <- str_wrap("Tracking the Shift in contributors to global Cabon dioxide Emissions Sources Over Time", 100)
+plot_subtitle <- str_wrap("Shift in contributors to global Cabon dioxide Emissions Sources over Time", 100)
 
 str_view(plot_subtitle)
 ```
 
-Image Annotation (Credits: [Icon Archive](https://www.iconarchive.com/))
+The static plot
 
 ```{r}
-#| label: image-annotation
+#| label: static-plot
 
 
 df |> 
@@ -339,11 +335,113 @@ df |>
   )
 ```
 
-The Base Plot - Donut Chart
+The Base Animation
 
 ```{r}
-#| label: base-plot
+#| label: base-animation
 
+g <- df |> 
+  # Starting the plot
+  ggplot(
+    mapping = aes(
+      x = 1.5,
+      y = perc,
+      fill = commodity,
+      group = commodity
+    )
+  ) +
+  geom_col(
+    colour = bg_col
+  ) +
+  scale_fill_manual(values = mypal) +
+  
+  # Central Text
+  geom_text(
+    mapping = aes(label = year),
+    x = 0.4,
+    y = 0,
+    family = "body_font",
+    size = 17,
+    colour = text_col
+  ) +
+  
+  geom_text(
+    mapping = aes(label = paste0(
+      "Total: ",
+      number(yearly_total,
+             accuracy = 0.1,
+             big.mark = ","), 
+      " MT")),
+    x = 0,
+    y = 0,
+    family = "body_font",
+    colour = text_col,
+    size = 4
+  ) +
+  
+  # Text Labels 
+  geom_text(
+    mapping = aes(
+      label = paste0(round(100 * perc, 1), "%"),
+      size = perc,
+      colour = commodity
+    ),
+    position = position_stack(vjust = 0.5),
+    family = "body_font"
+  ) +
+  geom_text(
+    mapping = aes(
+      label = str_wrap(commodity, 10, whitespace_only = F),
+      x = 2,
+      size = perc,
+      colour = commodity
+    ),
+    position = position_stack(vjust = 0.5),
+    hjust = "outward",
+    lineheight = 0.75,
+    family = "caption_font"
+  ) +
+  
+  # Labels
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  
+  # Scales and Coordinates
+  scale_colour_manual(values = darken(mypal, 0.75)) +
+  
+  coord_polar(theta = "y") +
+  scale_x_continuous(limits = c(0, 2)) +
+  scale_size_continuous(range = c(2, 4)) +
+  theme_void(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5,
+      margin = margin(5,0,2,0, "mm"),
+      colour = text_hil,
+      size = 24
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,2,0, "mm")
+    )
+  )
+
+g_anim <- g +
+  transition_manual(year) +
+  ease_aes("linear")
+
+animate(g_anim, fps = 5, duration = 30,
+        height = 600, width = 600)
 ```
 
 Additional Annotations
