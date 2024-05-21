@@ -2,11 +2,11 @@
 title: "Carbon Majors Emissions Data"
 author: "Aditya Dahiya"
 date: "2024-05-21"
-subtitle: "Preferred additions to Coffee in the survey of American coffee drinkers"
+subtitle: "Historical Carbon Emissions"
 categories:
   - "#TidyTuesday"
   - "Donut Chart"
-image: "thumbnails/tidy_coffee_test.png"
+image: "thumbnails/tidy_carbon_emissions.png"
 format:
   html:
     code-fold: true
@@ -29,6 +29,10 @@ bibliography: references.bib
 ---
 
 The [Carbon Majors Emissions Data](https://carbonmajors.org/) provides a comprehensive [database](https://carbonmajors.org/Downloads) of historical emissions from some of the world's largest producers of oil, gas, coal, and cement. This dataset, compiled by Carbon Majors and acknowledged by [Data is Plural](https://www.data-is-plural.com/archive/2024-05-15-edition/), includes data from as far back as 1854. It covers 122 entities, which comprise 75 investor-owned companies, 36 state-owned companies, and 11 nation states. Among these are 82 oil producers, 81 gas producers, 49 coal producers, and 6 cement producers. The data is used to quantify both direct operational emissions and emissions from the combustion of marketed products attributable to these entities. This extensive dataset captures over 1.42 trillion tonnes of CO~2~, representing 72% of global fossil fuel and cement emissions since the Industrial Revolution began in 1751. The available data is categorized with medium granularity, detailing information by year, entity, entity type, commodity, commodity production, commodity unit, and total emissions.
+
+The analysis of the Carbon Majors Emissions Data reveals significant trends in the sources of CO2 emissions over time. Historically, coal has been the predominant source of CO2 emissions, maintaining this status for much of human history. However, starting in the late 1970s, the share of emissions from oil, natural gas liquids (NGL), and natural gas began to rise significantly. This shift indicates a diversification in energy sources and their corresponding emissions. Interestingly, since the early 2000s, there has been a notable resurgence in coal emissions, driven primarily by increased demand for bituminous coal in Asia. In contrast, sub-bituminous and lignite coals, which are of lower quality, have largely been phased out, highlighting a shift towards higher-grade coal in the global energy market.
+
+*Historic CO~2~ trends show coal as the long-time leader, but oil and gas have surged since the late 1970s. A new coal boom in Asia since 2000s. #FossilFuels #ClimateAction*
 
 ### **How I made this graphic?**
 
@@ -79,7 +83,21 @@ emissions |>
   geom_line()
 
 emissions |> 
-  count(commodity)
+  count(commodity) |> 
+  pull(commodity)
+
+coal_levels <- c(
+  "Sub-Bituminous Coal",
+  "Lignite Coal",
+  "Bituminous Coal",
+  "Anthracite Coal",
+  "Thermal Coal",
+  "Metallurgical Coal",
+  "Oil & NGL",
+  "Natural Gas",
+  "Cement"
+)
+
 
 df <- emissions |> 
   group_by(year, commodity) |> 
@@ -88,8 +106,64 @@ df <- emissions |>
   group_by(year) |> 
   mutate(
     perc = total_emissions/sum(total_emissions),
-    
+    comm_2 = if_else(
+      str_detect(commodity, "Coal"),
+      "Coal",
+      commodity
+    ),
+    commodity = fct(commodity, levels = coal_levels)
+  ) |> 
+  ungroup() |> 
+  group_by(year) |> 
+  mutate(yearly_total = sum(total_emissions))
+
+yearly_df <- df |> 
+  group_by(year) |> 
+  summarise(yearly_total = round(sum(total_emissions), 1))
+
+# Checking if each year exists in the dataset
+df |> 
+  distinct(year) |> 
+  mutate(x = row_number()) |> 
+  ggplot(aes(x, year)) +
+    geom_col(width = 1)
+
+df |> 
+  ggplot(
+    aes(
+      x = year,
+      y = total_emissions,
+      fill = commodity
+    )
+  ) +
+  geom_col(position = position_fill()) +
+  scale_fill_brewer(palette = "Dark2")
+
+df |> 
+  ggplot(
+    aes(
+      x = year,
+      y = total_emissions,
+      fill = comm_2
+    )
+  ) +
+  geom_col(position = position_fill())
+
+# Percentage of 2022's emissions in that year
+df2 <- emissions |> 
+  mutate(commodity = fct(commodity, levels = coal_levels)) |> 
+  group_by(year, commodity) |> 
+  summarise(total_emissions_co2 = sum(total_emissions_MtCO2e)) |> 
+  ungroup() |> 
+  group_by(year) |> 
+  mutate(
+    year_total = sum(total_emissions_co2)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    overall_perc = round(100 * year_total / max(year_total), 2)
   )
+
 ```
 
 Visualization Parameters
@@ -99,48 +173,39 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Niconne",
+font_add_google("Handlee",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Stint Ultra Condensed",
+font_add_google("Saira Extra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("KoHo",
+font_add_google("Saira Condensed",
   family = "body_font"
 ) 
-
-ts <- 80
 
 showtext_auto()
 
 bg_col <- "white"
 # Credits for coffeee palette
-coffee_pal <- c("#623C2B", "#AF524E", "#736849", "#EBD188")
+mypal <- c(
+  "#F7CB45FF",
+  "#EE8026FF",
+  "#DC050CFF",
+  "#E8601CFF",
+  "#A5170EFF",
+  "#E65518FF", 
+  "#B4E2FFFF",
+  "#7ED7D1FF",
+  "#7BAFDEFF"
+)
 
-text_col <-  coffee_pal[1] |> darken(0.7)
-text_hil <-  coffee_pal[1] |> darken(0.4)
+text_col <-  "#00007FFF"
+text_hil <-  "#00009BFF"
 
-# Palettes for inset graphs
-
-n2 <- 0.1 * 1:nrow(df2)
-n2 <- n2 - median(n2)
-
-pal2 <- vector()
-for (i in 1:nrow(df2)){
-  pal2[i] <- darken(coffee_pal[2], n2[i], method = "absolute")
-}
-
-n3 <- 0.1 * 1:nrow(df3)
-n3 <- n3 - median(n3)
-
-pal3 <- vector()
-for (i in 1:nrow(df3)){
-  pal3[i] <- darken(coffee_pal[3], n3[i], method = "absolute")
-}
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -160,17 +225,13 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- ""
+plot_title <- "Coal's Legacy, Oil's Rise"
 
 plot_caption <- paste0(
-  "Data: ", 
-  " |  **Code:** ", 
-  social_caption_1, 
-  " |  **Graphics:** ", 
-  social_caption_2
+  "Data: CarbonMajors    |    Code: @aditya-dahiya (GitHub)"
   )
 
-plot_subtitle <- str_wrap("", 100)
+plot_subtitle <- str_wrap("Tracking the Shift in contributors to global Cabon dioxide Emissions Sources Over Time", 100)
 
 str_view(plot_subtitle)
 ```
@@ -183,6 +244,8 @@ Image Annotation (Credits: [Icon Archive](https://www.iconarchive.com/))
 
 df |> 
   filter(year == 1990) |> 
+  
+  # Starting the plot
   ggplot(
     mapping = aes(
       x = 1.5,
@@ -194,18 +257,86 @@ df |>
   geom_col(
     colour = bg_col
   ) +
+  scale_fill_manual(values = mypal) +
+  
+  # Central Text
   geom_text(
     mapping = aes(label = year),
-    x = 0.5,
-    y = 0
+    x = 0.3,
+    y = 0,
+    family = "body_font",
+    size = 18,
+    colour = text_col
   ) +
   geom_text(
-    mapping = aes(label = )
+    mapping = aes(label = paste0(
+      "Total: ",
+      number(yearly_total,
+             accuracy = 0.1,
+             big.mark = ","), 
+      " MT")),
+    x = 0,
+    y = 0,
+    family = "body_font",
+    colour = text_col
+  ) +
+  
+  # Text Labels 
+  geom_text(
+    mapping = aes(
+      label = paste0(round(100 * perc, 1), "%"),
+      size = perc,
+      colour = commodity
+    ),
+    position = position_stack(vjust = 0.5),
+    family = "body_font"
+  ) +
+  geom_text(
+    mapping = aes(
+      label = str_wrap(commodity, 10, whitespace_only = F),
+      x = 2,
+      size = perc,
+      colour = commodity
+    ),
+    position = position_stack(vjust = 0.5),
+    hjust = "outward",
+    lineheight = 0.75,
+    family = "caption_font"
+  ) +
+  
+  # Labels
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
   
   # Scales and Coordinates
+  scale_colour_manual(values = darken(mypal, 0.75)) +
+  
   coord_polar(theta = "y") +
-  scale_x_continuous(limits = c(0, 2))
+  scale_x_continuous(limits = c(0, 2)) +
+  scale_size_continuous(range = c(2, 7)) +
+  theme_void(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5,
+      margin = margin(3,0,0,0, "mm"),
+      colour = text_hil,
+      size = 18
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,2,0, "mm")
+    )
+  )
 ```
 
 The Base Plot - Donut Chart
