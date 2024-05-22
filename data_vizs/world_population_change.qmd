@@ -1,13 +1,15 @@
 ---
-title: "World Population (1960-2023)"
+title: "Population Surges and Falls"
 author: "Aditya Dahiya"
-date: "2024-05-20"
-subtitle: "Charts and Visualizations on the total Population of different regions using World Bank Data"
+date: "2024-05-22"
+subtitle: "The yearly percentage changes in population for various countries from 1961 to 2023, highlighting significant increases and sharp declines."
 categories:
-  - "Interactive"
-  - "Data Visualization"
+  - "#TidyTuesday"
+  - "Donut Chart"
   - "Animation"
-image: "world_population_animated_donut.gif"
+  - "A4 Size Viz"
+  - "World Bank"
+image: "thumbnails/world_population_change.png"
 format:
   html:
     code-fold: true
@@ -21,22 +23,27 @@ execute:
 filters:
   - social-share
 share:
-  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/world_population_animated_donut.html"
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
   twitter: true
   linkedin: true
   email: true
   mastodon: true
+bibliography: references.bib
 ---
 
-# Share of different regions in the total world population, from 1960 to 2023
+### Global Population Trends: Surges and Declines (1961-2023)
 
-Global population distribution, visualized through an animated donut chart. Using midyear estimates from the [World Bank](https://databank.worldbank.org/) [DataBank](https://data.worldbank.org/indicator/SP.POP.TOTL) and inspired by the compelling [visual style](https://x.com/VisualCap/status/1788403705873674494?s=03) of J[ames Eagle](https://x.com/JamesEagle17)'s [analysis on internet browser popularity](https://www.visualcapitalist.com/cp/the-rise-and-fall-of-popular-web-browsers-since-1994/), this chart illustrates the percentage share of the total world population across seven distinct regions: East Asia & Pacific, Middle East & North Africa, Europe & Central Asia, South Asia, Latin America & Caribbean, Sub-Saharan Africa, and North America. This engaging animation provides a dynamic perspective on demographic trends, reflecting data sourced from the United Nations Population Division, national statistical offices, and other reputable agencies. It shows how the world's population is distributed and how these regions contribute to the global demographic landscape.
+The data used for these line charts is sourced from the [World Bank](https://www.worldbank.org/en/home) [DataBank](https://databank.worldbank.org/), which compiles [midyear population estimates](https://data.worldbank.org/indicator/SP.POP.TOTL) based on the de facto definition of population, encompassing all residents regardless of legal status or citizenship. This data, spanning from 1961 to 2023, includes inputs from various reputable sources such as the United Nations Population Division, national statistical offices, Eurostat, and the U.S. Census Bureau. The graphic illustrates the yearly percentage changes in population for different countries, highlighting significant demographic shifts.
 
-![Animated Donut (Pie) Chart of the population-share of 7 different regions in the World's Total Population. Notice the rising share of South Asia and Africa, and the falling share of the western world.](world_population_animated_donut.gif)
+The analysis reveals notable population increases in countries like the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely driven by immigration. Conversely, the charts emphasize sharp population declines due to war or natural disasters in countries such as Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022).
 
-### **How I made this graphic?**
+These trends provide a stark visualization of how political instability, conflict, and crises can dramatically impact population dynamics.
 
-Loading required libraries and data import
+[![This graphic depicts the yearly percentage changes in population for various countries from 1961 to 2023, highlighting significant increases due to immigration and sharp declines resulting from war and natural disasters.](a4_world_population_change.png){width="1000"}](https://raw.githubusercontent.com/Aditya-Dahiya/projects_presentations/main/data_vizs/a4_world_population_change.png)
+
+### How I made this graphic?
+
+Getting the data
 
 ```{r}
 #| label: setup
@@ -56,251 +63,14 @@ library(gganimate)            # For animation
 
 rawdf <- wb_data(
   indicator = "SP.POP.TOTL",
-  country = "regions_only",
   start_date = 1960,
   end_date = 2023,
   return_wide = FALSE,
   gapfill = TRUE,
   mrv = 65
-) |> 
-  select(
-    region = country,
-    year = date,
-    population = value
-  ) 
-
-region_levels <- c(
-  "South Asia",
-  "Sub-Saharan Africa",
-  "Latin America & Caribbean",
-  "Middle East & North Africa",
-  "East Asia & Pacific",
-  "Europe & Central Asia",
-  "North America"
 )
+
 ```
-
-Visualization Parameters
-
-```{r}
-#| label: viz-params
-
-
-# Font for titles
-font_add_google("Dosis",
-  family = "title_font"
-) 
-
-# Font for the caption
-font_add_google("Saira Extra Condensed",
-  family = "caption_font"
-) 
-
-# Font for plot text
-font_add_google("Saira Semi Condensed",
-  family = "body_font"
-) 
-
-showtext_auto()
-
-# Colour Palette
-mypal <- paletteer::paletteer_d("feathers::bee_eater")
-mypal <- paletteer::paletteer_d("futurevisions::grand_tour")
-mypal_fill <- paletteer::paletteer_d("ghibli::PonyoLight")
-mypal_medium <- paletteer::paletteer_d("ghibli::PonyoMedium")
-mypal_col <- paletteer::paletteer_d("ghibli::PonyoDark")
-
-# Background Colour
-bg_col <- "white"
-
-# Colour for the text
-text_col <- "grey20"
-
-# Colour for highlighted text
-text_hil <- "grey30" 
-```
-
-Annotation Text for the Plot
-
-```{r}
-#| label: text-for-plot
-
-plot_title <- "Global Population Distribution"
-
-plot_subtitle <- "(1960 to 2023)"
-
-plot_caption <- "Data: World Bank.  |   Graphics: @adityadahiyaias on X"
-```
-
-Data Wrangling
-
-```{r}
-#| label: data-wrangling
-
-
-df <- rawdf |> 
-  group_by(year) |> 
-  mutate(percentage = population / sum(population)) |> 
-  mutate(region = fct(region, levels = region_levels)) |> 
-  ungroup() |> 
-  mutate(print_pop = number(population, 
-                            accuracy = 0.01,
-                            scale_cut = cut_short_scale())) |> 
-  group_by(year) |> 
-  mutate(totalpop = sum(population)) |> 
-  ungroup()
-```
-
-The static plot & animating it
-
-```{r}
-#| label: static-plot-animate
-
-g <- df |> 
-  ggplot(
-    aes(
-      x = 1,
-      y = percentage,
-      fill = region,
-      group = region
-    )
-  ) + 
-  geom_col(
-    colour = "white",
-    position = position_stack()
-  ) +
-  
-  # Text in the plot / animation
-  geom_text(
-    mapping = aes(
-      label = paste0(
-        round(100*percentage, 0),
-        "%"
-        ),
-      colour = region),
-    position = position_stack(vjust = 0.5),
-    family = "body_font",
-    fontface = "bold",
-    size = 6
-  ) +
-  geom_text(
-    mapping = aes(
-      label = paste0(
-        str_wrap(region, 15),
-        "\n",
-        print_pop
-        ),
-      x = 1.6,
-      colour = region
-    ),
-    position = position_stack(vjust = 0.5),
-    hjust = "outward",
-    lineheight = 1,
-    family = "body_font",
-    size = 3
-  ) +
-  
-  # Central Year Annotation
-  geom_text(
-    aes(
-      label = as.factor(year),
-      x = -0.4,
-      y = 0
-    ),
-    size = 10,
-    family = "title_font",
-    colour = text_hil
-  ) +
-  
-  geom_text(
-    aes(
-      label = paste0("Total: ", round(totalpop / 1e9, 1), " Billion"),
-      x = -0.8,
-      y = 0
-    ),
-    size = 5,
-    family = "title_font",
-    colour = text_hil
-  ) +
-  
-  # Scales
-  scale_y_continuous(expand = expansion(0)) +
-  scale_x_continuous(
-    limits = c(-0.8, 2)
-  ) +
-  scale_fill_manual(values = mypal_fill) +
-  scale_colour_manual(values = mypal_col) +
-  labs(
-    title = plot_title,
-    caption = plot_caption,
-    subtitle = plot_subtitle
-  ) +
-  coord_polar(theta = "y") +
-  theme_minimal(
-    base_family = "body_font"
-  ) +
-  theme(
-    legend.position = "none",
-    panel.grid = element_blank(),
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    plot.title = element_text(
-      hjust = 0.5, 
-      family = "title_font",
-      colour = text_hil,
-      margin = margin(0,0,0,0),
-      size = 30,
-      face = "bold"
-    ),
-    plot.subtitle = element_text(
-      margin = margin(0,0,0,0),
-      colour = text_hil,
-      family = "title_font",
-      hjust = 0.5,
-      size = 15
-    ),
-    plot.caption = element_text(
-      hjust = 0.5,
-      family = "caption_font",
-      colour = text_hil,
-      margin = margin(0,0,0,0)
-    )
-  )
-
-
-g_anim <- g +
-  transition_states(year) +
-  ease_aes("linear")
-```
-
-Savings the animation
-
-```{r}
-#| label: save-image
-
-anim_save(
-  filename = here::here(
-    "projects", 
-    "world_population_animated_donut.gif"
-    ),
-  animation = g_anim,
-  fps = 5,
-  duration = 20,
-  start_pause = 3,
-  end_pause = 10,
-  height = 500,
-  width = 480
-)
-```
-
-## Yearly population changes
-
-![This graphic depicts the yearly percentage changes in population for various countries from 1961 to 2023, highlighting significant increases due to immigration and sharp declines resulting from war and natural disasters.](/data_vizs/a4_world_population_change.png){width="900"}
-
-The data used for these line charts is sourced from the World Bank DataBank, which compiles midyear population estimates based on the de facto definition of population, encompassing all residents regardless of legal status or citizenship. This data, spanning from 1961 to 2023, includes inputs from various reputable sources such as the United Nations Population Division, national statistical offices, Eurostat, and the U.S. Census Bureau. The graphic illustrates the yearly percentage changes in population for different countries, highlighting significant demographic shifts. The analysis reveals notable population increases in countries like the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely driven by immigration. Conversely, the charts emphasize sharp population declines due to war or natural disasters in countries such as Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022). These trends provide a stark visualization of how political instability, conflict, and crises can dramatically impact population dynamics.
-
-### How I made this graphic?
 
 Setting Parameters
 
@@ -373,15 +143,6 @@ Data Wrangling
 ```{r}
 #| label: data-wrangling2
 
-rawdf <- wb_data(
-  indicator = "SP.POP.TOTL",
-  start_date = 1960,
-  end_date = 2023,
-  return_wide = FALSE,
-  gapfill = TRUE,
-  mrv = 65
-)
-
 high_pop_countries <- rawdf |> 
   filter(date == 2022) |> 
   filter(value > 1e5) |> 
@@ -405,6 +166,8 @@ df |>
   distinct(country)
 
 ```
+
+Visualization
 
 ```{r}
 #| label: visualize
@@ -577,6 +340,12 @@ g <- g_base +
       )
     )
   )
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save2
 
 ggsave(
   plot = g,
@@ -585,4 +354,13 @@ ggsave(
   width = 297 * 2,
   units = "mm"
 )
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "a4_world_population_change.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "world_population_change.png"))
+
 ```
