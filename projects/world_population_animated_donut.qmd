@@ -1,8 +1,8 @@
 ---
-title: "World Population (1960-2023)"
+title: "Some ingights on the World Population (1960-2023)"
 author: "Aditya Dahiya"
 date: "2024-05-20"
-subtitle: "Charts and Visualizations on the total Population of different regions using World Bank Data"
+subtitle: "Charts and Visualizations on the Population of different regions using World Bank Data"
 categories:
   - "Interactive"
   - "Data Visualization"
@@ -373,7 +373,7 @@ Data Wrangling
 ```{r}
 #| label: data-wrangling2
 
-rawdf <- wb_data(
+rawdf2 <- wb_data(
   indicator = "SP.POP.TOTL",
   start_date = 1960,
   end_date = 2023,
@@ -382,13 +382,13 @@ rawdf <- wb_data(
   mrv = 65
 )
 
-high_pop_countries <- rawdf |> 
+high_pop_countries <- rawdf2 |> 
   filter(date == 2022) |> 
   filter(value > 1e5) |> 
   pull(country)
 
 
-df <- rawdf |> 
+df <- rawdf2 |> 
   select(
     country, year = date,
     value, iso2c
@@ -585,4 +585,100 @@ ggsave(
   width = 297 * 2,
   units = "mm"
 )
+```
+
+## Another Analysis
+
+## 
+
+```{r}
+#| label: eda3
+
+df3 <- rawdf2 |> 
+  select(country, iso2c, year = date, value) |> 
+  mutate(iso2c = str_to_lower(iso2c)) |> 
+  drop_na()
+
+
+countries_to_visualize <- df3 |> 
+  filter(year == 2022) |> 
+  slice_max(order_by = value, n = 10) |> 
+  pull(iso2c)
+
+df3 |> 
+  mutate(
+    country = if_else(
+      iso2c %in% countries_to_visualize,
+      country,
+      "Others"
+    )
+  ) |> 
+  group_by(year, country) |> 
+  summarize(value = sum(value, na.rm = TRUE)) |> 
+  ungroup() |> 
+  ggplot(aes(x = year, y = value, fill = country, group = country)) +
+  ggstream::geom_stream(type = "proportional", colour = "white")
+
+
+df3 |> 
+  visdat::vis_miss()
+
+big_country <- "India"
+view_year <- 2023
+
+total_pop_to_fill <- df3 |> 
+  filter(year == view_year & country == big_country) |> 
+  pull(value)
+
+plotdf3 <- df3 |> 
+  filter(year == view_year) |> 
+  arrange(value) |> 
+  mutate(cumsum_value = cumsum(value)) |> 
+  filter(cumsum_value <= total_pop_to_fill)
+  
+plotdf3 |> 
+  ggplot(aes(area = value, fill = country)) +
+  treemapify::geom_treemap(colour = "white") +
+  labs(
+    title = paste0("The scale of ", big_country, "'s population"),
+    subtitle = paste0("Population of ", 
+                      big_country, 
+                      " in ", view_year, ": ",
+                      number(total_pop_to_fill, big.mark = ","),
+                      "\n",
+                      nrow(plotdf3), 
+                      " countries combined have lower population than ", 
+                      big_country)
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5)
+  )
+
+decade_df <- df3 |> 
+  mutate(year = paste0("y_", year)) |> 
+  pivot_wider(
+    id_cols = c(country, iso2c),
+    names_from = year,
+    values_from = value
+  ) |> 
+  mutate(
+    rise_overall = (y_2023 - y_1961)/y_1961,
+    rise60s = (y_1970 - y_1961)/y_1961,
+    rise70s = (y_1980 - y_1971)/y_1971,
+    rise80s = (y_1990 - y_1981)/y_1981,
+    rise90s = (y_2000 - y_1991)/y_1991,
+    rise00s = (y_2010 - y_2000)/y_2000,
+    rise10s = (y_2020 - y_2010)/y_2010
+  ) |> 
+  select(country, iso2c, starts_with("rise")) |> 
+  pivot_longer(
+    cols = -c(country, iso2c),
+    names_to = "value",
+    values_to = "decade"
+  )
+
+decade_df |> 
+  filter(value == "rise_overall") |> 
 ```
