@@ -2,7 +2,7 @@
 title: "World Population (1960-2023)"
 author: "Aditya Dahiya"
 date: "2024-05-20"
-subtitle: "An animated donut chart for the share in World Population of different regions using World Bank Data"
+subtitle: "Charts and Visualizations on the total Population of different regions using World Bank Data"
 categories:
   - "Interactive"
   - "Data Visualization"
@@ -296,6 +296,8 @@ anim_save(
 
 ## A separate analysis for yearly population changes
 
+![This graphic depicts the yearly percentage changes in population for various countries from 1961 to 2023, highlighting significant increases due to immigration and sharp declines resulting from war and natural disasters.](/data_vizs/a4_world_population_change.png){width="900"}
+
 The data used for these line charts is sourced from the World Bank DataBank, which compiles midyear population estimates based on the de facto definition of population, encompassing all residents regardless of legal status or citizenship. This data, spanning from 1961 to 2023, includes inputs from various reputable sources such as the United Nations Population Division, national statistical offices, Eurostat, and the U.S. Census Bureau. The graphic illustrates the yearly percentage changes in population for different countries, highlighting significant demographic shifts. The analysis reveals notable population increases in countries like the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely driven by immigration. Conversely, the charts emphasize sharp population declines due to war or natural disasters in countries such as Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022). These trends provide a stark visualization of how political instability, conflict, and crises can dramatically impact population dynamics.
 
 ```{r}
@@ -317,6 +319,12 @@ font_add_google("Saira Semi Condensed",
   family = "body_font"
 ) 
 
+text_col <- "grey20"
+
+text_hil <- "grey30"
+
+mypal <- paletteer::paletteer_d("ggthemes::Hue_Circle")
+
 showtext_auto()
 
 bg_col <- "white"
@@ -337,8 +345,9 @@ ts = 80
 
 plot_title <- "Global Population Trends: Surges and Declines (1961-2023)"
 
-plot_subtitle <- str_wrap("The line charts highlight important demographic changes, with rapid population increases in the UAE (1969-1977, 2007-2008) and Qatar (2006-2008), likely due to immigration. In contrast, marked population declines are observed in countries like Lebanon (1978-79), Afghanistan (1981-82), Kuwait (1990-91), Rwanda (1994-95), Kosovo (1998-1999), Syria (2013-2014), Libya (2012), and Ukraine (2022), primarily resulting from wars. These patterns highlight the profound impact of socio-political and environmental factors on population dynamics.", 130)
+plot_subtitle <- glue::glue("The line charts highlight important demographic changes, with rapid population increases in the <b style='color:{mypal[16]}'>UAE</b> (1969-1977,<br>2007-2008) and <b style='color:{mypal[11]}'>Qatar</b> (2006-2008), likely due to immigration. In contrast, marked population declines are observed in<br>countries like <b style='color:{mypal[8]}'>Lebanon </b> (1978-79), <b style='color:{mypal[1]}'>Afghanistan </b> (1981-82), <b style='color:{mypal[7]}'>Kuwait  </b>(1990-91), <b style='color:{mypal[12]}'>Rwanda </b>(1994-95), <b style='color:{mypal[6]}'>Kosovo </b>(1998-1999),<br><b style='color:{mypal[14]}'>Syria</b> (2013-2014), <b style='color:{mypal[10]}'>Libya </b>(2012), and <b style='color:{mypal[15]}'>Ukraine </b>(2022), primarily resulting from wars. These patterns highlight the profound<br>impact of socio-political and environmental factors on population dynamics.")
 
+str_view(plot_subtitle)
 
 plot_caption <- paste0(
   "**Data:** World Bank Databank. |  ",
@@ -348,13 +357,15 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-inset_text <- "The data for these line charts is derived from the World Bank DataBank, specifically the dataset on total population (ID: SP.POP.TOTL). This dataset is based on the de facto definition of population, counting all residents regardless of legal status or citizenship, and provides midyear estimates. The primary sources include the United Nations Population Division's World Population Prospects (2022 Revision), census reports, statistical publications from national statistical offices, Eurostat's demographic statistics, the United Nations Statistical Division's Population and Vital Statistics Report, the U.S. Census Bureau's International Database, and the Secretariat of the Pacific Community's Statistics and Demography Programme. These comprehensive and reputable sources ensure the reliability and accuracy of the population data presented in the charts."
+inset_text <- "About the data: The data for these line charts is derived from the World Bank DataBank, specifically the dataset on total population (ID: SP.POP.TOTL). This dataset is based on the de facto definition of population, counting all residents regardless of legal status or citizenship, and provides midyear estimates. The primary sources include the United Nations Population Division's World Population Prospects (2022 Revision), census reports, statistical publications from national statistical offices, Eurostat's demographic statistics, the United Nations Statistical Division's Population and Vital Statistics Report, the U.S. Census Bureau's International Database, and the Secretariat of the Pacific Community's Statistics and Demography Programme. These comprehensive and reputable sources ensure the reliability and accuracy of the population data presented in the charts."
 
-
+ggplot() +
+  labs(subtitle = plot_subtitle) +
+  theme(plot.subtitle = element_markdown())
 ```
 
 ```{r}
-#| label: data-wrangling
+#| label: data-wrangling2
 
 rawdf <- wb_data(
   indicator = "SP.POP.TOTL",
@@ -380,19 +391,23 @@ df <- rawdf |>
   group_by(country) |> 
   mutate(increase = 100*(value - lead(value))/value) |> 
   mutate(disp_val = (increase > 13 | increase < -5)) |> 
-  filter(country %in% high_pop_countries)
+  filter(country %in% high_pop_countries) |> 
+  mutate(country = fct(country))
 
+df |> 
+  filter(disp_val) |> 
+  distinct(country)
 
 ```
 
 ```{r}
 #| label: visualize
 
-g <- df |> 
+g_base <- df |> 
   ggplot(aes(x = year, 
              y = increase,
              group = country)) +
-  geom_line(colour = "grey50", alpha = 0.25) +
+  geom_line(colour = "grey10", alpha = 0.2) +
   geom_point(
     data = df |> filter(disp_val),
     mapping = aes(colour = country),
@@ -409,7 +424,36 @@ g <- df |>
     family = "body_font",
     size = ts / 4
   ) +
-  geom_hline(yintercept = 0) +
+  geom_hline(yintercept = 0, colour = text_hil, linewidth = 1) +
+  annotate(
+    geom = "label",
+    x = 1962,
+    y = -8,
+    hjust = 0, 
+    vjust = 1,
+    label = str_wrap(inset_text, 60),
+    colour = text_hil,
+    fill = bg_col,
+    lineheight = 0.35,
+    size = ts / 7,
+    family = "caption_font",
+    label.size = NA
+  ) +
+  annotate(
+    geom = "label",
+    x = 2010, 
+    y = -25,
+    label = "Name of the Country\n(% Population Change, Year)",
+    family = "body_font",
+    fontface = "bold",
+    colour = mypal[1],
+    lineheight = 0.3,
+    size = ts / 3,
+    fill = bg_col,
+    hjust = 0.5,
+    vjust = 0.5,
+    label.padding = unit(0.15, "lines")
+  ) +
   scale_x_continuous(
     expand = expansion(0), 
     breaks = seq(1960, 2020, 10),
@@ -418,6 +462,7 @@ g <- df |>
   scale_y_continuous(
     labels = label_number(suffix = "%")
   ) +
+  scale_colour_manual(values = mypal) +
   labs(
     x = NULL, y = "Yearly population change (%)",
     title = plot_title,
@@ -444,15 +489,17 @@ g <- df |>
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
     plot.title = element_text(
-      hjust = 0.5,
+      hjust = 0,
       family = "title_font",
-      size = 2 * ts,
-      colour = text_hil
+      size = 2.5 * ts,
+      colour = text_hil,
+      margin = margin(10, 0, 3,0, "mm")
     ),
-    plot.subtitle = element_text(
+    plot.subtitle = element_markdown(
       lineheight = 0.35,
       hjust = 0,
-      colour = text_col
+      colour = text_col,
+      margin = margin(0,0,5,0, "mm")
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
@@ -462,8 +509,68 @@ g <- df |>
     plot.background = element_rect(
       fill = bg_col,
       colour = bg_col
-    )
+    ),
+    axis.title.y = element_text(margin = margin(0,0,0,5, "mm"), colour = text_col),
+    axis.text.y = element_text(
+      margin = margin(0,0,0,0, "mm"), 
+      colour = text_col,
+      size = 1.2 * ts),
+    axis.text.x = element_text(
+      margin = margin(0,0,0,0, "mm"), 
+      colour = text_col,
+      size = 1.1 * ts),
+    axis.ticks.y = element_blank()
   ) 
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "world_population_animated_donut",         
+  ".html"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.9
+    ) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    )
+  )
+
+library(patchwork)
+g <- g_base +
+  # Add QR Code to the plot
+  inset_element(
+    p = plot_qr, 
+    left = 0.85, 
+    right = 1,
+    bottom = 0.75,
+    top = 0.90, 
+    align_to = "full",
+    clip = FALSE
+  ) +
+  
+  # Basix Plot Annotations
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col, 
+        colour = NA, 
+        linewidth = 0
+      )
+    )
+  )
 
 ggsave(
   plot = g,
