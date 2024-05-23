@@ -587,9 +587,33 @@ ggsave(
 )
 ```
 
-## Another Analysis
+# Decade by Decade: The World’s Population Story
+
+![This bee-swarm scatterplot illustrates decadal population changes by country from 1960s to 2020s, showcasing the percentage growth or decline for each decade. It reveals rapid population expansions in Gulf countries during economic booms and notable declines in war-torn and Eastern European nations, with color-coded dots representing different continents. The plot underscores the increasing growth rates in Sub-Saharan Africa and the stagnation or decline in Europe and Latin America.](/data_vizs/a4_wb_decade_population.png)
 
 The graphic is a beeswarm scatterplot illustrating the decadal population changes for each country from 1960 to 2020, based on data sourced from the official World Bank databank. This data, encompassing total population figures derived from midyear estimates, adheres to the de facto population definition, counting all residents irrespective of legal status or citizenship. The data originates from multiple reputable sources, including the United Nations Population Division, various national statistical offices, Eurostat, the U.S. Census Bureau, and the Secretariat of the Pacific Community. In the scatterplot, each column corresponds to a decade, with the y-axis representing the percentage change in population. Each dot signifies a country, color-coded by continent according to World Bank regions, effectively illustrating regional demographic trends over time. The plot also highlights and labels the most significant outliers, showcasing the three countries with the highest population increases and the two countries with the most substantial decreases for each decade, providing a clear visual representation of extreme demographic shifts across different periods.
+
+### How I made this graphic?
+
+Load libraries
+
+```{r}
+#| label: setup3
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(wbstats)              # Fetching World Bank Data
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(gganimate)            # For animation
+```
+
+Data Wrangling
 
 ```{r}
 #| label: data-wrangling3
@@ -604,7 +628,15 @@ rawdf2 <- wb_data(
   mrv = 65
 )
 
-
+region_levels <- c(
+  "East Asia & Pacific",
+  "Europe & Central Asia",
+  "Sub-Saharan Africa",
+  "Latin America & Caribbean",
+  "South Asia",
+  "Middle East & North Africa",
+  "North America"
+)
 ```
 
 Linking Countries to Regions / Continents
@@ -624,12 +656,33 @@ Visualization Parameters
 ```{r}
 #| label: viz-params3
 
+
+# Font for titles
+font_add_google("Dosis",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "white"
 text_col <- "grey15"
 text_hil <- "grey30"
 
-mypal <- paletteer::scale_colour_paletteer_d("nbapalettes::nuggets_city2")
+mypal <- paletteer::paletteer_d("nbapalettes::nuggets_city2")
 
-mypal <- c("darkred", "red")
+# Base Text Size
+bts <- 20
 ```
 
 Exploratory Data Analysis
@@ -751,7 +804,8 @@ decade_df <- df3 |>
   ) |> 
   left_join(link_regions) |> 
   mutate(
-    decade = fct(decade, levels = decade_levels)
+    decade = fct(decade, levels = decade_levels),
+    region = fct(region, levels = region_levels)
   )
 
 # Selecting countries to highlight and annotate in the plot
@@ -786,8 +840,10 @@ plotdf <- decade_df |>
   mutate(
     to_show_text = if_else(
       is.na(to_show_text),
-      " ",
-      paste0(country, "\n", number(round(100*value), suffix = "%"))
+      NA,
+      paste0(country, " (", 
+             number(round(100*value), suffix = "%"),
+             ")")
     )
   )
 
@@ -820,9 +876,50 @@ overall_decade_df <- df3 |>
     values_to = "value"
   ) |> 
   mutate(decade = fct(decade, levels = decade_levels))
+```
 
-# The actual plot
-plotdf |> 
+Plot text annotations
+
+```{r}
+#| label: text-annotate3
+
+plot_title <- "Rising and Falling: Nations' Population in past 6 Decades"
+
+plot_subtitle <- str_wrap("The beeswarm scatterplot of decadal population growth reveals that Gulf countries experienced the most rapid population expansions during the oil booms of the 1960s, 1970s, and economic boom of the 2000s. Population declines predominantly occurred in war-torn regions like Afghanistan (1980s) and Cambodia (1970s), with sharp declines also noted in Eastern Europe in the 2000s and 2010s, particularly in Bosnia Herzegovina, Latvia, and Lithuania. Additionally, Sub-Saharan African countries are showing increasing decadal population growth rates, while Europe and Latin American countries are experiencing stagnation or decline, often falling below the 0% growth line.", 170)
+
+text1_annotate <- str_wrap("The population surges in the UAE, Qatar, and Kuwait during the 1960s, 1970s, and 2000s were driven primarily by the discovery and exploitation of vast oil reserves, leading to rapid economic growth and significant infrastructure development. This economic boom attracted a large influx of foreign workers and expatriates to support the burgeoning industries.", 40)
+
+text2_annotate <- str_wrap("About the Data: The data for the plot is sourced from the official World Bank databank, encompassing total population figures from 1960 to 2023. These midyear estimates are based on the de facto definition of population, counting all residents regardless of legal status or citizenship. The data is compiled from multiple reputable sources, including the United Nations Population Division, national statistical offices, Eurostat, the U.S. Census Bureau, and the Secretariat of the Pacific Community, ensuring comprehensive and reliable demographic information.", 50)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+
+plot_caption <- paste0(
+  "**Data:** World Bank Databank. |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+```
+
+The actual base plot
+
+```{r}
+#| label: base-plot-3
+
+g_base <- plotdf |> 
   filter(decade != "rise_overall") |> 
   ggplot(
     mapping = aes(
@@ -835,28 +932,31 @@ plotdf |>
   
   # Beeswarm of the plot
   geom_point(
-    pch = 20,
+    pch = 19,
     alpha = 1,
-    size = 1, 
+    size = 5, 
     position = ggbeeswarm::position_beeswarm(
       method = "hex",
-      cex = 1,
-      corral.width = 0.9
+      cex = 2,
+      corral.width = 0.9,
+      corral = "wrap"
     )
   ) +
   # Displaying text country names
-  geom_text(
+  ggrepel::geom_text_repel(
     mapping = aes(label = to_show_text),
     position = ggbeeswarm::position_beeswarm(
       method = "hex",
-      cex = 1,
-      corral.width = 0.9
+      cex = 2,
+      corral.width = 0.9,
+      corral = "wrap"
     ),
     lineheight = 0.35,
-    colour = text_col,
+    colour = text_hil,
     hjust = 0,
     vjust = 0.5,
-    family = "body_font"
+    family = "body_font",
+    size = bts
   ) +
   
   # Horizontal Line Annotations
@@ -868,13 +968,14 @@ plotdf |>
   ) +
   annotate(
     geom = "text",
-    label = "Line of 100% rise -- population doubled in the decade",
+    label = "100% rise -- population doubled in the decade",
     x = 7,
     y = 1.02,
     family = "caption_font",
     colour = text_hil,
     hjust = 1,
-    vjust = 0
+    vjust = 0,
+    size = bts
   ) +
   geom_hline(
     yintercept = 2,
@@ -884,13 +985,14 @@ plotdf |>
   ) +
   annotate(
     geom = "text",
-    label = "Line of 200% rise -- population tripled in the decade",
+    label = "200% rise -- population tripled in the decade",
     x = 7,
     y = 2.02,
     family = "caption_font",
     colour = text_hil,
     hjust = 1,
-    vjust = 0
+    vjust = 0,
+    size = bts
   ) +
   geom_hline(
     yintercept = 0,
@@ -906,14 +1008,30 @@ plotdf |>
     family = "caption_font",
     colour = text_hil,
     hjust = 1,
-    vjust = 0
+    vjust = 0,
+    size = bts
+  ) +
+  annotate(
+    geom = "text",
+    x = 2.5,
+    y = 1.9,
+    label = text2_annotate,
+    colour = text_hil,
+    family = "caption_font",
+    size = bts/1.5,
+    lineheight = 0.3,
+    hjust = 0,
+    vjust = 1
   ) +
   
   # Labels
   labs(
     y = "Change in population (%)",
     x = NULL,
-    colour = NULL
+    colour = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
   
   # Scales and Coordinates
@@ -922,23 +1040,128 @@ plotdf |>
     labels = label_percent()
   ) +
   scale_x_discrete(
-    labels = c("1960s", "1970s", "1980s", "1990s", "2000s", "2010s")
+    labels = c("1960s", "1970s", "1980s", "1990s", "2000s", "2010s"),
+    expand = expansion(c(-0.05, 0.05))
   ) +
   coord_cartesian(clip = "off") +
   theme_minimal(
-    base_family = "body_font"
+    base_family = "body_font",
+    base_size = 4 * bts
   ) +
   theme(
-    legend.position = c(1, 0.9),
+    legend.position = c(0.99, 0.92),
     panel.grid.minor.y = element_blank(),
     panel.grid.major.x = element_blank(),
     legend.justification = c(1, 1),
     legend.text = element_text(
+      margin = margin(0,0,0,2, "mm"),
+      colour = text_hil,
+      family = "body_font",
+      size = 4 * bts
+    ),
+    legend.key.height = unit(10, "mm"),
+    plot.title = element_text(
+      size = 10.5 * bts,
+      colour = text_hil,
+      family = "title_font",
+      margin = margin(10,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.3,
+      colour = text_col,
+      size = 3 * bts,
       margin = margin(0,0,0,0, "mm")
     ),
-    legend.key.height = unit(2, "mm")
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    panel.grid.major.y = element_line(
+      linewidth = 0.5
+    ),
+    legend.background = element_rect(
+      fill = bg_col,
+      colour = "transparent"
+    ),
+    plot.title.position = "plot",
+    axis.text.x = element_text(
+      size = 5 * bts,
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.title = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    )
   )
-  
-  
-# Now plan a hex plot like ggbeeswarm
+
+
+
+```
+
+Add insets and save plot
+
+```{r}
+#| label: insets3
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "world_population_animated_donut.html#decade-by-decade-the-worlds-population-story"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2
+    ) +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    )
+  )
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 0.99,
+    top = 0.95, bottom = 0.8,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_wb_decade_population.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
 ```
