@@ -589,7 +589,50 @@ ggsave(
 
 ## Another Analysis
 
-## 
+The graphic is a beeswarm scatterplot illustrating the decadal population changes for each country from 1960 to 2020, based on data sourced from the official World Bank databank. This data, encompassing total population figures derived from midyear estimates, adheres to the de facto population definition, counting all residents irrespective of legal status or citizenship. The data originates from multiple reputable sources, including the United Nations Population Division, various national statistical offices, Eurostat, the U.S. Census Bureau, and the Secretariat of the Pacific Community. In the scatterplot, each column corresponds to a decade, with the y-axis representing the percentage change in population. Each dot signifies a country, color-coded by continent according to World Bank regions, effectively illustrating regional demographic trends over time. The plot also highlights and labels the most significant outliers, showcasing the three countries with the highest population increases and the two countries with the most substantial decreases for each decade, providing a clear visual representation of extreme demographic shifts across different periods.
+
+```{r}
+#| label: data-wrangling3
+
+
+rawdf2 <- wb_data(
+  indicator = "SP.POP.TOTL",
+  start_date = 1960,
+  end_date = 2023,
+  return_wide = FALSE,
+  gapfill = TRUE,
+  mrv = 65
+)
+
+
+```
+
+Linking Countries to Regions / Continents
+
+```{r}
+#| label: wb-regions-countries-link
+
+library(wbstats)
+
+link_regions <- wbstats::wb_countries() |> 
+  select(iso2c, region) |> 
+  mutate(iso2c = str_to_lower(iso2c))
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params3
+
+text_col <- "grey15"
+text_hil <- "grey30"
+
+mypal <- paletteer::scale_colour_paletteer_d("nbapalettes::nuggets_city2")
+
+mypal <- c("darkred", "red")
+```
+
+Exploratory Data Analysis
 
 ```{r}
 #| label: eda3
@@ -599,69 +642,92 @@ df3 <- rawdf2 |>
   mutate(iso2c = str_to_lower(iso2c)) |> 
   drop_na()
 
-
-countries_to_visualize <- df3 |> 
+# Not plotting very small territories with population below 750,000
+not_plot <- df3 |> 
   filter(year == 2022) |> 
-  slice_max(order_by = value, n = 10) |> 
+  filter(value < 7.5e5) |> 
   pull(iso2c)
 
-too_small_countries <- df3 |> 
-  filter(year == 2022) |> 
-  filter(value < 1e5) |> 
-  pull(country)
+# A treemap to show how many coutnries lie within population of some
+# of the most populous countries
 
-df3 |> 
-  mutate(
-    country = if_else(
-      iso2c %in% countries_to_visualize,
-      country,
-      "Others"
-    )
-  ) |> 
-  group_by(year, country) |> 
-  summarize(value = sum(value, na.rm = TRUE)) |> 
-  ungroup() |> 
-  ggplot(aes(x = year, y = value, fill = country, group = country)) +
-  ggstream::geom_stream(type = "proportional", colour = "white")
+# countries_to_visualize <- df3 |> 
+#   filter(year == 2022) |> 
+#   slice_max(order_by = value, n = 10) |> 
+#   pull(iso2c)
+# 
+# too_small_countries <- df3 |> 
+#   filter(year == 2022) |> 
+#   filter(value < 1e5) |> 
+#   pull(country)
+# 
+# df3 |> 
+#   mutate(
+#     country = if_else(
+#       iso2c %in% countries_to_visualize,
+#       country,
+#       "Others"
+#     )
+#   ) |> 
+#   group_by(year, country) |> 
+#   summarize(value = sum(value, na.rm = TRUE)) |> 
+#   ungroup() |> 
+#   ggplot(aes(x = year, y = value, fill = country, group = country)) +
+#   ggstream::geom_stream(type = "proportional", colour = "white")
+# 
+# 
+# df3 |> 
+#   visdat::vis_miss()
+# 
+# big_country <- "India"
+# view_year <- 2023
+# 
+# total_pop_to_fill <- df3 |> 
+#   filter(year == view_year & country == big_country) |> 
+#   pull(value)
+# 
+# plotdf3 <- df3 |> 
+#   filter(year == view_year) |> 
+#   arrange(value) |> 
+#   mutate(cumsum_value = cumsum(value)) |> 
+#   filter(cumsum_value <= total_pop_to_fill)
+#   
+# plotdf3 |> 
+#   ggplot(aes(area = value, fill = country)) +
+#   treemapify::geom_treemap(colour = "white") +
+#   labs(
+#     title = paste0("The scale of ", big_country, "'s population"),
+#     subtitle = paste0("Population of ", 
+#                       big_country, 
+#                       " in ", view_year, ": ",
+#                       number(total_pop_to_fill, big.mark = ","),
+#                       "\n",
+#                       nrow(plotdf3), 
+#                       " countries combined have lower population than ", 
+#                       big_country)
+#   ) +
+#   theme_void() +
+#   theme(
+#     legend.position = "none",
+#     plot.title = element_text(hjust = 0.5)
+#   )
 
 
-df3 |> 
-  visdat::vis_miss()
 
-big_country <- "India"
-view_year <- 2023
+# A new thought stream - decadal population rise
+decade_levels <- c(
+  "rise_overall",
+  "rise60s",
+  "rise70s",
+  "rise80s",
+  "rise90s",
+  "rise00s",
+  "rise10s"
+)
 
-total_pop_to_fill <- df3 |> 
-  filter(year == view_year & country == big_country) |> 
-  pull(value)
-
-plotdf3 <- df3 |> 
-  filter(year == view_year) |> 
-  arrange(value) |> 
-  mutate(cumsum_value = cumsum(value)) |> 
-  filter(cumsum_value <= total_pop_to_fill)
-  
-plotdf3 |> 
-  ggplot(aes(area = value, fill = country)) +
-  treemapify::geom_treemap(colour = "white") +
-  labs(
-    title = paste0("The scale of ", big_country, "'s population"),
-    subtitle = paste0("Population of ", 
-                      big_country, 
-                      " in ", view_year, ": ",
-                      number(total_pop_to_fill, big.mark = ","),
-                      "\n",
-                      nrow(plotdf3), 
-                      " countries combined have lower population than ", 
-                      big_country)
-  ) +
-  theme_void() +
-  theme(
-    legend.position = "none",
-    plot.title = element_text(hjust = 0.5)
-  )
-
+# Decade wise population rise in each country
 decade_df <- df3 |> 
+  filter(!(iso2c %in% not_plot)) |> 
   mutate(year = paste0("y_", year)) |> 
   pivot_wider(
     id_cols = c(country, iso2c),
@@ -682,30 +748,197 @@ decade_df <- df3 |>
     cols = -c(country, iso2c),
     names_to = "decade",
     values_to = "value"
+  ) |> 
+  left_join(link_regions) |> 
+  mutate(
+    decade = fct(decade, levels = decade_levels)
   )
 
-decade_levels <- c(
-  "rise_overall",
-  "rise60s",
-  "rise70s",
-  "rise80s",
-  "rise90s",
-  "rise00s",
-  "rise10s"
-)
+# Selecting countries to highlight and annotate in the plot
+# Top 3 high rise countries each decade
+selcon1 <- decade_df |> 
+  group_by(decade) |> 
+  slice_max(order_by = value, n = 3) |> 
+  ungroup()
 
-decade_df |> 
-  filter(!(country %in% too_small_countries)) |> 
+# Bottom 2 countries in each decade
+selcon2 <- decade_df |> 
+  group_by(decade) |> 
+  slice_min(order_by = value, n = 2) |> 
+  ungroup()
+
+
+# Overall 10 most populous countries
+selcon3 <- rawdf2 |> 
+  filter(date == 2022) |> 
+  slice_max(order_by = value, n = 10) |> 
+  mutate(iso2c = str_to_lower(iso2c)) |> 
+  pull(iso2c)
+
+selcons <- bind_rows(
+  selcon1,
+  selcon2
+) |> 
+  mutate(to_show_text = "display")
+
+plotdf <- decade_df |> 
+  left_join(selcons) |> 
+  mutate(
+    to_show_text = if_else(
+      is.na(to_show_text),
+      " ",
+      paste0(country, "\n", number(round(100*value), suffix = "%"))
+    )
+  )
+
+# Decadal rise overall for the world
+overall_decade_df <- df3 |> 
+  group_by(year) |> 
+  summarise(total_pop = sum(value, na.rm = T)) |> 
+  mutate(
+    country = "World",
+    year = paste0("y_", year),
+    
+  ) |> 
+  pivot_wider(
+    id_cols = country,
+    values_from = total_pop,
+    names_from = year
+  ) |> 
+  mutate(
+    rise60s = (y_1970 - y_1961)/y_1961,
+    rise70s = (y_1980 - y_1971)/y_1971,
+    rise80s = (y_1990 - y_1981)/y_1981,
+    rise90s = (y_2000 - y_1991)/y_1991,
+    rise00s = (y_2010 - y_2000)/y_2000,
+    rise10s = (y_2020 - y_2010)/y_2010,
+    .keep = "none"
+  ) |> 
+  pivot_longer(
+    cols = everything(),
+    names_to = "decade",
+    values_to = "value"
+  ) |> 
+  mutate(decade = fct(decade, levels = decade_levels))
+
+# The actual plot
+plotdf |> 
   filter(decade != "rise_overall") |> 
   ggplot(
     mapping = aes(
       x = decade,
       y = value,
-      label = country
+      label = country,
+      colour = region
     )
   ) +
-  geom_jitter(alpha = 0.5) 
-  # geom_text(alpha = 0.5)
+  
+  # Beeswarm of the plot
+  geom_point(
+    pch = 20,
+    alpha = 1,
+    size = 1, 
+    position = ggbeeswarm::position_beeswarm(
+      method = "hex",
+      cex = 1,
+      corral.width = 0.9
+    )
+  ) +
+  # Displaying text country names
+  geom_text(
+    mapping = aes(label = to_show_text),
+    position = ggbeeswarm::position_beeswarm(
+      method = "hex",
+      cex = 1,
+      corral.width = 0.9
+    ),
+    lineheight = 0.35,
+    colour = text_col,
+    hjust = 0,
+    vjust = 0.5,
+    family = "body_font"
+  ) +
+  
+  # Horizontal Line Annotations
+  geom_hline(
+    yintercept = 1,
+    colour = text_hil,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  annotate(
+    geom = "text",
+    label = "Line of 100% rise -- population doubled in the decade",
+    x = 7,
+    y = 1.02,
+    family = "caption_font",
+    colour = text_hil,
+    hjust = 1,
+    vjust = 0
+  ) +
+  geom_hline(
+    yintercept = 2,
+    colour = text_hil,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  annotate(
+    geom = "text",
+    label = "Line of 200% rise -- population tripled in the decade",
+    x = 7,
+    y = 2.02,
+    family = "caption_font",
+    colour = text_hil,
+    hjust = 1,
+    vjust = 0
+  ) +
+  geom_hline(
+    yintercept = 0,
+    colour = text_hil,
+    linewidth = 0.5,
+    alpha = 0.5
+  ) +
+  annotate(
+    geom = "text",
+    label = "Static Population",
+    x = 7,
+    y = 0.02,
+    family = "caption_font",
+    colour = text_hil,
+    hjust = 1,
+    vjust = 0
+  ) +
+  
+  # Labels
+  labs(
+    y = "Change in population (%)",
+    x = NULL,
+    colour = NULL
+  ) +
+  
+  # Scales and Coordinates
+  scale_color_manual(values = mypal) +
+  scale_y_continuous(
+    labels = label_percent()
+  ) +
+  scale_x_discrete(
+    labels = c("1960s", "1970s", "1980s", "1990s", "2000s", "2010s")
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = c(1, 0.9),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.justification = c(1, 1),
+    legend.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.key.height = unit(2, "mm")
+  )
+  
   
 # Now plan a hex plot like ggbeeswarm
 ```
