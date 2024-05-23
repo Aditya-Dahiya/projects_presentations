@@ -605,6 +605,11 @@ countries_to_visualize <- df3 |>
   slice_max(order_by = value, n = 10) |> 
   pull(iso2c)
 
+too_small_countries <- df3 |> 
+  filter(year == 2022) |> 
+  filter(value < 1e5) |> 
+  pull(country)
+
 df3 |> 
   mutate(
     country = if_else(
@@ -675,10 +680,32 @@ decade_df <- df3 |>
   select(country, iso2c, starts_with("rise")) |> 
   pivot_longer(
     cols = -c(country, iso2c),
-    names_to = "value",
-    values_to = "decade"
+    names_to = "decade",
+    values_to = "value"
   )
 
+decade_levels <- c(
+  "rise_overall",
+  "rise60s",
+  "rise70s",
+  "rise80s",
+  "rise90s",
+  "rise00s",
+  "rise10s"
+)
+
 decade_df |> 
-  filter(value == "rise_overall") |> 
+  filter(!(country %in% too_small_countries)) |> 
+  filter(decade != "rise_overall") |> 
+  ggplot(
+    mapping = aes(
+      x = decade,
+      y = value,
+      label = country
+    )
+  ) +
+  geom_jitter(alpha = 0.5) 
+  # geom_text(alpha = 0.5)
+  
+# Now plan a hex plot like ggbeeswarm
 ```
