@@ -1,7 +1,7 @@
 ---
 title: "Airports of India"
 author: "Aditya Dahiya"
-date: "2024-05-26"
+date: "2024-05-27"
 subtitle: "Voronoi Tesselation to produce nearest airports to each region in India"
 categories:
   - "A4 Size Viz"
@@ -72,12 +72,11 @@ ind_airports <- airportr::airports |>
   janitor::clean_names() |> 
   rename(lat = latitude, lon = longitude, airport = name) |> 
   filter(country == "India") |> 
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-
-# Air Force run airports
-ind_airports |> 
-  filter(str_detect(airport, "Air Force"))
-
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
+  # Remove Air Force run airports
+  filter(!str_detect(airport, "Air Force"))
+  # Only international airports
+  #filter(str_detect(airport, "International"))
 # Check the data: it works!
 ggplot() +
   geom_sf(data = india_map) +
@@ -162,7 +161,7 @@ voronoi_lines <- ind_airports |>
   
 voronoi_lines <- voronoi_lines |> 
   mutate(fill_var = sample(
-  x = c("a", "b", "c", "d"),
+  x = letters[1:6],
   size = nrow(voronoi_lines),
   replace = T
   )
@@ -177,15 +176,24 @@ Visualization
 
 ggplot() +
   geom_sf(
-    data = india_map
-  ) +
-  geom_sf(
     data = ind_airports
   ) +
   geom_sf(data = voronoi_lines,
           mapping = aes(fill = fill_var),
-          alpha = 0.5) +
+          alpha = 0.5,
+          colour = "white") +
+  geom_sf(
+    data = india_map,
+    colour = "grey30",
+    fill = "transparent"
+  ) +
+  # paletteer::scale_fill_paletteer_d("ggthemes::excel_Atlas") +
+  # paletteer::scale_fill_paletteer_d("ggthemes::excel_Celestial") +
+  paletteer::scale_fill_paletteer_d("ggthemes::excel_Ion") +
+  ggthemes::theme_map() +
   theme(legend.position = "none") 
+
+
 ```
 
 Add annotations and insets
