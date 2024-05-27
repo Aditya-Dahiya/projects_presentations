@@ -60,8 +60,17 @@ library(showtext)             # Display fonts in ggplot2
 # Maps related packages
 library(sf)                   # Geomteric objects manipulation and plotting
 
+# Get country map of India
+# Credits: Survey of India; and Anuj Tiwari @
+# https://github.com/AnujTiwari/India-State-and-Country-Shapefile-Updated-Jan-2020
+india_map <- read_sf(here::here("data", "india_map", 
+                                "India_Country_Boundary.shp")) |> 
+  st_simplify(dTolerance = 1000) |> 
+  st_transform(crs = 4326)
+
+
 # Get State Map of India
-india_map <- read_sf(here::here(
+india_state_map <- read_sf(here::here(
   "data", "india_map", "India_State_Boundary.shp"
 )) |> 
   st_simplify(dTolerance = 1000) |> 
@@ -74,9 +83,10 @@ ind_airports <- airportr::airports |>
   filter(country == "India") |> 
   st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
   # Remove Air Force run airports
-  filter(!str_detect(airport, "Air Force"))
+  filter(!str_detect(airport, "Air Force")) |> 
   # Only international airports
-  #filter(str_detect(airport, "International"))
+  filter(str_detect(airport, "International"))
+
 # Check the data: it works!
 ggplot() +
   geom_sf(data = india_map) +
@@ -139,16 +149,6 @@ Data Wrangling
 #| label: data-wrangling
 
 
-
-# Credits: https://rpubs.com/valentin/pacific-centered-map-voronoi-tessellation
-# by: Valentin Stefan
-voronoi_lines <- ind_airports |> 
-  st_union() |> 
-  st_voronoi(bOnlyEdges = TRUE) |> 
-  st_crop(st_bbox(india_map)) |> 
-  st_intersection(india_map)
-
-# Next Try
 # Credits: https://stackoverflow.com/questions/76856625/perimeter-of-voronoi-cells
 
 voronoi_lines <- ind_airports |> 
@@ -158,10 +158,12 @@ voronoi_lines <- ind_airports |>
   st_sf(geometry = _) |> 
   st_crop(st_bbox(india_map)) |> 
   st_intersection(india_map) 
-  
+
+# Set seed for reproducability  
+set.seed(4326)
 voronoi_lines <- voronoi_lines |> 
   mutate(fill_var = sample(
-  x = letters[1:6],
+  x = letters[1:20],
   size = nrow(voronoi_lines),
   replace = T
   )
@@ -176,20 +178,43 @@ Visualization
 
 ggplot() +
   geom_sf(
-    data = ind_airports
+    data = india_map,
+    colour = "grey30",
+    fill = "transparent"
+  ) +
+  geom_sf(
+    data = ind_airports,
+    colour = "grey10"
   ) +
   geom_sf(data = voronoi_lines,
           mapping = aes(fill = fill_var),
           alpha = 0.5,
           colour = "white") +
   geom_sf(
-    data = india_map,
-    colour = "grey30",
-    fill = "transparent"
+    data = india_state_map,
+    colour = "grey40",
+    fill= "transparent"
   ) +
-  # paletteer::scale_fill_paletteer_d("ggthemes::excel_Atlas") +
-  # paletteer::scale_fill_paletteer_d("ggthemes::excel_Celestial") +
-  paletteer::scale_fill_paletteer_d("ggthemes::excel_Ion") +
+  
+  # Using ggrepel to label the airports with geom_sf_text
+  # Technique Credits:https://github.com/slowkow/ggrepel/issues/111
+  ggrepel::geom_text_repel(
+    data = ind_airports,
+    mapping = aes(
+      geometry = geometry,
+      label = paste0(
+        airport, 
+        "\n", city, " (",
+        iata, ")"
+      )
+    ),
+    stat = "sf_coordinates",
+    min.segment.length = 0,
+    family = "caption_font",
+    size = 2,
+    lineheight = 0.4
+  ) +
+  paletteer::scale_fill_paletteer_d("palettesForR::Windows") +
   ggthemes::theme_map() +
   theme(legend.position = "none") 
 
