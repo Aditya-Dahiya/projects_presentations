@@ -1,0 +1,328 @@
+---
+title: "Indian States Capitals - Distrance from the centre of the state"
+author: "Aditya Dahiya"
+date: "2024-05-28"
+subtitle: "Distances between State Capitals and the Geogrpahic centre of the respective state"
+categories:
+  - "A4 Size Viz"
+  - "India"
+  - "Maps"
+image: "thumbnails/ind_state_centroid.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+# library(colorspace)         # To lighten and darken colours
+
+# Maps related packages
+library(sf)                   # Geomteric objects manipulation
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 5000) |> 
+  st_transform(crs = 4326)
+
+state_capitals <- tibble(
+  State = c(
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
+    "Chhattishgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
+    "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+    "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+    "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamilnadu",
+    "Telengana", "Tripura", "Uttar Pradesh", "Uttarakhand", 
+    "West Bengal"),
+  Capital = c(
+    "Amaravati", "Itanagar", "Dispur", "Patna", "Raipur", 
+    "Panaji", "Gandhinagar", "Chandigarh", "Shimla", "Ranchi",
+    "Bengaluru", "Thiruvananthapuram", "Bhopal", "Mumbai", "Imphal", 
+    "Shillong", "Aizawl", "Kohima", "Bhubaneswar", "Chandigarh", 
+    "Jaipur", "Gangtok", "Chennai", "Hyderabad", "Agartala", 
+    "Lucknow", "Dehradun", "Kolkata"),
+  Latitude = c(16.5417, 27.1020, 26.1445, 25.5941, 21.2514, 
+               15.4909, 23.2156, 30.7333, 31.1048, 23.3441, 
+               12.9716, 8.5241, 23.2599, 19.0760, 24.8170, 
+               25.5788, 23.7271, 25.6751, 20.2961, 30.7333, 
+               26.9124, 27.3314, 13.0827, 17.3850, 23.8315, 
+               26.8467, 30.3165, 22.5726),
+  Longitude = c(80.5167, 93.6920, 91.7362, 85.1376, 81.6296, 
+                73.8278, 72.6369, 76.7794, 77.1734, 85.3096, 
+                77.5946, 76.9366, 77.4126, 72.8777, 93.9368, 
+                91.8933, 92.7176, 94.1086, 85.8245, 76.7794, 
+                75.7873, 88.6138, 80.2707, 78.4867, 91.2868, 
+                80.9462, 78.0322, 88.3639)
+)
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Merienda",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Fjalla One",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "#fffee6"
+text_col <- "#400600"
+text_hil <- "#630b01"
+
+# Base Text Size
+bts <- 80
+
+plot_title <- ""
+
+plot_subtitle <- str_wrap("", 72)
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xf09b;</span> <span style='color: {text_col}'>aditya-dahiya  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xe61b;</span> <span style='color: {text_col}'>@adityadahiyaias </span>")
+plot_caption <- paste0(
+  "**Data:** ",
+  "**Code:** ", social_caption_1, 
+  " |  **Graphics:** ", social_caption_2
+  )
+
+data_source <- str_wrap("", 80)
+
+data_source |> str_view()
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+df1 <- india_state_map |> 
+  st_centroid() |> 
+  rename(geometry_centroid = geometry) |> 
+  as_tibble() |> 
+  print(n = Inf)
+
+plotdf <- state_capitals |> 
+  janitor::clean_names() |> 
+  st_as_sf(coords = c("longitude", "latitude")) |> 
+  rename(
+    State_Name = state,
+    geometry_capital = geometry
+  ) |>
+  as_tibble() |> 
+  left_join(df1) |> 
+  mutate(state = case_when(
+    State_Name == "Chhattishgarh" ~ "Chhattisgarh",
+    State_Name == "Tamilnadu" ~ "Tamil Nadu",
+    State_Name == "Telengana" ~ "Telangana",
+    .default = State_Name
+    ),
+    .keep = "unused"
+  ) |> 
+  st_as_sf(crs = 4326)
+
+
+plotdf |> 
+  mutate(
+    distance = st_distance(geometry_capital, geometry_centroid)
+  )
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+plotdf |> 
+  ggplot() +
+  geom_sf(
+    data = india_state_map
+  ) +
+  geom_sf(
+    mapping = aes(
+      geometry = geometry_centroid
+    ),
+    colour = "red"
+  ) +
+  geom_sf(
+    mapping = aes(
+      geometry = geometry_capital
+    )
+  )
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "ind_airports_voronoi",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  labs(caption = "Interactive Version") +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.5,
+      colour = text_hil
+    )
+  )
+
+inset1 <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = data_source,
+    lineheight = 0.3,
+    family = "caption_font",
+    hjust = 1,
+    size = bts / 4,
+    colour = text_col
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.82, right = 0.96,
+    top = 0.91, bottom = 0.78,
+    align_to = "full"
+  ) +
+  inset_element(
+    p = inset1,
+    left = 0.55, right = 1.25,
+    top = 0.8, bottom = 0.55,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_ind_state_centroid.png"),
+  plot = g,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+ggsave(
+  filename = here::here("data_vizs", "a4_ind_state_centroid.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "a4_ind_state_centroid.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "ind_state_centroid.png"))
+
+```
