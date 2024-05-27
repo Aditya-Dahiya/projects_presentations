@@ -1,11 +1,12 @@
 ---
-title: "Airports of India"
+title: "Navigating India: Closest International Airports"
 author: "Aditya Dahiya"
 date: "2024-05-27"
-subtitle: "Voronoi Tesselation to produce nearest airports to each region in India"
+subtitle: "A Voronoi Tesselation to produce regions nearest to each international airport in India"
 categories:
   - "A4 Size Viz"
-  - "Our World in Data"
+  - "India"
+  - "Maps"
 image: "thumbnails/ind_airports_voronoi.png"
 format:
   html:
@@ -28,7 +29,11 @@ share:
 bibliography: references.bib
 ---
 
-## 
+# Navigating India: Closest International Airports
+
+The map of India illustrates the locations of international airports and the regions nearest to each, highlighted with distinct colors using Voronoi tessellation. The size of the dots represents the annual passenger traffic for each airport in 2023, with larger dots indicating busier airports. The geographical boundaries of India are sourced from the Survey of India. Airport locations are obtained from the OpenFlights database, accessed through the {airportr} package in R. Passenger traffic data is retrieved from Wikipedia using the {rvest} package in R. For more details, refer to [Survey of India](https://surveyofindia.gov.in), [OpenFlights](https://openflights.org/data.html), and [Wikipedia](https://en.wikipedia.org).
+
+![This map of India shows the locations of international airports and the areas closest to each one, highlighted in different colors. The size of each airport's dot represents how many passengers used it in 2023, with larger dots indicating busier airports.](a4_ind_airports_voronoi.png)
 
 ### *An interactive version of the same plot (work in-progress)*
 
@@ -58,14 +63,15 @@ library(showtext)             # Display fonts in ggplot2
 # library(colorspace)         # To lighten and darken colours
 
 # Maps related packages
-library(sf)                   # Geomteric objects manipulation and plotting
+library(sf)                   # Geomteric objects manipulation
 
 # Get country map of India
 # Credits: Survey of India; and Anuj Tiwari @
 # https://github.com/AnujTiwari/India-State-and-Country-Shapefile-Updated-Jan-2020
 india_map <- read_sf(here::here("data", "india_map", 
                                 "India_Country_Boundary.shp")) |> 
-  st_simplify(dTolerance = 1000) |> 
+  # During interations, using lower resolution for quick plotting
+  # st_simplify(dTolerance = 1000) |> 
   st_transform(crs = 4326)
 
 
@@ -73,7 +79,8 @@ india_map <- read_sf(here::here("data", "india_map",
 india_state_map <- read_sf(here::here(
   "data", "india_map", "India_State_Boundary.shp"
 )) |> 
-  st_simplify(dTolerance = 1000) |> 
+  # During interations, using lower resolution for quick plotting
+  # st_simplify(dTolerance = 1000) |> 
   st_transform(crs = 4326)
 
 # Get locations of Airports in India
@@ -91,6 +98,30 @@ ind_airports <- airportr::airports |>
 ggplot() +
   geom_sf(data = india_map) +
   geom_sf(data = ind_airports)
+
+# Get passenger traffic data in International airports of India
+# Load necessary libraries
+library(rvest)
+# Wikipedia URL for India's busiest airports
+url <- "https://en.wikipedia.org/wiki/List_of_the_busiest_airports_in_India"
+# Read the HTML content from the webpage
+webpage <- read_html(url)
+# Extract the table containing the airport data
+airport_table <- webpage |> 
+  html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[2]') |> 
+  html_table()
+# Convert the list to a data frame
+airport_df <- as.data.frame(airport_table[[1]])
+# Clean the data frame
+airport_data <- airport_df |> 
+  select(name_of_airport = Name, 
+         iata = `IATA Code`, 
+         passengers_2023 = `Passengers  2022–23`) |> 
+  mutate(
+    passengers_2023 = as.numeric(gsub(",", "", passengers_2023))
+  )
+rm(airport_df, webpage, airport_table, url)
+
 ```
 
 Visualization Parameters
@@ -99,7 +130,7 @@ Visualization Parameters
 #| label: parameters2
 
 # Font for titles
-font_add_google("Dosis",
+font_add_google("Merienda",
   family = "title_font"
 ) 
 
@@ -109,23 +140,23 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Saira Semi Condensed",
+font_add_google("Fjalla One",
   family = "body_font"
 ) 
 
 showtext_auto()
 
 # Background Colour
-bg_col <- "white"
-text_col <- "grey20"
-text_hil <- "grey30"
+bg_col <- "#fffee6"
+text_col <- "#400600"
+text_hil <- "#630b01"
 
 # Base Text Size
 bts <- 80
 
-plot_title <- ""
+plot_title <- "India's Airport Proximity Map"
 
-plot_subtitle <- str_wrap("", 130)
+plot_subtitle <- str_wrap("Locations of India's international airports and the areas closest to each one. The size of each airport's dot represents passenger traffic in 2023 - larger dots mean busier airports. The number in brackets are the passengers handled by the airport in the year 2023.", 72)
 str_view(plot_subtitle)
 
 # Caption stuff for the plot
@@ -141,6 +172,9 @@ plot_caption <- paste0(
   " |  **Graphics:** ", social_caption_2
   )
 
+data_source <- str_wrap("Sources of Data: The map of India is based on official data from the Survey of India. International airports are plotted using data from the OpenFlights database, accessed via the {airportr} package in R. Voronoi tessellation is applied to depict areas closest to each airport, with the method highlighting regions by nearest airport proximity. Airport dot sizes, representing annual passenger traffic for 2023, are sourced from Wikipedia through the {rvest} package in R.", 80)
+
+data_source |> str_view()
 ```
 
 Data Wrangling
@@ -160,7 +194,7 @@ voronoi_lines <- ind_airports |>
   st_intersection(india_map) 
 
 # Set seed for reproducability  
-set.seed(4326)
+set.seed(42)
 voronoi_lines <- voronoi_lines |> 
   mutate(fill_var = sample(
   x = letters[1:20],
@@ -175,50 +209,86 @@ Visualization
 ```{r}
 #| label: visualize
 
-
-ggplot() +
+g_base <- ggplot() +
   geom_sf(
     data = india_map,
-    colour = "grey30",
-    fill = "transparent"
-  ) +
-  geom_sf(
-    data = ind_airports,
-    colour = "grey10"
+    colour = text_col,
+    fill = "transparent",
+    linewidth = 1
   ) +
   geom_sf(data = voronoi_lines,
           mapping = aes(fill = fill_var),
           alpha = 0.5,
-          colour = "white") +
+          colour = bg_col) +
+  geom_sf(
+    data = ind_airports |> left_join(airport_data),
+    mapping = aes(size = passengers_2023),
+    colour = text_col,
+    alpha = 0.75
+  ) +
   geom_sf(
     data = india_state_map,
-    colour = "grey40",
-    fill= "transparent"
+    colour = "grey50",
+    fill = "transparent"
   ) +
   
   # Using ggrepel to label the airports with geom_sf_text
   # Technique Credits:https://github.com/slowkow/ggrepel/issues/111
   ggrepel::geom_text_repel(
-    data = ind_airports,
+    data = ind_airports |> left_join(airport_data),
     mapping = aes(
       geometry = geometry,
       label = paste0(
         airport, 
         "\n", city, " (",
-        iata, ")"
+        number(passengers_2023, big.mark = ","), 
+        ")"
       )
     ),
     stat = "sf_coordinates",
     min.segment.length = 0,
     family = "caption_font",
-    size = 2,
-    lineheight = 0.4
+    size = bts / 5,
+    lineheight = 0.3,
+    force = 10,
+    force_pull = 0.5
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
   paletteer::scale_fill_paletteer_d("palettesForR::Windows") +
-  ggthemes::theme_map() +
-  theme(legend.position = "none") 
-
-
+  
+  # Scales and Coordinates
+  coord_sf(clip = "off") +
+  scale_size(range = c(2, 10)) +
+  
+  # Themes
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      size = 2.8 * bts,
+      colour = text_hil,
+      margin = margin(10,0,10,0, "mm"),
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.35,
+      size = 1.2 * bts
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5
+    )
+  ) 
 ```
 
 Add annotations and insets
@@ -247,6 +317,7 @@ plot_qr <- ggplot(
   # labs(caption = "Scan for the Interactive Version") +
   coord_fixed() +
   theme_void() +
+  labs(caption = "Interactive Version") +
   theme(plot.background = element_rect(
     fill = NA, 
     colour = NA
@@ -255,17 +326,46 @@ plot_qr <- ggplot(
       hjust = 0.5,
       margin = margin(0,0,0,0, "mm"),
       family = "caption_font",
-      size = bts/1.8
+      size = bts/1.5,
+      colour = text_hil
     )
   )
-plot_qr
+
+inset1 <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = data_source,
+    lineheight = 0.3,
+    family = "caption_font",
+    hjust = 1,
+    size = bts / 4,
+    colour = text_col
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
 
 library(patchwork)
 g <- g_base +
   inset_element(
     p = plot_qr,
-    left = 0.85, right = 0.98,
-    top = 0.88, bottom = 0.75,
+    left = 0.82, right = 0.96,
+    top = 0.91, bottom = 0.78,
+    align_to = "full"
+  ) +
+  inset_element(
+    p = inset1,
+    left = 0.55, right = 1.25,
+    top = 0.8, bottom = 0.55,
     align_to = "full"
   ) +
   plot_annotation(
@@ -281,6 +381,14 @@ g <- g_base +
     )
   )
 
+ggsave(
+  filename = here::here("data_vizs", "a4_ind_airports_voronoi.png"),
+  plot = g,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Save graphic and a thumbnail
