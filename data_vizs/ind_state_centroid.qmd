@@ -29,7 +29,7 @@ share:
 bibliography: references.bib
 ---
 
-The map of India, developed using data from the Survey of India, illustrates the capitals and geographic centres of various Indian states. Utilizing the R programming language and the 'sf' package, the geographic centre, or centroid, of each state was calculated. The distance between each centroid and its corresponding state capital was then measured, and a comparative metric was derived by normalizing this distance by the area of the state. The map visually represents these distances with arrows pointing from the geographic centres to the state capitals, highlighting the spatial relationship between them. An inset graph provides a comparative analysis of the relative distances for each state. The findings indicate that, apart from the smaller states, Punjab, Haryana, and Himachal Pradesh have capitals that are significantly farther from their geographic centres compared to other states.
+The map illustrates the geographic centres and capitals of Indian states, based on data from the Survey of India. Using the R programming language and the {sf} package, the geographic centres were determined with the `sf_centroid()` function, and distances to the capitals were calculated using `sf_distance()`. These distances were normalized by the square root of the state area to allow for meaningful comparisons across states of varying sizes. The findings show that the capitals of Uttar Pradesh, Chhattisgarh, and Manipur are closest to their geographic centres, while those of Haryana, Tamil Nadu, and Kerala are the farthest. This spatial relationship is visually represented with arrows connecting the geographic centres to the state capitals.
 
 ### How I made this graphic?
 
@@ -126,12 +126,14 @@ bg_col <- "#f5f0fc"
 text_col <- "#2a0169"
 text_hil <- "#350182"
 
+viz_cols <- paletteer::paletteer_d("ltc::trio1")
+
 # Base Text Size
 bts <- 80
 
 plot_title <- "Geocentres & Capitals: Indian States"
 
-plot_subtitle <- str_wrap("The map displays the geographic centres and capitals of Indian states, with arrows indicating the distance between them. Apart from smaller states, Punjab, Haryana, and Himachal Pradesh have their capitals located the farthest from their geographic centres.", 100)
+plot_subtitle <- str_wrap("Geographic centres and capitals of Indian states, with arrows indicating the distance between them. The capitals are closest to the geographic centres for Uttar Pradesh, Chhattisgarh, and Manipur, while they are farthest for Haryana, Tamil Nadu, and Kerala.", 100)
 str_view(plot_subtitle)
 
 # Caption stuff for the plot
@@ -157,6 +159,7 @@ Data Wrangling
 ```{r}
 #| label: data-wrangling
 
+# Calculate geomteric centres of each state
 df1 <- india_state_map |>
   st_centroid() |>
   rename(geometry_centroid = geometry)
@@ -165,8 +168,18 @@ df1 <- df1 |>
   mutate(
     from_lon = sf::st_coordinates(df1)[,1],
     from_lat = sf::st_coordinates(df1)[,2]) |> 
-    as_tibble()
-  
+    as_tibble() |> 
+    mutate(state = case_when(
+    state == "Chhattishgarh" ~ "Chhattisgarh",
+    state == "Tamilnadu" ~ "Tamil Nadu",
+    state == "Telengana" ~ "Telangana",
+    .default = state
+    ),
+    .keep = "unused"
+  )
+print(df1, n = Inf)
+
+# Capitals of each state
 df2 <- state_capitals |> 
   janitor::clean_names() |> 
   st_as_sf(coords = c("longitude", "latitude")) |> 
@@ -180,13 +193,8 @@ df2 <- df2 |>
     to_lon = sf::st_coordinates(df2)[,1],
     to_lat = sf::st_coordinates(df2)[,2]
   ) |> 
-  as_tibble()
-  
-
-
-plotdf <- df2 |>
+  as_tibble() |> 
   rename(state = State_Name) |> 
-  left_join(df1) |> 
   mutate(state = case_when(
     state == "Chhattishgarh" ~ "Chhattisgarh",
     state == "Tamilnadu" ~ "Tamil Nadu",
@@ -194,16 +202,28 @@ plotdf <- df2 |>
     .default = state
     ),
     .keep = "unused"
-  ) |> 
+  )
+  
+print(df2, n = Inf)
+
+plotdf <- df2 |>
+  left_join(df1) |> 
   st_as_sf(crs = 4326) |> 
   mutate(
-    distance = as.numeric(st_distance(geometry_capital, geometry_centroid)[,1] / 1000)
+    distance = as.numeric(
+      st_distance(
+        geometry_capital, 
+        geometry_centroid, by_element = TRUE) / 1000)
   ) |> 
   relocate(state)
 
+print(plotdf, n = Inf)
+
 distance_lines <- geosphere::gcIntermediate(
-  p1 = plotdf |> as_tibble() |> select(from_lon, from_lat),
-  p2 = plotdf |> as_tibble() |> select(to_lon, to_lat),
+  p1 = plotdf |> drop_na() |> as_tibble() |> 
+       select(from_lon, from_lat),
+  p2 = plotdf |> drop_na() |> as_tibble() |>
+       select(to_lon, to_lat),
   n = 1000,
   breakAtDateLine = TRUE,
   addStartEnd = TRUE,
@@ -211,48 +231,11 @@ distance_lines <- geosphere::gcIntermediate(
   sf::st_as_sf(crs = 4326)
 
 ratio_df <- india_state_map |> 
-  mutate(area_state = st_area(geometry)) |> 
+  mutate(area_state = as.numeric(st_area(geometry))) |> 
   as_tibble() |> 
   select(state, area_state) |> 
   full_join(plotdf |> as_tibble() |> select(state, distance)) |> 
-  mutate(ratio = 1e8 * distance / as.numeric(area_state))
-
-g2 <- ratio_df |> 
-  drop_na() |> 
-  ggplot(
-    mapping = aes(
-      x = ratio, 
-      y = reorder(state, ratio),
-      label = state
-    )
-  ) +
-  geom_point(
-    alpha = 0.2,
-    pch = 19,
-    size = 3
-  ) +
-  geom_text(
-    check_overlap = TRUE,
-    hjust = "outward",
-    vjust = "outward"
-  ) +
-  # ggrepel::geom_text_repel(
-  #   nudge_x = 2
-  # ) +
-  scale_x_continuous(
-    trans = "log2",
-    expand = expansion(0)
-  ) +
-  scale_y_discrete(
-    expand = expansion(0)
-  ) +
-  coord_polar(theta = "y") +
-  theme_minimal() +
-  theme(
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    axis.title = element_blank()
-  )
+  mutate(ratio = distance / sqrt(area_state))
 ```
 
 Visualization
@@ -267,39 +250,146 @@ g_base <- plotdf |>
     mapping = aes(label = state, size = area_state),
     colour = text_col,
     alpha = 0.5,
-    family = "body_font"
+    family = "body_font",
+    size = bts / 8
   ) +
   geom_sf(
     data = india_state_map,
-    fill = lighten(text_hil, 0.9)
+    fill = text_hil,
+    colour = text_hil,
+    alpha = 0.05, 
+    linewidth = 0.5
   ) +
   geom_sf(
     mapping = aes(
       geometry = geometry_centroid
     ),
-    colour = "red",
-    pch = 8
+    colour = viz_cols[2],
+    pch = 8,
+    size = 6
   ) +
   geom_sf(
     mapping = aes(
       geometry = geometry_capital
     ),
+    colour = viz_cols[3],
     pch = 19,
-    size = 1,
+    size = 6,
     alpha = 0.8
   ) +
   geom_sf(
     data = distance_lines,
     linetype = 3,
-    arrow = arrow(length = unit(1, "mm")),
-    linewidth = 0.5
+    linewidth = 0.5,
+    colour = text_col
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
   ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      size = 2.8 * bts,
+      colour = text_hil,
+      margin = margin(10,0,10,0, "mm"),
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.35,
+      size = 1.2 * bts
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5
+    )
+  )
+
+g2 <- ratio_df |> 
+  drop_na() |> 
+  ggplot(
+    mapping = aes(
+      x = ratio, 
+      y = reorder(state, ratio),
+      label = state,
+      colour = ratio
+    )
+  ) +
+  geom_point(
+    alpha = 0.2,
+    pch = 19,
+    size = 5
+  ) +
+  geom_text(
+    check_overlap = TRUE,
+    hjust = "outward",
+    vjust = "outward",
+    nudge_x = 0.25,
+    family = "body_font"
+  ) +
+  # ggrepel::geom_text_repel(
+  #   nudge_x = 2
+  # ) +
+  scale_x_continuous(
+    trans = "log2",
+    expand = expansion(0)
+  ) +
+  scale_y_discrete(
+    expand = expansion(0)
+  ) +
+  viridis::scale_colour_viridis(
+    option = "plasma",
+    begin = 0, end = 0.75
+  ) +
+  labs(
+    title = "Distances between State Capital and Geographic Centre",
+    subtitle = "(in Kilometres, normalized by State Area)",
+    caption = "Andhra Pradesh's capital is closest to its geographic centre."
+  ) +
+  coord_polar(theta = "y") +
+  theme_minimal(
     base_family = "body_font"
   ) +
   theme(
-    legend.position = "none"
+    legend.position = "none",
+    plot.title = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+      ),
+    plot.subtitle = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+      ),
+    plot.caption = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+      ),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_line(
+      linewidth = 0.5,
+      colour = darken(bg_col, 0.2),
+      linetype = 3
+    )
   )
+g2
+ggsave(
+  filename = here::here("data_vizs", "a4_ind_state_centroid.png"),
+  plot = g_base,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Add annotations and insets
