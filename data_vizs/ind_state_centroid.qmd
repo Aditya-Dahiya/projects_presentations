@@ -33,6 +33,393 @@ The map illustrates the geographic centres and capitals of Indian states, based 
 
 ![The map displays the geographic centres and capitals of Indian states, with arrows indicating the distance between them. When normalized by the square root of the state area, the capitals of Uttar Pradesh, Chhattisgarh, and Manipur are closest to their centres, while those of Haryana, Tamil Nadu, and Kerala are farthest.](a4_ind_state_centroid.png)
 
+### Interactive Version of the map
+
+```{r}
+#| label: fig-interact-centre
+#| fig-cap: "Data & Technique: The data for this map was sourced from the Survey of India, providing accurate locations of state capitals and boundaries. Using the R programming language, specifically the {sf} package, the geographic centre (centroid) of each state was calculated with the function sf_centroid(). The distances between these centroids and the actual state capitals were then computed using the sf_distance() function. The comparison metric represents the distance between a state's capital and its geographic centre, normalized by the state's area, allowing for a comparative analysis of this distance across states of varying sizes."
+#| fig-width: 6
+#| fig-height: 9
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)         # To lighten and darken colours
+
+# Maps related packages
+library(sf)                   # Geomteric objects manipulation
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 1000) |> 
+  st_transform(crs = 4326) |> 
+  mutate(state = case_when(
+    State_Name == "Chhattishgarh" ~ "Chhattisgarh",
+    State_Name == "Tamilnadu" ~ "Tamil Nadu",
+    State_Name == "Telengana" ~ "Telangana",
+    .default = State_Name
+    ),
+    .keep = "unused"
+  ) |> 
+  mutate(
+    area_state = as.numeric(st_area(geometry))
+  )
+
+state_capitals <- tibble(
+  State = c(
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
+    "Chhattishgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
+    "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+    "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+    "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamilnadu",
+    "Telengana", "Tripura", "Uttar Pradesh", "Uttarakhand", 
+    "West Bengal"),
+  Capital = c(
+    "Amaravati", "Itanagar", "Dispur", "Patna", "Raipur", 
+    "Panaji", "Gandhinagar", "Chandigarh", "Shimla", "Ranchi",
+    "Bengaluru", "Thiruvananthapuram", "Bhopal", "Mumbai", "Imphal", 
+    "Shillong", "Aizawl", "Kohima", "Bhubaneswar", "Chandigarh", 
+    "Jaipur", "Gangtok", "Chennai", "Hyderabad", "Agartala", 
+    "Lucknow", "Dehradun", "Kolkata"),
+  Latitude = c(16.5417, 27.1020, 26.1445, 25.5941, 21.2514, 
+               15.4909, 23.2156, 30.7333, 31.1048, 23.3441, 
+               12.9716, 8.5241, 23.2599, 19.0760, 24.8170, 
+               25.5788, 23.7271, 25.6751, 20.2961, 30.7333, 
+               26.9124, 27.3314, 13.0827, 17.3850, 23.8315, 
+               26.8467, 30.3165, 22.5726),
+  Longitude = c(80.5167, 93.6920, 91.7362, 85.1376, 81.6296, 
+                73.8278, 72.6369, 76.7794, 77.1734, 85.3096, 
+                77.5946, 76.9366, 77.4126, 72.8777, 93.9368, 
+                91.8933, 92.7176, 94.1086, 85.8245, 76.7794, 
+                75.7873, 88.6138, 80.2707, 78.4867, 91.2868, 
+                80.9462, 78.0322, 88.3639)
+)
+
+
+# Font for titles
+font_add_google("Fjalla One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "#f5f0fc"
+text_col <- "#2a0169"
+text_hil <- "#350182"
+
+viz_cols <- paletteer::paletteer_d("ltc::trio1")
+viz_cols[2] <- "red"
+
+# Base Text Size
+bts <- 15
+
+plot_title <- "Geocentres & Capitals: Indian States"
+
+plot_subtitle <- glue::glue("Geographic centres and capitals of the Indian states,<br>with arrows indicating the distance between them.<br>The <b style='color:{viz_cols[3] }'>capitals</b> are closest to the <b style='color:{viz_cols[2] }'>geographic</b><br><b style='color:{viz_cols[2] }'>centres</b> for Uttar Pradesh, Chhattisgarh,<br>and Manipur, while they are farthest<br>for Haryana, Tamil Nadu, & Kerala.")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xf09b;</span> <span style='color: {text_col}'>aditya-dahiya  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xe61b;</span> <span style='color: {text_col}'>@adityadahiyaias </span>")
+plot_caption <- paste0(
+  "**Data:** Survey of India ",
+  "**Code:** ", social_caption_1, 
+  " |  **Graphics:** ", social_caption_2
+  )
+
+
+# Calculate geomteric centres of each state
+df1 <- india_state_map |>
+  st_centroid() |>
+  rename(geometry_centroid = geometry)
+
+df1 <- df1 |> 
+  mutate(
+    from_lon = sf::st_coordinates(df1)[,1],
+    from_lat = sf::st_coordinates(df1)[,2]) |> 
+    as_tibble() |> 
+    mutate(state = case_when(
+    state == "Chhattishgarh" ~ "Chhattisgarh",
+    state == "Tamilnadu" ~ "Tamil Nadu",
+    state == "Telengana" ~ "Telangana",
+    .default = state
+    ),
+    .keep = "unused"
+  )
+
+# Capitals of each state
+df2 <- state_capitals |> 
+  janitor::clean_names() |> 
+  st_as_sf(coords = c("longitude", "latitude")) |> 
+  rename(
+    State_Name = state,
+    geometry_capital = geometry
+  )
+
+df2 <- df2 |> 
+  mutate(
+    to_lon = sf::st_coordinates(df2)[,1],
+    to_lat = sf::st_coordinates(df2)[,2]
+  ) |> 
+  as_tibble() |> 
+  rename(state = State_Name) |> 
+  mutate(state = case_when(
+    state == "Chhattishgarh" ~ "Chhattisgarh",
+    state == "Tamilnadu" ~ "Tamil Nadu",
+    state == "Telengana" ~ "Telangana",
+    .default = state
+    ),
+    .keep = "unused"
+  )
+  
+plotdf <- df2 |>
+  left_join(df1) |> 
+  st_as_sf(crs = 4326) |> 
+  mutate(
+    distance = as.numeric(
+      st_distance(
+        geometry_capital, 
+        geometry_centroid, by_element = TRUE) / 1000)
+  ) |> 
+  relocate(state)
+
+distance_lines <- geosphere::gcIntermediate(
+  p1 = plotdf |> drop_na() |> as_tibble() |> 
+       select(from_lon, from_lat),
+  p2 = plotdf |> drop_na() |> as_tibble() |>
+       select(to_lon, to_lat),
+  n = 1000,
+  breakAtDateLine = TRUE,
+  addStartEnd = TRUE,
+  sp = TRUE) |> 
+  sf::st_as_sf(crs = 4326)
+
+ratio_df <- india_state_map |> 
+  mutate(area_state = as.numeric(st_area(geometry))) |> 
+  as_tibble() |> 
+  select(state, area_state) |> 
+  full_join(plotdf |> as_tibble() |> select(state, distance)) |> 
+  mutate(ratio = distance / sqrt(area_state))
+
+plotdf1 <- plotdf |> 
+  left_join(ratio_df |> select(state, area_state, ratio)) |> 
+  mutate(data_id = row_number())
+
+library(ggiraph)
+
+g_base <- plotdf1 |> 
+  ggplot() +
+  geom_sf(
+    data = distance_lines,
+    linetype = 1,
+    linewidth = 0.1,
+    colour = text_col
+  ) +
+  geom_sf_interactive(
+    data = india_state_map,
+    mapping = aes(
+      tooltip = paste0(
+        state, "\nArea: ",
+        round(area_state/1e6, 0),
+        " sq. km."
+      )
+    ),
+    fill = text_hil,
+    colour = text_hil,
+    alpha = 0.05, 
+    linewidth = 0.15
+  ) +
+  geom_sf_interactive(
+    mapping = aes(
+      data_id = data_id,
+      geometry = geometry_centroid,
+      tooltip = paste0(
+        "Geographic centre of ", state, "\nLatitude:",
+        round(from_lat, 1), " N; Longitude: ",
+        round(from_lon, 1), " E"
+      )
+    ),
+    colour = viz_cols[2],
+    pch = 8,
+    size = 2
+  ) +
+  geom_sf_interactive(
+    mapping = aes(
+      data_id = data_id,
+      geometry = geometry_capital,
+      tooltip = paste0(
+        capital, "\n",
+        "Capital of ", state, "\nLatitude:",
+        round(to_lat, 1), " N; Longitude: ",
+        round(to_lon, 1), " E"
+      )
+    ),
+    colour = viz_cols[3],
+    pch = 19,
+    size = 2,
+    alpha = 0.8
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 20
+    ),
+    plot.subtitle = element_markdown(
+      colour = text_hil,
+      lineheight = 0.38,
+      size = 15
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5
+    )
+  )
+
+g2 <- plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = ratio, 
+      y = reorder(state, ratio),
+      label = state,
+      colour = ratio,
+      data_id = data_id
+    )
+  ) +
+  geom_point_interactive(
+    mapping = aes(
+      tooltip = paste0(
+        state, "\n", 
+        "Capital: ", capital,
+        "\nDistance between capital and geographic center: ",
+        round(distance, 0), " km",
+        "\nState Area: ", round(area_state, 1), " sq. km."
+      )
+    ),
+    colour = viz_cols[3],
+    alpha = 0.8,
+    pch = 19,
+    size = 2
+  ) +
+  scale_x_continuous(
+    trans = "log2",
+    expand = expansion(0)
+  ) +
+  scale_y_discrete(
+    expand = expansion(0)
+  ) +
+  viridis::scale_colour_viridis(
+    option = "plasma",
+    begin = 0, end = 0.75
+  ) +
+  coord_polar(theta = "y") +
+  theme_minimal(
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font"
+      ),
+    plot.subtitle = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.75
+      ),
+    plot.caption = element_text(
+      colour = text_col, hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+      ),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_line(
+      linewidth = 0.15,
+      colour = darken(bg_col, 0.2),
+      linetype = 3
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = g2,
+    left = 0.5, right = 1,
+    top = 0.95, bottom = 0.5,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+girafe(
+  ggobj = g,
+  options = list(
+    opts_tooltip(
+      opacity = 1,
+      css = "background-color:#4d4d4d;color:#fcfcfc;padding:2px;border-radius:3px;font-family:Arial"
+    ),
+    opts_hover(
+      css = "stroke:black;stroke-width:1px;"),
+    opts_hover_inv(css = "opacity:0.2;"),
+    opts_zoom(max = 10)
+  )
+)
+```
+
 ### How I made this graphic?
 
 Getting the data
