@@ -35,14 +35,218 @@ The map of India illustrates the locations of international airports and the reg
 
 ![This map of India shows the locations of international airports and the areas closest to each one, highlighted in different colors. The size of each airport's dot represents how many passengers used it in 2023, with larger dots indicating busier airports.](a4_ind_airports_voronoi.png)
 
-### *An interactive version of the same plot (work in-progress)*
+### An interactive version
 
 ```{r}
 #| label: fig-interact-airports
-#| eval: false
-#| fig-cap: ""
+#| eval: true
+#| fig-cap: "Sources of Data: The map of India is based on official data from the Survey of India. International airports are plotted using data from the OpenFlights database, accessed via the {airportr} package in R. Voronoi tessellation is applied to depict areas closest to each airport, with the method highlighting regions by nearest airport proximity. Airport dot sizes, representing annual passenger traffic for 2023, are sourced from Wikipedia through the {rvest} package in R."
 #| echo: false
+#| cache: true
+#| fig-height: 9
+#| fig-width: 6
 
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+# library(colorspace)         # To lighten and darken colours
+
+# Maps related packages
+library(sf)                   # Geomteric objects manipulation
+
+# Get country map of India
+# Credits: Survey of India; and Anuj Tiwari @
+# https://github.com/AnujTiwari/India-State-and-Country-Shapefile-Updated-Jan-2020
+india_map <- read_sf(here::here("data", "india_map", 
+                                "India_Country_Boundary.shp")) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 1000) |> 
+  st_transform(crs = 4326)
+
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 1000) |> 
+  st_transform(crs = 4326)
+
+# Get locations of Airports in India
+ind_airports <- airportr::airports |> 
+  janitor::clean_names() |> 
+  rename(lat = latitude, lon = longitude, airport = name) |> 
+  filter(country == "India") |> 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
+  # Remove Air Force run airports
+  filter(!str_detect(airport, "Air Force")) |> 
+  # Only international airports
+  filter(str_detect(airport, "International"))
+
+# Get passenger traffic data in International airports of India
+# Load necessary libraries
+library(rvest)
+# Wikipedia URL for India's busiest airports
+url <- "https://en.wikipedia.org/wiki/List_of_the_busiest_airports_in_India"
+# Read the HTML content from the webpage
+webpage <- read_html(url)
+# Extract the table containing the airport data
+airport_table <- webpage |> 
+  html_nodes(xpath = '//*[@id="mw-content-text"]/div[1]/table[2]') |> 
+  html_table()
+# Convert the list to a data frame
+airport_df <- as.data.frame(airport_table[[1]])
+# Clean the data frame
+airport_data <- airport_df |> 
+  select(name_of_airport = Name, 
+         iata = `IATA Code`, 
+         passengers_2023 = `Passengers  2022–23`) |> 
+  mutate(
+    passengers_2023 = as.numeric(gsub(",", "", passengers_2023))
+  )
+rm(airport_df, webpage, airport_table, url)
+
+
+# Font for titles
+font_add_google("Merienda",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Fjalla One",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "#fffee6"
+text_col <- "#400600"
+text_hil <- "#630b01"
+
+plot_title <- "India's Airport Proximity Map"
+
+plot_subtitle <- str_wrap("Locations of India's international airports and the areas closest to each one. The size of each airport's dot represents passenger traffic in 2023 - larger dots mean busier airports. The number in brackets are the passengers handled by the airport in the year 2023.", 72)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xf09b;</span> <span style='color: {text_col}'>aditya-dahiya  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>&#xe61b;</span> <span style='color: {text_col}'>@adityadahiyaias </span>")
+plot_caption <- paste0(
+  "**Data:** Survey of India; Open Flights Database  |  ",
+  "**Code:** ", social_caption_1, 
+  " |  **Graphics:** ", social_caption_2
+  )
+
+voronoi_lines <- ind_airports |> 
+  st_union() |> 
+  st_voronoi() |>
+  st_collection_extract("POLYGON") |> 
+  st_sf(geometry = _) |> 
+  st_crop(st_bbox(india_map)) |> 
+  st_intersection(india_map) 
+
+# Set seed for reproducability  
+set.seed(42)
+voronoi_lines <- voronoi_lines |> 
+  mutate(fill_var = sample(
+  x = letters[1:20],
+  size = nrow(voronoi_lines),
+  replace = T
+  )
+)
+
+library(ggiraph)
+
+g_base <- ggplot() +
+  geom_sf(data = voronoi_lines,
+          mapping = aes(fill = fill_var),
+          alpha = 0.4,
+          colour = bg_col) +
+  geom_sf(
+    data = india_state_map,
+    colour = colorspace::lighten(text_hil, 0.3),
+    fill = "transparent",
+    linewidth = 0.15,
+    alpha = 0.3
+  ) +
+  geom_sf_interactive(
+    data = ind_airports |> left_join(airport_data),
+    mapping = aes(
+      size = passengers_2023,
+      data_id = open_flights_id,
+      tooltip = paste0(
+        airport, "\n",
+        "City: ", city, "\n",
+        "Passengers handled (2023): ",
+        number(passengers_2023, big.mark = ",")
+      )
+    ),
+    colour = text_col,
+    alpha = 0.75
+  ) +
+  geom_sf(
+    data = india_map,
+    colour = text_col,
+    fill = "transparent",
+    linewidth = 0.25
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  paletteer::scale_fill_paletteer_d("palettesForR::Windows") +
+  
+  # Scales and Coordinates
+  coord_sf(clip = "off") +
+  scale_size(range = c(1, 4)) +
+  
+  # Themes
+  ggthemes::theme_map() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      colour = text_hil,
+      size = 20,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      lineheight = 0.75
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      hjust = 0.5
+    )
+  ) 
+
+girafe(
+  ggobj = g_base,
+  options = list(
+    opts_tooltip(
+      opacity = 1,
+      css = "background-color:#4d4d4d;color:#fcfcfc;padding:2px;border-radius:3px;font-family:Arial"
+    ),
+    opts_hover(
+      css = "stroke:black;stroke-width:1px;"),
+    opts_hover_inv(css = "opacity:0.2;"),
+    opts_zoom(max = 10)
+  )
+)
 ```
 
 ### How I made this graphic?
