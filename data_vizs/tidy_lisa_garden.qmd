@@ -1,0 +1,392 @@
+---
+title: "Lisa's Vegetable Garden Data"
+author: "Aditya Dahiya"
+date: "2024-05-29"
+subtitle: "Exploring Lisa Lendway's vegetable garden from summer 2020 and summer 2021, from her {gardenR} package."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_lisa_garden.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+# Lisa's Vegetable Garden Data
+
+The data for this analysis is sourced from the `gardenR` package , which contains records from Lisa Lendway's vegetable garden, collected during the summers of 2020 and 2021. This dataset, first introduced in 2021 and updated with 2021 data on January 29, 2022, was utilized in Lisa Lendway's Introduction to Data Science course at Macalester College to teach various data science concepts. The circular graph created from this data illustrates the average weights of 12 different tomato varieties harvested in 2020. The analysis reveals that the Amish Paste Tomato variety is the heaviest, while the Grape Tomatoes are the smallest. This visual representation provides a clear comparison of the tomato varieties based on their average weights.
+
+![This circular plot displays the average weights of 12 different tomato varieties harvested in 2020 from Lisa's vegetable garden. The Amish Paste Tomato stands out as the heaviest variety, while the Grape Tomatoes are the smallest. The visualization provides a clear comparison of each variety's average weight.](tidy_lisa_garden.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Extras and Annotations
+library(magick)               # Image processing
+library(ggfittext)            # Fitting labels inside bar plots
+ 
+# Load Data
+harvest_2020 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-28/harvest_2020.csv')
+
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+bg_col <- "#fcd7d4"
+
+harvest_2020 |> visdat::vis_dat()
+
+harvest_2020 |> summarytools::dfSummary() |> summarytools::view()
+
+df <- harvest_2020 |> 
+  filter(vegetable == "tomatoes") |> 
+  group_by(vegetable, variety) |>
+  summarise(
+    avg_wt = mean(weight, na.rm = TRUE),
+    n = n()
+  ) |> 
+  ungroup() |> 
+  mutate(
+    id = row_number(),
+    file_name = paste0(
+      "temp1_tomato_", id, ".png"
+    )
+  )
+
+library(magick)
+
+for (i in 1:12) {
+  im <- magick::image_read(
+  paste0("temp_tomato_", i, ".jpg")
+)
+  
+  # Technique Credits: https://stackoverflow.com/questions/64597525/r-magick-square-crop-and-circular-mask
+  # get height, width and crop longer side to match shorter side
+  ii <- image_info(im)
+  ii_min <- min(ii$width, ii$height)
+  im1 <- image_crop(
+    im, 
+    geometry = paste0(ii_min, "x", ii_min, "+0+0"), 
+    repage = TRUE
+    )
+  
+  # create a new image with white background and black circle
+  fig <- image_draw(image_blank(ii_min, ii_min))
+  symbols(ii_min / 2, ii_min / 2, 
+          circles = (ii_min / 2) - 3, 
+          bg = "black", inches = FALSE, add = TRUE)
+  dev.off()
+  
+  # create an image composite using both images
+  im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
+  im2 <- image_resize(im2, "x400")
+  # set background as white
+  
+  
+  image_write(
+    image = magick::image_background(im2, bg_col),
+    path = paste0("temp1_tomato_", i,".png"),
+    format = "png"
+    )
+}
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Anton",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira",
+  family = "body_font"
+) 
+
+bts <- 80
+
+showtext_auto()
+
+# Credits for coffeee palette
+mypal <- paletteer::paletteer_d("RColorBrewer::Reds")
+bg_col <- mypal[2]
+text_col <-  mypal[9]
+text_hil <-  mypal[7]
+line_col <- mypal[4]
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- "Hefty Harvest:\nTomato Weights from Lily's Garden"
+
+plot_caption <- paste0(
+  "**Data:** {gardenR} Lisa's Vegetable Garden Data", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+plot_subtitle <- str_wrap("The average weights of 12 tomato varieties from Lisa's 2020 garden: Amish Paste Tomato is the heaviest and Grape Tomatoes are the lightest.", 80)
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+g <- df |> 
+  ggplot(
+  mapping = aes(
+    x = reorder(variety, avg_wt),
+    y = avg_wt
+    )
+  ) +
+  ggimage::geom_image(
+    aes(image = file_name),
+    size = 0.05
+  ) +
+  geom_text(
+    aes(
+    label = paste0(
+      variety, " (", round(avg_wt, 0), " gm)"
+      )
+    ),
+    hjust = "outward",
+    vjust = "outward",
+    family = "caption_font",
+    lineheight = 0.5,
+    size = bts/4, 
+    colour = text_col
+  ) +
+  # annotate(
+  #   geom = "text",
+  #   label = plot_subtitle,
+  #   x = 6, y = 1000,
+  #   hjust = 0.5,
+  #   colour = text_hil,
+  #   lineheight = 0.35,
+  #   size = bts / 2,
+  #   family = "caption_font"
+  # ) +
+  scale_y_continuous(
+    limits = c(200, 1000),
+    labels = label_number(suffix = " gm"),
+    expand = expansion(0),
+    breaks = seq(200, 1000, 200)
+  ) +
+  scale_x_discrete(
+    expand = expansion(c(0, 0.1))
+  ) +
+  coord_radial(
+    theta = "x",
+    # start = -90 * pi / 180,
+    # end = +90 * pi / 180,
+    clip = "off",
+    r_axis_inside = TRUE
+  ) +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle
+  ) +
+  theme_minimal(
+    base_family = "caption_font",
+    base_size = bts
+  ) +
+  theme(
+    axis.title = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(
+      colour = line_col,
+      linewidth = 0.5,
+      linetype = 3
+    ),
+    panel.grid.minor.y = element_line(
+      colour = line_col,
+      linewidth = 0.5
+    ),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(colour = text_hil),
+    panel.border = element_blank(),
+    plot.title = element_text(
+      hjust = 0.5,
+      family = "title_font",
+      margin = margin(5,0,5,0, "mm"),
+      colour = text_hil,
+      size = 2 * bts,
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,20,0,"mm"),
+      lineheight = 0.35,
+      colour = text_hil,
+      hjust = 0.5,
+      size = 1.5 * bts
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(10,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.background = element_rect(
+      fill = bg_col, colour = bg_col
+    ),
+    panel.background = element_rect(
+      fill = bg_col, colour = bg_col
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_lisa_garden.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 400,   
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: add-annotations
+
+g <- p1 +
+  inset_element(
+    p = inset1,
+    on_top = TRUE,
+    ignore_tag = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = 0.32, right = 0.7,
+    bottom = 0.3, top = 0.7
+  ) +
+  inset_element(
+    p = p_subtitle,
+    on_top = TRUE,
+    ignore_tag = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = -1,  right = 1,
+    top = 1.3, bottom = 0.7
+  ) +
+  
+  # Add stacked horizontal Bar Charts
+  inset_element(
+    p = p2,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = 0.45, right = 1.08,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
+  inset_element(
+    p = p3,
+    on_top = TRUE,
+    clip = FALSE,
+    align_to = "panel",
+    left = -0.08, right = 0.55,
+    top = 0.27,
+    bottom = -0.3
+  ) +
+  
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = bg_col,
+        colour = bg_col
+      )
+    )
+  )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_lisa_garden.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_lisa_garden.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_lisa_garden.png"))
+
+
+
+unlink(paste0("temp_tomato_", 1:12, ".jpg"))
+
+unlink(paste0("temp1_tomato_", 1:12, ".png"))
+```
