@@ -1,0 +1,422 @@
+---
+title: "How Have Global Life Expectancy Trends Diverged?"
+author: "Aditya Dahiya"
+date: "2024-06-01"
+subtitle: ""
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+image: "thumbnails/owid_le_compare.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+### Which continents made the biggest strides in longevity, and for which age-groups?
+
+The data for this infographic is sourced from "Our World in Data" and Gapminder.org, which provide comprehensive global life expectancy statistics. The graphic illustrates the changes in life expectancy between 1950 and 2020 across six regions: Africa, Asia, Latin America, Oceania, Europe, and North America. Each panel compares life expectancy at birth and at ages 15, 25, 45, 65, and 80 years. The findings reveal that the most significant improvements at birth occurred in Africa and Asia, primarily due to successful efforts in reducing childhood mortality through better healthcare and vaccination programs. Conversely, the most substantial gains in life expectancy for older age groups (65 and 80 years) were observed in Oceania, North America, and Europe, indicating a stronger emphasis on elderly care and advancements in medical treatments for age-related conditions in these regions. This comparison highlights the diverse regional strategies and achievements in enhancing life expectancy over the past seven decades.
+
+![Life Expectancy Trends by Region (1950-2020): This plot compares the changes in life expectancy at birth and at ages 15, 25, 45, 65, and 80 years across Africa, Asia, Latin America, Oceania, Europe, and North America. Each panel highlights regional improvements over the past seven decades.](owid_le_compare.png){width="1200"}
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+
+# The Expansion pack to ggplot2
+library(ggforce)              # to learn some new geom-extensions
+
+# Searrch for the life expectancy indicators in Our World in Data
+temp1 <- owid_search("life expectancy") |> 
+  as_tibble()
+
+# Select an indicator
+sel_indicator <- temp1 |> 
+  filter(str_detect(title, "Remaining")) |> 
+  slice_head(n = 1) |> 
+  pull(chart_id)
+
+# Raw Data
+temp <- owid(chart_id = sel_indicator)
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Glegoo",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Hepta Slab",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Maiden Orange",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- paletteer::paletteer_d("PrettyCols::PurpleYellows", direction = -1)
+
+# Background Colour
+colpal <- mypal[-5]
+bg_col <- "white"
+panel_col <- "#f4f4f4"
+
+text_col <- mypal[9]
+text_hil <- mypal[8]
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "How Do Life Expectancy Gains Vary Across the World?"
+
+plot_subtitle <- str_wrap("Comparison the improvement in life expectancy between 1950 and 2020 across six world regions. At birth, Africa and Asia saw the most significant gains, driven by efforts to reduce childhood mortality. In contrast, Oceania, North America, and Europe experienced the most notable improvements in life expectancy for those aged 65 and older, reflecting a focus on elderly care.", 130)
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+
+plot_caption <- paste0(
+  "**Data:** Our World in Data | Gapminder |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+df <- temp |> 
+  as_tibble() |> 
+  janitor::clean_names() |> 
+  rename(country = entity)
+
+selected_regions <- df |> 
+  distinct(country) |> 
+  filter(str_detect(country, "(UN)")) |> 
+  pull(country)
+
+df2 <-  df |>
+  filter(country %in% selected_regions) |> 
+  filter(year %in% seq(1950, 2020, 10)) |> 
+  pivot_longer(
+    cols = starts_with("life_"),
+    values_to = "value",
+    names_to = "age_group"
+  ) |> 
+  mutate(
+    age_group = str_replace_all(age_group, "birth", "0"),
+    age_group = parse_number(age_group),
+    year = as.character(year)
+  )
+
+levels_regions <- c("Africa", "Asia", "Latin America", "Oceania", "Europe", "Northern America")  
+
+plotdf <- df2 |> 
+  filter(age_group != 10) |> 
+  mutate(
+    country = str_remove(country, " \\(UN\\)$"),
+    country = str_remove(country, " and the Caribbean$"),
+    country = fct(country, levels = levels_regions),
+    age_group = paste0(
+      "Remaining life at age **", 
+      age_group, " years**"
+      ),
+    disp_val = if_else(
+      year %in% c(1950, 2020),
+      round(value, 0),
+      NA
+    )
+  ) |> 
+  group_by(age_group, country) |> 
+  mutate(
+    x_var_annotation = (max(disp_val, na.rm = T) + min(disp_val, na.rm = T))/2
+  ) |> 
+  group_by(age_group, country) |> 
+  mutate(
+    label_var_annotation = max(disp_val, na.rm = T) - min(disp_val, na.rm = T)
+  ) |> 
+  ungroup()
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+g_base <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      y = country,
+      x = value,
+      colour = year,
+      group = country
+    )
+  ) +
+  geom_line() +
+  geom_point(
+    size = 3,
+    pch = 19
+  ) +
+  geom_text(
+    mapping = aes(label = disp_val),
+    family = "body_font",
+    hjust = 0,
+    nudge_y = -0.2,
+    size = bts/5
+  ) +
+  geom_text(
+    mapping = aes(
+      x = x_var_annotation,
+      label = paste0("+", label_var_annotation)
+    ),
+    colour = text_col,
+    hjust = 0,
+    nudge_y = +0.2,
+    size = bts / 4,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  facet_wrap(
+    ~ age_group, 
+    scales = "free_x",
+    ncol = 3,
+    dir = "h"
+  ) +
+  
+  # Labels
+  labs(
+    x = NULL,
+    y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    colour = "Year"
+  ) +
+  # Scales and Coordinates
+  scale_colour_manual(
+    values = colpal
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 12
+      )
+    )
+  ) +
+  theme_minimal(
+    base_size = bts,
+    base_family = "body_font",
+    base_line_size = bts / 44
+  ) +
+  theme(
+    legend.position = "right",
+    legend.justification = c(1, 1),
+    plot.title.position = "plot",
+    plot.title = element_text(
+      colour = text_hil,
+      family = "body_font",
+      hjust = 0,
+      margin = margin(15,3,5,3, "mm"),
+      size = 3.5 * bts,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      family = "body_font",
+      margin = margin(3,3,10,3, "mm"),
+      size = 1.4 * bts,
+      lineheight = 0.3,
+      hjust = 0
+    ),
+    strip.text = element_textbox(
+      colour = text_col,
+      family = "caption_font",
+      margin = margin(0,0,2,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "body_font",
+      hjust = 0.5
+    ),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.text.y = element_text(
+      margin = margin(0,5,0,0, "mm"),
+      colour = text_col,
+      size = bts
+    ),
+    axis.text.x = element_text(
+      colour = text_col,
+      size = bts,
+      margin = margin(2,0,0,0, "mm")
+    ),
+    axis.title = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.line = element_blank(),
+    panel.background = element_rect(
+      fill = panel_col,
+      colour = panel_col
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    legend.text = element_text(
+      colour = text_col,
+      family = "body_font",
+      margin = margin(6,0,6,0, "mm"),
+      size = 1.5 * bts,
+      vjust = 0.5, hjust = 0
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      family = "body_font",
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5,
+      size = 2 * bts
+    )
+  )
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_le_compare",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.6
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+plot_qr
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 1,
+    top = 0.18, bottom = 0,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+ggsave(
+  filename = here::here("data_vizs", "owid_le_compare.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_le_compare.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_le_compare.png"))
+
+```
