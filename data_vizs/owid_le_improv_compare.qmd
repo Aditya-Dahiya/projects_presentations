@@ -1,0 +1,507 @@
+---
+title: "................."
+author: "Aditya Dahiya"
+date: "............"
+subtitle: ""
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_le_compare.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+### Where are the biggest gains in life expectancy: Early Life or Old Age?
+
+The graph is based on life expectancy data sourced from [Our World in Data](https://ourworldindata.org/) (using `owidR` [package](https://github.com/piersyork/owidR)) and [Gapminder.org](https://www.gapminder.org/), comparing the percentage rise in life expectancy at birth with the percentage rise in life expectancy beyond age 65 across six decades (1960s-2010s) for various countries. Each dot represents a country and is colored by its GDP per capita, with red indicating low GDP per capita (poor countries) and green indicating high GDP per capita (rich countries). The 45-degree line represents equal percentage rises for both indicators.
+
+**Main Findings:**
+
+1.  The overall rate of rise in life expectancy was highest in the 1960s and 1970s, reflecting the rapid spread of modern medicine in the post-World War II era, and has been slowing down globally.
+
+2.  Most of the gains in the initial decades were in poorer countries due to widespread vaccinations and control of childhood infectious diseases, indicated by most dots being below the 45-degree line in the 1960s and 1970s.
+
+3.  Richer countries (green dots) have focused more on elderly care, resulting in a higher rise in life expectancy beyond 65 years compared to poorer countries (red dots).
+
+4.  Over recent decades, as countries grow richer, more are improving life expectancy beyond 65 years through enhanced elderly care, shown by more dots appearing above the 45-degree line.
+
+!["Percentage Rise in Life Expectancy: This graph compares the percentage rise in life expectancy at birth (x-axis) and beyond age 65 (y-axis) across six decades (1960s-2010s) for various countries. Each dot represents a country, colored by its GDP per capita, with red for low GDP (poor countries) and green for high GDP (rich countries). The 45-degree line indicates equal percentage rises for both indicators."](owid_le_improv_compare.png)
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+
+# The Expansion pack to ggplot2
+library(ggforce)              # To learn some new geom-extensions
+library(wbstats)              # To fetch World Bank data on Country
+                              # Codes and GDP per capita
+# Credits: https://stackoverflow.com/questions/48199791/rounded-corners-in-ggplot2
+# Credits @X: @TeunvandenBrand
+library(elementalist)         # Rounded corners of panels
+
+# Searrch for the life expectancy indicators in Our World in Data
+temp1 <- owid_search("life expectancy") |> 
+  as_tibble()
+
+# Select an indicator
+sel_indicator <- temp1 |> 
+  filter(str_detect(title, "Remaining")) |> 
+  slice_head(n = 1) |> 
+  pull(chart_id)
+
+# Raw Data
+rawdf <- owid(chart_id = sel_indicator)|> 
+  as_tibble() |>
+  janitor::clean_names()
+
+# Get list of countries from World Bank with ISO Codes
+wb_cons <- wbstats::wb_countries()
+
+# List of World Bank Indicators
+# wb_inds <- wbstats::wb_indicators()
+# wb_inds |>
+#   filter(str_detect(indicator, "GDP per capita")) |> 
+#   filter(indicator_id == "NY.GDP.PCAP.PP.CD") |> 
+#   pull(indicator)
+
+indicator_definition <- "GDP per capita, PPP (current international $)"
+
+# To obtain data on GDP per capita (for colouring the dots)
+rawdf2 <- wb_data(
+  indicator = "NY.GDP.PCAP.PP.CD"
+) 
+
+rm(temp1, sel_indicator)
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Glegoo",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Maiden Orange",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- paletteer::paletteer_d("PNWColors::Mushroom")
+mypal
+
+# Background Colour
+bg_col <- mypal[6]
+panel_col <- darken(bg_col, 0.05)
+colpal <- c("#C53540FF", "#32834AFF", "#F1D066FF")
+text_col <- mypal[1]
+text_hil <- mypal[2]
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "When and where are the biggest gains in\nlongevity: Early Life or Old Age?"
+str_view(plot_title)
+
+plot_subtitle <- str_wrap("The graphic reveals that life expectancy gains were highest in the 1960s and 1970s, driven by advancements in modern medicine and vaccinations, especially in poorer countries. Over time, richer countries focused more on elderly care, leading to higher life expectancy gains beyond age 65. Recent decades show a trend of improving elderly care as countries grow wealthier.", 130)
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+
+plot_caption <- paste0(
+  "**Data:** Our World in Data & Gapminder |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+df <- rawdf |> 
+  filter(!is.na(code)) |> 
+  select(entity, code, year, 
+         life_expectancy_at_birth_period, 
+         life_expectancy_at_65_period) |> 
+  pivot_longer(
+    cols = starts_with("life_"),
+    names_to = "variable",
+    values_to = "value"
+  ) |> 
+  # Note: In the decade of 2010s, I have compared 2019 and 2010 
+  # to negate the imapct of Covid-19 pandemic which serious
+  # impacted life expectancy globally
+  
+  filter(year %in% c(seq(1950, 2010, 10), 2019)) |> 
+  mutate(year = paste0("y_", year)) |> 
+  arrange(entity, variable, year) |> 
+  group_by(entity, variable) |> 
+  mutate(
+    improvement = (value - lag(value))/value
+  ) |> 
+  drop_na() |> 
+  ungroup() |> 
+  mutate(
+    decade = case_when(
+      year == "y_1960" ~ "1950s",
+      year == "y_1970" ~ "1960s",
+      year == "y_1980" ~ "1970s",
+      year == "y_1990" ~ "1980s",
+      year == "y_2000" ~ "1990s",
+      year == "y_2010" ~ "2000s",
+      year == "y_2019" ~ "2010s"
+    )
+  ) |> 
+  select(-year, -value) |> 
+  pivot_wider(
+    id_cols = c(entity, code, decade),
+    values_from = improvement,
+    names_from = variable
+  ) |> 
+  filter(decade != "1950s")
+
+# From WB: A celaned tibble on income levels & ISO Codes
+df1 <- wb_cons |> 
+  select(
+    entity = country,
+    code = iso3c,
+    iso2c,
+    income_level_iso3c
+  ) |> 
+  mutate(iso2c = str_to_lower(iso2c))
+
+# WB Data: clean and format it to match our base data-set
+df2 <- rawdf2 |> select(
+    code = iso3c,
+    entity = country,
+    year = date,
+    gdp_per_capita = `NY.GDP.PCAP.PP.CD`
+  ) |> 
+  fill(gdp_per_capita, .direction = "up") |> 
+  filter(year %in% seq(1965, 2015, 10)) |> 
+  mutate(
+    decade = case_when(
+      year == 1965 ~ "1960s",
+      year == 1975 ~ "1970s",
+      year == 1985 ~ "1980s",
+      year == 1995 ~ "1990s",
+      year == 2005 ~ "2000s",
+      year == 2015 ~ "2010s"
+    )
+  )
+
+
+plotdf <- df |> 
+  left_join(df1) |> 
+  left_join(df2)
+
+# Text Annotations to each panel
+annotationdf <-  tibble(
+  decade = c("1960s", "1970s", "1980s", "1990s", "2000s", "2010s"),
+  finding = c(
+    "Disportionately highest rise in life expectancy at birth (compared to beyond 65) driven by control of childhood infections and vaccinations.",
+    "Continued high gains in poorer countries through control of childhood diseases.",
+    "Richer countries focusing on elderly care - more green dots shifting above the diagonal line.",
+    "Gains in life expectancy for the elderly increase in wealthier nations, and rise in life expectancy in birth only amongst still left out poorer nations.",
+    "More countries start to improve life expectancy beyond 65 years, and by much more.",
+    "Global trend of enhanced elderly care, with more dots above 45-degree line, most of them of richer countries.")
+)
+
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+g_base <- plotdf |> 
+  drop_na() |> 
+  ggplot(
+    aes(
+      x = life_expectancy_at_birth_period,
+      y = life_expectancy_at_65_period,
+      colour = gdp_per_capita
+    )
+  ) +
+  geom_jitter(
+    alpha = 0.75,
+    size = 3
+  ) +
+  geom_abline(
+    linewidth = 2,
+    colour = "lightgrey",
+    alpha = 0.3
+  ) +
+  geom_hline(
+    yintercept = 0,
+    linetype = 3,
+    colour = text_hil
+  ) +
+  geom_vline(
+    xintercept = 0,
+    linetype = 3,
+    colour = text_hil
+  ) +
+  
+  # Decade Label
+  geom_text(
+    data = distinct(df, decade),
+    mapping = aes(
+      x = 0.01, 
+      y = 0.195,
+      label = decade
+    ),
+    size = bts / 1.5,
+    hjust = 0,
+    vjust = 1,
+    colour = text_col,
+    family = "body_font"
+  ) +
+  
+  # Text Annotation on findings for each decade
+  geom_text(
+    data = annotationdf,
+    mapping = aes(
+      x = -0.01,
+      y = 0.195,
+      label = str_wrap(finding, 15)
+    ),
+    colour = text_col,
+    family = "caption_font",
+    lineheight = 0.3,
+    hjust = 1,
+    vjust = 1,
+    size = bts / 4
+  ) +
+  
+  # Scales and Coordinates
+  coord_equal() +
+  scale_y_continuous(
+    labels = label_percent(),
+    limits = c(-0.05, 0.2)
+  ) +
+  scale_x_continuous(
+    labels = label_percent(),
+    limits = c(-0.05, 0.2)
+  ) +
+  facet_wrap(~decade, ncol = 2) +
+  paletteer::scale_color_paletteer_c(
+    "ggthemes::Red-Green-Gold Diverging",
+    direction = 1,
+    na.value = "white",
+    trans = "log2",
+    breaks = c(1e2, 1e3, 1e4, 1e5),
+    labels = label_dollar(),
+    name = str_wrap(indicator_definition, 20)
+  ) +
+  
+  # Labels
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    # subtitle = plot_subtitle,
+    x = "Improvement in Life Expectancy at Birth (in each decade)",
+    y = "Improvement in Life Expectancy beyond the age of 65 years (in each decade)",
+  ) +
+  
+  # Theme options
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "right",
+    legend.justification = c(1,0.3),
+    legend.direction = "vertical",
+    legend.title.position = "top",
+    panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    panel.background = elementalist::element_rect_round(
+      fill = panel_col,
+      colour = NA,
+      radius = unit(5, "mm")
+    ),
+    legend.key.height = unit(25, "mm"),
+    legend.key.width = unit(5, "mm"),
+    legend.text = element_text(
+      colour = text_hil,
+      vjust = 0.5,
+      margin = margin(0,0,0,2, "mm")
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    plot.title.position = "plot",
+    plot.title = element_text(
+      hjust = 0,
+      size = 2 * bts,
+      colour = text_hil,
+      family = "title_font",
+      face = "bold",
+      margin = margin(10,0,5,2, "mm"),
+      lineheight = 0.35
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(0,0,5,2, "mm"),
+      lineheight = 0.3
+    ),
+    plot.caption = element_textbox(
+      hjust = 0,
+      colour = text_hil,
+      family = "caption_font"
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = NA
+    ),
+    legend.title = element_text(
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(
+      hjust = 0.5,
+      colour = text_col,
+      margin =  margin(0,0,0,0, "mm")
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_le_improv_compare.png"),
+  plot = g_base,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_le_compare",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.6
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+plot_qr
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 1,
+    top = 0.18, bottom = 0,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+```
