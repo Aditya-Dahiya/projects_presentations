@@ -55,7 +55,19 @@ library(wbstats)              # To fetch World Bank data on Country
                               # Codes and GDP per capita
 # Credits: https://stackoverflow.com/questions/48199791/rounded-corners-in-ggplot2
 # Credits @X: @TeunvandenBrand
+# devtools::install_github("teunbrand/elementalist")
 library(elementalist)         # Rounded corners of panels
+
+
+# Data from 1990 to 2021
+# Coverage of essential health services, as defined by the 
+# UHC service coverage index - Both Sexes - Estimate
+rawdf1 <- owidR::owid("healthcare-access-quality-ihme")
+
+# Our World in Data
+# Current health expenditure per capita, PPP (current international $)
+# GDP per capita Population (historical estimates) Countries Continents
+rawdf2 <- owidR::owid("healthcare-expenditure-vs-gdp")
 
 ```
 
@@ -129,11 +141,6 @@ Exploratory Data Analysis and Data Wrangling
 # temp1 <- owidR::owid_search("Healthcare")
 # temp2 <- owidR::owid_search("health")
 
-# Data from 1990 to 2021
-# Coverage of essential health services, as defined by the 
-# UHC service coverage index - Both Sexes - Estimate
-rawdf1 <- owidR::owid("healthcare-access-quality-ihme")
-
 # Universal Health Coverage Service Index
 df1 <- rawdf1 |> 
   as_tibble() |>
@@ -142,19 +149,58 @@ df1 <- rawdf1 |>
     country = entity
   )
 
-# Our World in Data
-# Current health expenditure per capita, PPP (current international $)
-# GDP per capita Population (historical estimates) Countries Continents
-rawdf2 <- owidR::owid("healthcare-expenditure-vs-gdp")
 
 # Current Health Expenditure (Per Person) and GDP Per Capita
 df2 <- rawdf2 |> 
   as_tibble() |> 
   janitor::clean_names() |> 
   select(-countries_continents, -population_historical_estimates) |> 
+  drop_na() |> 
+  rename(
+    country = entity,
+    health_exp = current_health_expenditure_per_capita_ppp_current_international
+  )
+
+plotdf <- df1 |> 
+  left_join(df2) |> 
   drop_na()
 
+plotdf |> 
+  count(year, sort = T) |> 
+  ggplot(
+    aes(y = n, x = year)
+  ) +
+  geom_point() +
+  scale_x_continuous(breaks = 2000:2021)
 
+plotdf |> 
+  pull(year) |> 
+  range()
+
+g <- plotdf1 |>
+  ggplot(
+    mapping = aes(
+      x = fitted,
+      y = coverage
+    )
+  ) + 
+  geom_point(
+    alpha = 0.4
+  ) +
+  geom_abline(
+    colour = "red",
+    slope = 80/0.1
+  ) +
+  scale_x_continuous(
+    limits = c(0, 0.15),
+    oob = scales::squish
+  ) +
+  scale_y_continuous(
+    limits = c(20, 80)
+  ) +
+  labs(
+    title = "Year: {frame_time}"
+  )
 ```
 
 Visualization
