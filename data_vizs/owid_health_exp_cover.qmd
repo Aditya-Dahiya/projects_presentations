@@ -1,13 +1,13 @@
 ---
-title: "....New Exploratory Project.........."
+title: "Does Higher Healthcare Spending Guarantee Better Coverage?"
 author: "Aditya Dahiya"
-date: "2024-06-03"
-subtitle: ".........."
+date: "2024-06-04"
+subtitle: "Comparing healthcare spending to coverage (in the year 2020). Higher spending doesn't always equate to better health coverage, with notable outliers like the United States showing high costs but low coverage, while countries like Brunei, Turkey and Thailand achieve high coverage with lower spending."
 categories:
   - "A4 Size Viz"
   - "Our World in Data"
   - "Public Health"
-image: "thumbnails/..........png"
+image: "thumbnails/owid_health_exp_cover.png"
 format:
   html:
     code-fold: true
@@ -29,7 +29,11 @@ share:
 bibliography: references.bib
 ---
 
-### ...........................
+### Health Expenditure vs. Coverage: Are We Balancing the Scales?
+
+The scatterplot for the year 2020, using data from Our World in Data and the Institute of Health Metrics and Evaluation (IHME), illustrates the relationship between per capita health expenditure as a percentage of GDP and the Universal Health Coverage (UHC) Service Index across various countries. The graphic reveals that while many countries align along a central diagonal, indicating a proportional relationship between health spending and coverage, significant outliers exist. Countries such as Turkey, Thailand, and Brunei achieve higher UHC indices despite relatively low spending, highlighted in green. Conversely, nations like the United States, Afghanistan, Argentina, and Brazil, along with several small island nations (e.g., Tuvalu, Palau, Nauru, Lesotho, Marshall Islands), exhibit lower coverage relative to their health expenditure, marked in red. Notably, the United States stands out as a wealthy country with exceptionally high health spending but inadequate coverage. These findings suggest that the efficiency and allocation of healthcare spending are crucial for achieving extensive and equitable health coverage, rather than the sheer amount of money spent.
+
+![Comparing healthcare spending to coverage (in the year 2020). Higher spending doesn't always equate to better health coverage, with notable outliers like the United States showing high costs but low coverage, while countries like Brunei, Turkey and Thailand achieve high coverage with lower spending.](a4_owid_health_exp_cover.png)
 
 ### How I made this graphic?
 
@@ -69,6 +73,9 @@ rawdf1 <- owidR::owid("healthcare-access-quality-ihme")
 # GDP per capita Population (historical estimates) Countries Continents
 rawdf2 <- owidR::owid("healthcare-expenditure-vs-gdp")
 
+# Getting country ISO2 codes for geom_flag()
+rawdf3 <- wbstats::wb_countries()
+
 ```
 
 Visualization Parameters
@@ -105,10 +112,10 @@ text_hil <- mypal[2]
 # Base Text Size
 bts <- 80
 
-plot_title <- ""
-str_view(plot_title)
+plot_title <- "Does Higher Healthcare Spending Guarantee Better Coverage?"
 
-plot_subtitle <- ""
+plot_subtitle <- str_wrap("Comparing healthcare spending to coverage (in the year 2020). Higher spending doesn't always equate to better health coverage, with notable outliers like the United States showing high costs but low coverage, while countries like Brunei, Turkey and Thailand achieve high coverage with lower spending.", 102)
+str_view(plot_subtitle)
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -124,12 +131,18 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 
 plot_caption <- paste0(
-  "**Data:** Our World in Data |  ",
+  "**Data:** Our World in Data | World Health Organization  ",
   "**Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
+
+about_the_data <- "About the Data: The data for the Universal Health Coverage (UHC) Service Coverage Index, which assesses the extent of health services coverage in various countries, is sourced from the World Health Organization (WHO) Global Health Observatory. The index reflects the breadth and quality of essential health services provided to populations without financial hardship. The per capita current health expenditure and GDP per capita data are obtained from the Institute for Health Metrics and Evaluation (IHME). These indicators help measure the financial resources allocated to health relative to the overall economic output of a country, providing insights into the priority given to health in national budgets."
+
+inset_title <- "Trends in Health Expenditure and Coverage: Spending More, Covering Less Equitably?"
+
+inset_subtitle <- str_wrap("The evolution of healthcare spending vs. service coverage from 2000 to 2020. While countries are increasingly allocating a higher percentage of their GDP to healthcare, the Universal Health Coverage Service Index has not risen proportionately. This trend suggests a growing inequity in how healthcare funds are being utilized, indicating that higher spending does not necessarily translate to more comprehensive coverage. (Each dot is a country)", 170)
 
 ```
 
@@ -177,30 +190,31 @@ plotdf |>
   pull(year) |> 
   range()
 
-g <- plotdf1 |>
-  ggplot(
-    mapping = aes(
-      x = fitted,
-      y = coverage
-    )
-  ) + 
-  geom_point(
-    alpha = 0.4
-  ) +
-  geom_abline(
-    colour = "red",
-    slope = 80/0.1
-  ) +
-  scale_x_continuous(
-    limits = c(0, 0.15),
-    oob = scales::squish
-  ) +
-  scale_y_continuous(
-    limits = c(20, 80)
-  ) +
-  labs(
-    title = "Year: {frame_time}"
-  )
+highlight_countries <- c(
+  "Turkey", "Thailand", "Brunei", "United States", 
+  "Afghanistan", "Argentina", "Brazil", "India",
+  "China", "Mexico", "Armenia", "Tajikistan"
+)
+
+
+merge_codes <- rawdf3 |> 
+  select(iso3c, iso2c) |> 
+  mutate(iso2c = str_to_lower(iso2c)) |> 
+  rename(code = iso3c)
+
+plotdf1 <- plotdf |>
+  mutate(
+    ratio = health_exp / gdp_per_capita,
+    col_var = sqrt(coverage) / sqrt(ratio),
+    size_var = country %in% highlight_countries
+  ) |> 
+  arrange(desc(size_var)) |> 
+  left_join(merge_codes)
+
+range(plotdf1$col_var)
+
+
+
 ```
 
 Visualization
@@ -208,7 +222,216 @@ Visualization
 ```{r}
 #| label: visualize
 
-g_base
+g_base <- plotdf1 |>  
+  filter(year == 2020) |>
+  ggplot(
+    mapping = aes(
+      x = ratio,
+      y = coverage,
+      label = country
+    )
+  ) + 
+  ggflags::geom_flag(
+    mapping = aes(country = iso2c),
+    size = 7
+  ) +
+  # During iterations, I use geom_point() instead of geom_flag() to save rendering time
+  # geom_point(
+  #   alpha = 0.4
+  # ) +
+  geom_text(
+    mapping = aes(size = size_var, colour = col_var),
+    check_overlap = TRUE,
+    family = "body_font",
+    nudge_y = -1.5
+  ) +
+  scale_size_manual(
+    values = c(bts/6, bts/3)
+  ) +
+  geom_abline(
+    colour = mypal[5],
+    linewidth = 80,
+    alpha = 0.2,
+    slope = 80/0.11,
+    intercept = 9,
+    lineend = "round"
+  ) +
+  annotate(
+    geom = "text",
+    x = 0.005, y = 80,
+    family = "caption_font",
+    size = bts / 6,
+    label = str_wrap(about_the_data, 80),
+    hjust = 0,
+    vjust = 1,
+    lineheight = 0.3,
+    colour = text_col
+  ) +
+  scale_x_continuous(
+    limits = c(0, 0.2),
+    labels = scales::label_percent(),
+    oob = scales::squish,
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_y_continuous(
+    limits = c(20, 80)
+  ) +
+  paletteer::scale_color_paletteer_c(
+    "ggthemes::Red-Green-Gold Diverging",
+    direction = 1
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    y = "Universal Health Coverage Service Index",
+    x = "Percentage of GDP spent on healthcare"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot",
+    plot.title = element_text(
+      # family = "title_font",
+      size = 2 * bts,
+      hjust = 0,
+      lineheight = 0.35,
+      colour = text_hil,
+      margin = margin(20,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.3,
+      hjust = 0,
+      size = bts,
+      colour = text_hil,
+      margin = margin(10,0,5,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(175,0,0,20, "mm")
+    ),
+    axis.line = element_line(
+      colour = text_col,
+      linewidth = 0.5,
+      arrow = arrow(
+        angle = 20,
+        length = unit(bts / 7, "mm")
+      )
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    )
+  )
+
+btsi = bts * 0.75
+
+g2 <- plotdf1 |> 
+  filter(year %in% seq(2000, 2020, 5)) |> 
+  ggplot(
+    mapping = aes(
+      x = ratio, 
+      y = coverage,
+      colour = col_var,
+      group = year
+    )
+  ) + 
+  geom_point(
+    pch = 20,
+    size = 3.5,
+    alpha = 0.8
+  ) +
+  geom_abline(
+    colour = mypal[5],
+    linewidth = 20,
+    alpha = 0.2,
+    slope = 80/0.1,
+    intercept = 4,
+    lineend = "round"
+  ) +
+  facet_wrap(
+    ~ year,
+    nrow = 1
+  ) +
+  scale_x_continuous(
+    limits = c(0, 0.15),
+    oob = scales::squish,
+    expand = expansion(c(0, 0.02)),
+    labels = scales::label_percent()
+  ) + 
+  scale_y_continuous(
+    expand = expansion(0)
+  ) + 
+  paletteer::scale_color_paletteer_c(
+    "ggthemes::Red-Green-Gold Diverging",
+    direction = 1
+  ) +
+  labs(
+    y = "Universal Health Coverage Service Index",
+    x = "Percentage of GDP spent on healthcare",
+    title = inset_title,
+    subtitle = inset_subtitle
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = btsi
+  ) + 
+  theme(
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.position = "none",
+    plot.subtitle = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5,
+      margin = margin(2,0,2,0, "mm")
+    ),
+    plot.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      size = btsi * 1.5
+    ),
+    axis.line = element_line(
+      colour = text_col,
+      linewidth = 0.3,
+      arrow = arrow(length = unit(3, "mm"))
+    ),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.title = element_text(
+      colour = text_col
+    ),
+    strip.background = element_rect(
+      colour = "transparent",
+      fill = "transparent"
+    ),
+    strip.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      size = btsi * 2
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    plot.title.position = "plot"
+  )
 ```
 
 Add annotations and insets
@@ -220,7 +443,7 @@ Add annotations and insets
 url_graphics <- paste0(
   "https://aditya-dahiya.github.io/projects_presentations/projects/",
   # The file name of the current .qmd file
-  "owid_le_improv_compare",
+  "owid_health_exp_cover",
   ".qmd"
 )
 # remotes::install_github('coolbutuseless/ggqr')
@@ -253,9 +476,16 @@ library(patchwork)
 g <- g_base +
   inset_element(
     p = plot_qr,
-    left = 0.98, right = 1.3,
-    top = 0.2, bottom = 0,
-    align_to = "panel"
+    left = 0.81, right = 0.91,
+    top = 0.92, bottom = 0.82,
+    align_to = "full",
+    on_top = TRUE
+  ) +
+  inset_element(
+    p = g2,
+    left = 0, right = 1,
+    top = 0.33, bottom = 0.04,
+    align_to = "full"
   ) +
   plot_annotation(
     theme = theme(
@@ -275,8 +505,9 @@ Save graphic and a thumbnail
 
 ```{r}
 #| label: save-plot
+
 ggsave(
-  filename = here::here("data_vizs", ".........png"),
+  filename = here::here("data_vizs", "a4_owid_health_exp_cover.png"),
   plot = g,
   height = 297 * 2,
   width = 210 * 2,
@@ -287,8 +518,8 @@ ggsave(
 library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "............png")) |> 
+                      "a4_owid_health_exp_cover.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", "thumbnails", 
-                         "............png"))
+                         "owid_health_exp_cover.png"))
 ```
