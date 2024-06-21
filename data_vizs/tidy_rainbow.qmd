@@ -1,0 +1,232 @@
+---
+title: "Carbon Majors Emissions Data"
+author: "Aditya Dahiya"
+date: "2024-05-21"
+subtitle: "Historical Carbon Emissions"
+categories:
+  - "#TidyTuesday"
+  - "Donut Chart"
+  - "Animation"
+image: "tidy_carbon_emissions.gif"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The data for this week comes from the TidyRainbow project, which is dedicated to the LGBTQ+ community using the `R` language ecosystem. This specific dataset, curated by [Cara Cuiule](https://github.com/cacalc/tidyRainbowScratch), features **LGBTQ+ movies**. It includes comprehensive details such as movie titles, original language, release dates, popularity ratings, vote counts, and genres, among others.
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Load data
+lgbtq_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-06-25/lgbtq_movies.csv')
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+number_to_display = 10
+
+lgbtq_movies |> 
+  summarytools::dfSummary() |> 
+  summarytools::view()
+
+df1 <- lgbtq_movies |> 
+  mutate(
+    year = year(release_date),
+    month = month(release_date),
+    day = wday(release_date, label = TRUE),
+    language = original_language,
+    .keep = "none"
+  )
+
+df1 |> 
+  filter(year >= 1960) |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      fill = language
+    )
+  ) +
+  geom_bar() +
+  theme(
+    legend.position = "none"
+    )
+
+df2 <- df1 |> 
+  filter(year >= 1990) |> 
+  count(year, language) 
+
+languages <- df2 |> 
+  group_by(language) |> 
+  summarise(n = sum(n)) |> 
+  slice_max(order_by = n, n = number_to_display) |> 
+  pull(language)
+
+plotdf1 <- df2 |> 
+  mutate(
+    language = if_else(
+      language %in% languages,
+      language,
+      "others"
+    )
+  ) |> 
+  group_by(year, language) |> 
+  summarise(n = sum(n)) |> 
+  mutate(
+    language = fct(language, levels = c(languages, "others"))
+  )
+  
+plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = n,
+      fill = language
+    )
+  ) + 
+  ggstream::geom_stream(
+    colour = "white"
+  ) +
+  scale_x_continuous(
+    expand = expansion(0.05),
+    breaks = seq(1990, 2022, 4)
+  ) + 
+  scale_y_continuous(
+    expand = expansion(0)
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Handlee",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+# Credits for coffeee palette
+mypal <- c(
+  "#F7CB45FF",
+  "#EE8026FF",
+  "#DC050CFF",
+  "#E8601CFF",
+  "#A5170EFF",
+  "#E65518FF", 
+  "#B4E2FFFF",
+  "#7ED7D1FF",
+  "#7BAFDEFF"
+)
+
+text_col <-  "#00007FFF"
+text_hil <-  "#00009BFF"
+
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- ""
+
+plot_caption <- paste0("Data: CarbonMajors    |    Code: @aditya-dahiya (GitHub)")
+
+plot_subtitle <- str_wrap("", 100)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_rainbow.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_rainbow.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_rainbow.png"))
+
+```
