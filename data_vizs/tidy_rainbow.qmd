@@ -31,6 +31,8 @@ bibliography: references.bib
 
 The data for this week comes from the TidyRainbow project, which is dedicated to the LGBTQ+ community using the `R` language ecosystem. This specific dataset, curated by [Cara Cuiule](https://github.com/cacalc/tidyRainbowScratch), features **LGBTQ+ movies**. It includes comprehensive details such as movie titles, original language, release dates, popularity ratings, vote counts, and genres, among others.
 
+The graphic displays a stacked bar graph of movie releases per year, color-coded by language, alongside a proportional stream graph showing language distribution over time. Key findings reveal a significant rise in LGBTQ+ movies, from 20 in 1990 to 526 in 2020, with English-language films dominating at around 75% of the total. While the share of non-English movies is increasing slightly, there are notable shifts such as the rise in Portuguese films and a decline in Japanese films. This indicates growing LGBTQ+ representation in cinema, though predominantly in English.
+
 ### **How I made this graphic?**
 
 Loading required libraries, data import & creating custom functions
@@ -73,7 +75,6 @@ df1 <- lgbtq_movies |>
     .keep = "none"
   )
 
-
 df2 <- df1 |> 
   filter(year >= 1990) |> 
   count(year, language) 
@@ -88,6 +89,11 @@ full_names = c("English", "Spanish", "French", "German",
                  "Portuguese", "Japanese", "Italian", "Korean", 
                  "Chinese", "Tagalog", "Swedish", "Others")
 
+lan_df <- tibble(
+  language = c(languages, "others"),
+  full_name = full_names
+  )
+
 plotdf1 <- df2 |> 
   mutate(
     language = if_else(
@@ -98,13 +104,14 @@ plotdf1 <- df2 |>
   ) |> 
   group_by(year, language) |> 
   summarise(n = sum(n)) |> 
-  mutate(
-    language = fct(language, levels = c(languages, "others"))
-  ) |> 
   group_by(year) |> 
   mutate(
     lang_prop = round(100*n/sum(n), 1),
     lang_prop = if_else(lang_prop > 5, lang_prop, NA)
+  ) |> 
+  left_join(lan_df) |> 
+  mutate(
+    full_name = fct(full_name, levels = full_names)
   )
  
 plotdf2 <- plotdf1 |> 
@@ -143,7 +150,7 @@ length(mypal)
 text_col <-  "#00007FFF"
 text_hil <-  "#00009BFF"
 
-bts = 11
+bts = 80
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -163,11 +170,19 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- ""
+plot_supertitle <- "Rising Representation"
 
-plot_caption <- paste0("Data: CarbonMajors    |    Code: @aditya-dahiya (GitHub)")
+plot_title <- "LGBTQ+ Movies by Language (1990-2022)"
 
-plot_subtitle <- str_wrap("", 100)
+plot_caption <- paste0(
+  "**Data:** TidyRainbow Project by Cara Cuiule", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+plot_subtitle <- str_wrap("The number of LGBTQ+ movies has surged from 1990 to 2022, with English-language films consistently dominating despite a slight rise in non-English releases.", 100)
 ```
 
 The static plot
@@ -175,30 +190,34 @@ The static plot
 ```{r}
 #| label: static-plot
 
-plotdf1 |> 
+g_inset <- plotdf1 |> 
   ggplot(
     mapping = aes(
       x = year,
       y = n,
-      fill = language
+      fill = full_name,
+      label = full_name
     )
   ) +
   ggstream::geom_stream(
     type = "proportional",
     colour = bg_col,
-    alpha = 0.5
+    alpha = 0.5,
+    linewidth = 0.1
   ) +
   scale_x_continuous(
-    expand = expansion(0)
+    expand = expansion(0),
+    breaks = seq(1990, 2022, 4)
   ) +
   scale_y_continuous(
     expand = expansion(0),
     labels = label_percent()
   ) +
   coord_cartesian(clip = "off") +
-  # ggstream::geom_stream_label(
-  #   type = "proportional"
-  # ) +
+  ggstream::geom_stream_label(
+    type = "proportional",
+    family = "body_font"
+  ) +
   scale_fill_manual(
     values = mypal
   ) +
@@ -208,6 +227,7 @@ plotdf1 |>
   ) +
   theme(
     axis.text.y = element_text(),
+    axis.text.x = element_text(),
     panel.grid.major.y = element_line(
       colour = text_col,
       linetype = 3
@@ -223,8 +243,6 @@ plotdf1 |>
     legend.position = "none"
   )
   
-
-
 g <- plotdf1 |> 
   ggplot(
     mapping = aes(
@@ -233,7 +251,7 @@ g <- plotdf1 |>
     )
   ) + 
   geom_col(
-    mapping = aes(fill = language),
+    mapping = aes(fill = full_name),
     colour = "white",
     linewidth = 0.1
   ) +
@@ -244,7 +262,34 @@ g <- plotdf1 |>
       label = total
     ),
     colour = text_col,
-    nudge_y = 10
+    nudge_y = 10,
+    family = "body_font"
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_supertitle,
+    x = 1990, y = 520,
+    hjust = 0,
+    family = "title_font",
+    size = bts / 2
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_title,
+    x = 1990, y = 500,
+    hjust = 0,
+    family = "title_font",
+    size = bts / 3
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_subtitle,
+    x = 1990, y = 460,
+    hjust = 0,
+    family = "body_font",
+    size = bts,
+    lineheight = 0.3,
+    size = bts / 5
   ) +
   scale_x_continuous(
     expand = expansion(0),
@@ -255,8 +300,7 @@ g <- plotdf1 |>
   ) +
   scale_fill_manual(
     name = "Language\n(of the movie)",
-    values = mypal,
-    labels = full_names
+    values = mypal
   ) +
   guides(
     fill = guide_legend(
@@ -265,15 +309,63 @@ g <- plotdf1 |>
       )
     )
   ) +
-  theme_classic() +
+  labs(
+    caption = plot_caption
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
   theme(
-    legend.position = c(0.02, 0.9),
+    legend.position = c(0.02, 0.7),
     legend.justification = c(0, 1),
     axis.line.y = element_blank(),
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
-    axis.title = element_blank()
+    axis.title = element_blank(),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour= text_col
+    )
   )
+```
+
+Plot compilation
+
+```{r}
+#| label: plot-compile
+
+library(patchwork)
+
+g_full <- g + 
+  inset_element(
+    p = g_inset,
+    left = 0.2, right = 0.5,
+    bottom = 0.4, top = 0.7,
+    align_to = "panel"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_rainbow.png"),
+  plot = g_full,
+  width = 400,    # Best Twitter Aspect Ratio = 4:5
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
 
 ```
 
@@ -281,16 +373,6 @@ Savings the graphics
 
 ```{r}
 #| label: save-image
-
-
-ggsave(
-  filename = here::here("data_vizs", "tidy_rainbow.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 4:5
-  height = 500,   
-  units = "mm",
-  bg = bg_col
-)
 
 
 # Saving a thumbnail for the webpage
