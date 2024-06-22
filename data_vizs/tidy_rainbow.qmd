@@ -1,13 +1,11 @@
 ---
-title: "Carbon Majors Emissions Data"
+title: "LGBTQ+ Movies over the years (1990-2022)"
 author: "Aditya Dahiya"
-date: "2024-05-21"
-subtitle: "Historical Carbon Emissions"
+date: "2024-06-22"
+subtitle: "The number of LGBTQ+ movies has surged from 1990 to 2022, with English-language films consistently dominating despite a slight rise in non-English releases."
 categories:
   - "#TidyTuesday"
-  - "Donut Chart"
-  - "Animation"
-image: "tidy_carbon_emissions.gif"
+image: "thumbnails/tidy_rainbow.png"
 format:
   html:
     code-fold: true
@@ -32,6 +30,8 @@ bibliography: references.bib
 The data for this week comes from the TidyRainbow project, which is dedicated to the LGBTQ+ community using the `R` language ecosystem. This specific dataset, curated by [Cara Cuiule](https://github.com/cacalc/tidyRainbowScratch), features **LGBTQ+ movies**. It includes comprehensive details such as movie titles, original language, release dates, popularity ratings, vote counts, and genres, among others.
 
 The graphic displays a stacked bar graph of movie releases per year, color-coded by language, alongside a proportional stream graph showing language distribution over time. Key findings reveal a significant rise in LGBTQ+ movies, from 20 in 1990 to 526 in 2020, with English-language films dominating at around 75% of the total. While the share of non-English movies is increasing slightly, there are notable shifts such as the rise in Portuguese films and a decline in Japanese films. This indicates growing LGBTQ+ representation in cinema, though predominantly in English.
+
+![The graph illustrates the annual number of LGBTQ+ movie releases from 1990 to 2022, color-coded by language. An inset stream graph shows the proportional distribution of movie languages over the same period.](tidy_rainbow.png)
 
 ### **How I made this graphic?**
 
@@ -136,7 +136,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Saira Condensed",
+font_add_google("Dosis",
   family = "body_font"
 ) 
 
@@ -145,7 +145,6 @@ showtext_auto()
 bg_col <- "white"
 # Credits for coffeee palette
 mypal <- paletteer::paletteer_d("PrettyCols::Rainbow")
-length(mypal)
 
 text_col <-  "#00007FFF"
 text_hil <-  "#00009BFF"
@@ -182,13 +181,135 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- str_wrap("The number of LGBTQ+ movies has surged from 1990 to 2022, with English-language films consistently dominating despite a slight rise in non-English releases.", 100)
+plot_subtitle <- str_wrap("The number of LGBTQ+ movies has surged from 1990 to 2022, with English-language films consistently dominating despite a slight rise in non-English releases.", 80)
 ```
 
 The static plot
 
 ```{r}
 #| label: static-plot
+
+g <- plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = n
+    )
+  ) + 
+  geom_col(
+    mapping = aes(fill = full_name),
+    colour = "white",
+    linewidth = 0.5
+  ) +
+  geom_text(
+    data = plotdf2,
+    mapping = aes(
+      y = total,
+      label = total
+    ),
+    colour = text_col,
+    nudge_y = 5,
+    family = "body_font",
+    size = bts / 5
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_supertitle,
+    x = 1990, y = 500,
+    hjust = 0,
+    vjust = 0,
+    family = "title_font",
+    size = 1.2 * bts,
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_title,
+    x = 1990, y = 470,
+    hjust = 0,
+    vjust = 0,
+    family = "title_font",
+    size = bts / 1.8,
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_subtitle,
+    x = 1990, y = 460,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    size = bts / 3.5,
+    lineheight = 0.3,
+    colour = text_col
+  ) +
+  scale_x_continuous(
+    expand = expansion(0),
+    breaks = seq(1990, 2022, 4)
+  ) + 
+  scale_y_continuous(
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_fill_manual(
+    values = mypal
+  ) +
+  guides(
+    fill = guide_legend(
+      title = "Language of the LGBTQ+ movies",
+      override.aes = list(
+        pch = 20,
+        size = 5
+      )
+    )
+  ) +
+  labs(
+    caption = plot_caption
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = c(-0.025, 0.8),
+    legend.justification = c(0, 1),
+    legend.direction = "horizontal",
+    axis.line.y = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col
+    ),
+    axis.line.x = element_line(
+      linewidth = 0.5,
+      linetype = 1,
+      colour = text_col
+    ),
+    axis.ticks.x = element_blank(),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_col
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0, 
+      margin = margin(0,0,5,0, "mm"),
+      size = bts
+    ),
+    legend.title.position = "top",
+    legend.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,1, "mm")
+    ),
+    legend.key.spacing.y = unit(2, "mm"),
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
 
 g_inset <- plotdf1 |> 
   ggplot(
@@ -202,8 +323,8 @@ g_inset <- plotdf1 |>
   ggstream::geom_stream(
     type = "proportional",
     colour = bg_col,
-    alpha = 0.5,
-    linewidth = 0.1
+    alpha = 0.9,
+    linewidth = 0.5
   ) +
   scale_x_continuous(
     expand = expansion(0),
@@ -216,18 +337,27 @@ g_inset <- plotdf1 |>
   coord_cartesian(clip = "off") +
   ggstream::geom_stream_label(
     type = "proportional",
-    family = "body_font"
+    family = "body_font",
+    size = bts / 7,
+    hjust = "inward"
   ) +
   scale_fill_manual(
     values = mypal
   ) +
+  labs(
+    title = "Share of different languages."
+  ) +
   theme_void(
     base_family = "body_font",
-    base_size = bts
+    base_size = bts / 2
   ) +
   theme(
-    axis.text.y = element_text(),
-    axis.text.x = element_text(),
+    axis.text.y = element_text(
+      colour = text_col
+    ),
+    axis.text.x = element_text(
+      colour = text_col
+    ),
     panel.grid.major.y = element_line(
       colour = text_col,
       linetype = 3
@@ -240,94 +370,13 @@ g_inset <- plotdf1 |>
       fill = "transparent",
       colour = "transparent"
     ),
-    legend.position = "none"
-  )
-  
-g <- plotdf1 |> 
-  ggplot(
-    mapping = aes(
-      x = year, 
-      y = n
-    )
-  ) + 
-  geom_col(
-    mapping = aes(fill = full_name),
-    colour = "white",
-    linewidth = 0.1
-  ) +
-  geom_text(
-    data = plotdf2,
-    mapping = aes(
-      y = total,
-      label = total
-    ),
-    colour = text_col,
-    nudge_y = 10,
-    family = "body_font"
-  ) +
-  annotate(
-    geom = "text",
-    label = plot_supertitle,
-    x = 1990, y = 520,
-    hjust = 0,
-    family = "title_font",
-    size = bts / 2
-  ) +
-  annotate(
-    geom = "text",
-    label = plot_title,
-    x = 1990, y = 500,
-    hjust = 0,
-    family = "title_font",
-    size = bts / 3
-  ) +
-  annotate(
-    geom = "text",
-    label = plot_subtitle,
-    x = 1990, y = 460,
-    hjust = 0,
-    family = "body_font",
-    size = bts,
-    lineheight = 0.3,
-    size = bts / 5
-  ) +
-  scale_x_continuous(
-    expand = expansion(0),
-    breaks = seq(1990, 2022, 4)
-  ) + 
-  scale_y_continuous(
-    expand = expansion(c(0, 0.1))
-  ) +
-  scale_fill_manual(
-    name = "Language\n(of the movie)",
-    values = mypal
-  ) +
-  guides(
-    fill = guide_legend(
-      override.aes = list(
-        shape = 1
-      )
-    )
-  ) +
-  labs(
-    caption = plot_caption
-  ) +
-  theme_classic(
-    base_family = "body_font",
-    base_size = bts
-  ) +
-  theme(
-    legend.position = c(0.02, 0.7),
-    legend.justification = c(0, 1),
-    axis.line.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(),
-    axis.title = element_blank(),
-    plot.caption = element_textbox(
-      hjust = 0.5,
-      family = "caption_font",
-      colour= text_col
-    )
+    legend.position = "none",
+    plot.title = element_text(
+      size = bts,
+      hjust = 0,
+      colour = text_col
+    ), 
+    plot.title.position = "panel"
   )
 ```
 
@@ -341,8 +390,8 @@ library(patchwork)
 g_full <- g + 
   inset_element(
     p = g_inset,
-    left = 0.2, right = 0.5,
-    bottom = 0.4, top = 0.7,
+    left = 0, right = 0.4,
+    bottom = 0.35, top = 0.65,
     align_to = "panel"
   ) +
   plot_annotation(
@@ -357,6 +406,13 @@ g_full <- g +
       )
     )
   )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
 
 ggsave(
   filename = here::here("data_vizs", "tidy_rainbow.png"),
@@ -366,15 +422,7 @@ ggsave(
   units = "mm",
   bg = bg_col
 )
-
-```
-
-Savings the graphics
-
-```{r}
-#| label: save-image
-
-
+library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", "tidy_rainbow.png")) |> 
   image_resize(geometry = "400") |> 
