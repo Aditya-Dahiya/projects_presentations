@@ -58,11 +58,11 @@ Exploratory Data Analysis & Data Wrangling
 ```{r}
 #| label: eda
 
-number_to_display = 10
+number_to_display = 11
 
-lgbtq_movies |> 
-  summarytools::dfSummary() |> 
-  summarytools::view()
+# lgbtq_movies |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
 
 df1 <- lgbtq_movies |> 
   mutate(
@@ -73,18 +73,6 @@ df1 <- lgbtq_movies |>
     .keep = "none"
   )
 
-df1 |> 
-  filter(year >= 1960) |> 
-  ggplot(
-    mapping = aes(
-      x = year, 
-      fill = language
-    )
-  ) +
-  geom_bar() +
-  theme(
-    legend.position = "none"
-    )
 
 df2 <- df1 |> 
   filter(year >= 1990) |> 
@@ -95,6 +83,10 @@ languages <- df2 |>
   summarise(n = sum(n)) |> 
   slice_max(order_by = n, n = number_to_display) |> 
   pull(language)
+
+full_names = c("English", "Spanish", "French", "German", 
+                 "Portuguese", "Japanese", "Italian", "Korean", 
+                 "Chinese", "Tagalog", "Swedish", "Others")
 
 plotdf1 <- df2 |> 
   mutate(
@@ -108,31 +100,16 @@ plotdf1 <- df2 |>
   summarise(n = sum(n)) |> 
   mutate(
     language = fct(language, levels = c(languages, "others"))
+  ) |> 
+  group_by(year) |> 
+  mutate(
+    lang_prop = round(100*n/sum(n), 1),
+    lang_prop = if_else(lang_prop > 5, lang_prop, NA)
   )
-  
-plotdf1 |> 
-  ggplot(
-    mapping = aes(
-      x = year, 
-      y = n,
-      fill = language
-    )
-  ) + 
-  ggstream::geom_stream(
-    colour = "white"
-  ) +
-  scale_x_continuous(
-    expand = expansion(0.05),
-    breaks = seq(1990, 2022, 4)
-  ) + 
-  scale_y_continuous(
-    expand = expansion(0)
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "none"
-  )
-
+ 
+plotdf2 <- plotdf1 |> 
+  group_by(year) |> 
+  summarise(total = sum(n))
 ```
 
 Visualization Parameters
@@ -160,21 +137,13 @@ showtext_auto()
 
 bg_col <- "white"
 # Credits for coffeee palette
-mypal <- c(
-  "#F7CB45FF",
-  "#EE8026FF",
-  "#DC050CFF",
-  "#E8601CFF",
-  "#A5170EFF",
-  "#E65518FF", 
-  "#B4E2FFFF",
-  "#7ED7D1FF",
-  "#7BAFDEFF"
-)
+mypal <- paletteer::paletteer_d("PrettyCols::Rainbow")
+length(mypal)
 
 text_col <-  "#00007FFF"
 text_hil <-  "#00009BFF"
 
+bts = 11
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -205,6 +174,106 @@ The static plot
 
 ```{r}
 #| label: static-plot
+
+plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = n,
+      fill = language
+    )
+  ) +
+  ggstream::geom_stream(
+    type = "proportional",
+    colour = bg_col,
+    alpha = 0.5
+  ) +
+  scale_x_continuous(
+    expand = expansion(0)
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    labels = label_percent()
+  ) +
+  coord_cartesian(clip = "off") +
+  # ggstream::geom_stream_label(
+  #   type = "proportional"
+  # ) +
+  scale_fill_manual(
+    values = mypal
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    axis.text.y = element_text(),
+    panel.grid.major.y = element_line(
+      colour = text_col,
+      linetype = 3
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.position = "none"
+  )
+  
+
+
+g <- plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = n
+    )
+  ) + 
+  geom_col(
+    mapping = aes(fill = language),
+    colour = "white",
+    linewidth = 0.1
+  ) +
+  geom_text(
+    data = plotdf2,
+    mapping = aes(
+      y = total,
+      label = total
+    ),
+    colour = text_col,
+    nudge_y = 10
+  ) +
+  scale_x_continuous(
+    expand = expansion(0),
+    breaks = seq(1990, 2022, 4)
+  ) + 
+  scale_y_continuous(
+    expand = expansion(c(0, 0.1))
+  ) +
+  scale_fill_manual(
+    name = "Language\n(of the movie)",
+    values = mypal,
+    labels = full_names
+  ) +
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        shape = 1
+      )
+    )
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = c(0.02, 0.9),
+    legend.justification = c(0, 1),
+    axis.line.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title = element_blank()
+  )
 
 ```
 
