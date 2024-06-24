@@ -1,0 +1,453 @@
+---
+title: "Age-Specific Sex Ratios Over Seven Decades"
+author: "Aditya Dahiya"
+date: "2024-06-25"
+subtitle: "Seven Decades of Sex Ratio Dynamics in Male-Preferred Societies: China, India, and Vietnam"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_gender_ratio_ages.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The data for this graphic is sourced from Our World in Data, based on United Nations World Population Prospects (2022). It showcases the sex ratios at different ages—from birth to 80 years—across three countries with a historical preference for male children: **China, India, and Vietnam**, spanning seven decades from the 1950s to the 2010s. The graphic reveals distinct patterns in how male preference impacts sex ratios over time. In China, the one-child policy and prenatal diagnostics significantly skewed birth ratios towards males, but a balance is seen in older age groups. India exhibits a consistent male dominance across all ages, reflecting poorer female healthcare and higher mortality. Vietnam, while showing increased male births in recent decades, continues to have females outliving males significantly, indicating better health outcomes for women as they age.
+
+![This graphic illustrates the sex ratios at different ages—ranging from birth to 80 years—across three countries: China, India, and Vietnam. Each row represents a country, while each column depicts a decade from the 1950s to the 2010s. The x-axis shows the sex ratio (number of females per 100 males), and the y-axis represents the age groups.](a4_owid_gender_ratio_ages.png){width="1200"}
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+
+search_terms <- owidR::owid_search("gender")
+search_terms_1 <- owidR::owid_search("sex ratio")
+search_terms_2 <- owidR::owid_search("population")
+search_terms_2 |> 
+  as_tibble() |> 
+  View()
+rawdf <- owidR::owid("sex-ratio-by-age")
+
+rawdf1 <- owidR::owid("population-with-un-projections")
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Patua One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Maiden Orange",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- c("#ba1e18", "#2352fa", "#019109")
+
+# Background Colour
+bg_col <- "grey95"
+text_col <- "grey10"
+text_hil <- "grey20"
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "Divergent Paths of Male Preference"
+
+plot_subtitle <- "A 70-Year Analysis of Sex Ratios in China, India, and Vietnam at different age groups - from birth to age 80 years. The\ngrey line (with dots) shows world average. The vertical dashed line is the line of equality - equal number of males and females."
+
+data_annotation <- "About the Data: The data for this analysis is sourced from Our World in Data, which compiles information based on the United Nations World Population Prospects (2022). The dataset includes sex ratio statistics—number of males per 100 females—at birth and various age levels from 1950 to 2021. This comprehensive dataset enables a detailed examination of global and regional trends in birth sex ratios over several decades."
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** Our World in Data & UN World Population Prospects (2022)  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+china_text <- "During the 1940s, an excess number of boys were born, a bulge towards males, that continued into the 1990s. After 2000, another surge in the birth of boys is evident, perhaps linked to the one-child policy and the use of pre-natal diagnostic techniques. Despite these imbalances at birth, the sex ratio evens out in older age groups, with more females surviving beyond the age of 50, in line with world average."
+
+india_text <- "A persistent male preference, with more males than females across all age groups, contrary to global trends. While the sex ratio at birth aligns closely with the natural ratio, the disparity grows as age increases. This indicates poorer healthcare and higher mortality rates for females. Unlike other countries, India's females do not outlive males significantly."
+
+vietnam_text <- "A notable pattern of longevity for females, with women significantly outliving men, especially in the older age groups. While this is in line with global trends, but even more pronounced in Vietnam. However, in the past two decades (2000-2020), there has been a marked increase in the number of male births, likely due to the use of pre-natal sex selection techniques."
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# Select only important and populous countries to avoid randomness
+# possible in small population micronations
+
+filter_countries <- rawdf1 |> 
+  as_tibble() |> 
+  filter(year == 2020) |> 
+  filter(!is.na(code)) |> 
+  select(-`Population - Sex: all - Age: all - Variant: medium`) |> 
+  rename(pop = `Population - Sex: all - Age: all - Variant: estimates`) |> 
+  slice_max(order_by = pop, n = 100)
+
+# Prepare the data
+df1 <- rawdf |> 
+  as_tibble() |> 
+  janitor::clean_names() |>
+  
+  pivot_longer(
+    cols = -c(entity, code, year),
+    names_to = "variable",
+    values_to = "value"
+  ) |> 
+  mutate(
+    variable = str_replace_all(variable, "_birth_", "_0_"),
+    variable = parse_number(variable)
+  ) |> 
+  filter(code %in% filter_countries$code)
+
+# Get the age levels at which we have data on sex-ratio
+age_levels <- df1$variable |> unique() |> sort()
+
+# df1 |> 
+#   filter(!is.na(code)) |> 
+#   filter(year %in% seq(1970, 2020, 10)) |> 
+#   filter(variable <= 80) |> 
+#   ggplot(
+#     mapping = aes(
+#       y = value,
+#       x = variable,
+#       group = entity, 
+#       colour = code == "IND"
+#     )
+#   ) +
+#   geom_line(
+#     alpha = 0.1
+#   ) +
+#   geom_text(
+#     mapping = aes(
+#       label = code
+#     ),
+#     family = "caption_font",
+#     check_overlap = TRUE
+#   ) +
+#   geom_hline(
+#     yintercept = 100,
+#     linetype = "dashed"
+#   ) +
+#   scale_y_continuous(
+#     limits = c(50, 120)
+#   ) +
+#   scale_x_continuous(
+#     breaks = age_levels
+#   ) +
+#   coord_flip() +
+#   scale_alpha_manual(values = c(0.1, 1)) +
+#   facet_wrap(~ year, nrow = 1)
+
+plotdf1 <- df1 |> 
+  filter(year %in% seq(1950, 2020, 10)) |> 
+  filter(variable <= 80) 
+
+plotdf1_world <- plotdf1 |> 
+  filter(code == "OWID_WRL") |> 
+  select(-code)
+
+# Strip labelling
+
+strip_labels <- c("China", "India", "Vietnam")
+names(strip_labels) <- c("CHN", "IND", "VNM")
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+g_base <- plotdf1 |> 
+  filter(code %in% c("IND", "CHN", "VNM")) |> 
+
+  ggplot(
+    mapping = aes(
+      y = value,
+      x = variable,
+      group = entity, 
+      colour = code
+    )
+  ) +
+  
+  # Line of equality
+  geom_hline(
+    yintercept = 100,
+    alpha = 0.5,
+    linetype = "dashed"
+  ) +
+  
+  # Background data of the world
+  geom_line(
+    data = plotdf1_world,
+    colour = "black",
+    alpha = 0.2
+  ) +
+  geom_point(
+    data = plotdf1_world,
+    colour = "black",
+    alpha = 0.2
+  ) +
+  
+  # Display for selected countries
+  geom_line(
+    linewidth = 1,
+    alpha = 0.9
+  ) +
+  geom_point(
+    size = 3,
+    alpha = 0.9
+  ) +
+  scale_y_continuous(
+    limits = c(50, 140), 
+    breaks = seq(60, 120, 20),
+    expand = expansion(0),
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 80, 10)
+  ) +
+  coord_flip(
+    clip = "off"
+  ) +
+  scale_colour_manual(
+    values = mypal
+  ) +
+  facet_grid(code ~ year, labeller = labeller(code = strip_labels)) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = "Age at which sex ratio is measured",
+    y = "Sex Ratio (number of females per 100 males)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line = element_line(
+      linewidth = 0.5
+    ),
+    strip.text.y = element_text(
+      angle = 0,
+      size = 2 * bts,
+      vjust = 1.2,
+      hjust = 0,
+      colour = text_col
+    ),
+    strip.text.x = element_text(
+      margin = margin(2,0,5,0, "mm"),
+      size = 2 * bts, 
+      hjust = 0.5,
+      colour = text_col
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(1,1,1,1, "mm")
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      size = 1.6 * bts,
+      margin = margin(2,2,2,2, "mm")
+    ),
+    plot.title = element_text(
+      colour = text_hil,
+      family = "title_font",
+      hjust = 0,
+      margin = margin(10,0,10,0, "mm"),
+      size = bts * 3
+    ),
+    plot.subtitle = element_text(
+      colour = text_col,
+      lineheight = 0.28,
+      margin = margin(0,0,5,0, "mm"),
+      family = "caption_font",
+      size = bts * 1.6
+    ),
+    plot.caption = element_textbox(
+      hjust = 0,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "grey92",
+      colour = "grey92"
+    ),
+    panel.spacing = unit(5, "mm"),
+    plot.margin = margin(5,80,5,5, "mm")
+  )
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_gender_ratio_ages",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+var_text <- china_text
+var_col <- mypal[1]
+write_text <- function(var_text, var_col){
+  ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y= 0 , hjust = 0, vjust = 1,
+    colour = var_col,
+    lineheight = 0.27,
+    size = bts / 5,
+    family = "body_font",
+    label = str_wrap(var_text, 80)
+  ) +
+  theme_void()
+}
+
+
+
+library(patchwork)
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 1,
+    bottom = 0.8, top = 0.95, 
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_gender_ratio_ages.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "a4_owid_gender_ratio.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_gender_ratio.png"))
+```
