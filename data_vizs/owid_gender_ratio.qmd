@@ -31,7 +31,7 @@ bibliography: references.bib
 
 # Decades of Imbalance: Sex Ratios at Birth Worldwide (1970-2020)
 
-The graphic, based on data from Our World in Data (2022), compiled from United Nations World Population Prospects (2022), illustrates the sex ratio at birth across various countries from 1970 to 2020. The world maps for each decade depict the number of boys born per 100 girls, highlighting significant deviations from the natural sex ratio of 105 boys per 100 girls. The findings reveal that with the advent of sex-determination technology, countries like China, Azerbaijan, Vietnam, and Armenia experienced increasingly skewed sex ratios, favoring male births. Conversely, sub-Saharan African nations traditionally displayed a preference for female births, resulting in lower male-to-female birth ratios than expected. Recently, countries like China and India are trending back towards a balanced sex ratio at birth after decades of a strong preference for male children. The inset below the maps identifies the top 10 countries with the highest male births for each decade, underscoring regional and temporal variations in birth gender preferences.
+The graphic, based on data from Our World in Data (2022), compiled from United Nations World Population Prospects (2022), illustrates the sex ratio at birth across various countries from 1970 to 2020. The world maps for each decade depict the number of boys born per 100 girls, highlighting significant deviations from the natural sex ratio of 105 boys per 100 girls. The findings reveal that with the advent of sex-determination technology, countries like China, Azerbaijan, Vietnam, and Armenia experienced increasingly skewed sex ratios, favouring male births. Conversely, sub-Saharan African nations traditionally displayed a preference for female births, resulting in lower male-to-female birth ratios than expected. Recently, countries like China and India are trending back towards a balanced sex ratio at birth after decades of a strong preference for male children. The inset below the maps identifies the top 10 countries with the highest male births for each decade, underscoring regional and temporal variations in birth gender preferences.
 
 ![The graphic displays the sex ratios at birth, measured as the number of boys born per 100 girls, across various countries from 1970 to 2020. It includes six world maps, each representing a different decade, and highlights the changes in birth gender ratios over time. Additionally, an inset lists the top 10 countries with the highest male birth ratios for each decade, providing a detailed view of global and regional patterns.](a4_owid_gender_ratio.png){width="1200"}
 
@@ -205,11 +205,15 @@ plotdf1 <- df1 |>
   filter(variable == 0) |> 
   left_join(map_data, relationship = "many-to-many") |> 
   drop_na() |> 
-  select(-geometry) |> 
+  select(-geometry) |>
+  # Drop some outliers (small island nations)
+  filter(!(code %in% c("LIE", "MNP", "HKG", "MNE", 
+                       "MKD", "TON", "PLW", "WSM",
+                       "MAC", "NRU", "BIH", "PNG"))) |> 
   group_by(year) |> 
   slice_max(order_by = value, n = 10, with_ties = FALSE) |> 
   mutate(rank_num = rank(desc(value), ties.method = "first")) |>
-  mutate(name = paste0(name, " (", round(value,1), ")"))
+  mutate(name = paste0(entity, " (", round(value,1), ")"))
 
 # Correct map of India
 india_map <- read_sf(here::here("data", "india_map", "India_Country_Boundary.shp")) |> 
