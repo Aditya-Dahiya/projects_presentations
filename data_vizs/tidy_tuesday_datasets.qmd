@@ -2,7 +2,7 @@
 title: "Tidy Tuesday Datasets"
 author: "Aditya Dahiya"
 date: "2024-06-27"
-subtitle: "..............."
+subtitle: "Size of the Tidy Tuesday Datasets visualized"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_tuesday_datasets.png"
@@ -27,9 +27,7 @@ share:
 bibliography: references.bib
 ---
 
-.
-
-![.............](tidy_tuesday_datasets.png)
+![The figure shows 644 overlapping red rectangles - each represents a dataset. The axes are on log scales. Each rectangle shows size of a #TidyTuesday dataset. The largest, smallest, widest and longest datasets are labelled.](tidy_tuesday_datasets.png)
 
 ### **How I made this graphic?**
 
@@ -79,10 +77,10 @@ plotdf1 <- tt_datasets |>
     observations1 = log10(observations)
   ) |> 
   mutate(
-    x_min = -variables / 2,
-    x_max = +variables / 2,
-    y_min = -observations / 2,
-    y_max = observations / 2,
+    x_min = -variables1 / 2,
+    x_max = +variables1 / 2,
+    y_min = -observations1 / 2,
+    y_max = observations1 / 2,
     year = as_factor(year)
   ) |> 
   mutate(
@@ -97,7 +95,13 @@ plotdf1 <- tt_datasets |>
   arrange(var_col)
 
 plotdf1 |> 
-  filter(var_col)
+  filter(var_col) |> 
+  mutate(
+    type = c("largest", "longest", "widest", "smallest")
+  ) |> 
+  select(type, dataset_name, variables1, observations1,
+         variables, observations) |> 
+  inner_join(tt_datasets)
 ```
 
 Visualization Parameters
@@ -106,7 +110,7 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Handlee",
+font_add_google("Xanh Mono",
   family = "title_font"
 ) 
 
@@ -116,7 +120,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Dosis",
+font_add_google("M PLUS 1 Code",
   family = "body_font"
 ) 
 
@@ -148,7 +152,7 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- "#TidyTuesday Datasets"
+plot_title <- "Size of *#TidyTuesday* Datasets"
 
 plot_caption <- paste0(
   "**Data:** #TidyTuesday Datasets", 
@@ -158,7 +162,6 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- str_wrap("...............................", 80)
 ```
 
 The static plot
@@ -177,14 +180,15 @@ g <- plotdf1 |>
       colour = var_col,
       linewidth = var_col
     ),
-    alpha = 0.1,
+    alpha = 0.15,
     fill = mypal[1]
   ) +
   scale_colour_manual(values = c("white", mypal[2])) +
-  scale_linewidth_manual(values = c(0.05,  0.75)) +
+  scale_linewidth_manual(values = c(0.1,  0.75)) +
   scale_x_continuous(
-    breaks = c(-3, -2, -1, 0, 1, 2, 3),
-    labels = c(1000, 100, 10, 0, 10, 100, 1000)
+    breaks = c(-1, -log10(5), 0, log10(5), 1),
+    labels = c(10, 5, 0, 5, 10),
+    expand = expansion(c(0.05, 0))
   ) +
   scale_y_continuous(
     breaks = c(-5:-1, 0, 1:5),
@@ -192,7 +196,7 @@ g <- plotdf1 |>
   ) +
   labs(
     title = plot_title,
-    subtitle = plot_subtitle,
+    subtitle = "Each rectangle represents one of the 644 datasets !",
     caption = plot_caption,
     x = "Number of Variables (Rows)",
     y = "Number of Observations (Columns)"
@@ -203,28 +207,34 @@ g <- plotdf1 |>
   ) +
   theme(
     legend.position = "none",
-    axis.line = element_line(
-      arrow = arrow(
-        ends = "both",
-        length = unit(5, "mm"), 
-        angle = 20
-      ),
-      linewidth = 0.2
-    ),
-    plot.title = element_text(
+    plot.title.position = "plot",
+    axis.line = element_blank(),
+    # axis.line = element_line(
+    #   arrow = arrow(
+    #     ends = "both",
+    #     length = unit(5, "mm"), 
+    #     angle = 20
+    #   ),
+    #   linewidth = 0.2
+    # ),
+    plot.title = element_markdown(
       colour = text_col,
-      margin = margin(10,0,0,0, "mm"),
+      margin = margin(10,0,15,0, "mm"),
       hjust = 0.5,
-      size = bts * 3
+      size = bts * 3,
+      family = "title_font"
     ),
     plot.subtitle = element_text(
       colour = text_col,
-      margin = margin(10,0,0,0, "mm")
+      margin = margin(0,0,15,0, "mm"),
+      hjust = 0.5,
+      size = 1.5 * bts
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
-      margin = margin(0,0,10,0, "mm"),
-      colour = text_col
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_col,
+      family = "caption_font"
     ),
     plot.margin = margin(5,5,5,5, "mm"),
     axis.title = element_text(
@@ -242,42 +252,52 @@ g <- plotdf1 |>
     axis.ticks.length = unit(2, "mm")
   )
 
-ggsave(
-  filename = here::here("data_vizs", "tidy_tuesday_datasets.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 4:5
-  height = 500,   
-  units = "mm",
-  bg = bg_col
-)
-
-```
-
-Plot compilation
-
-```{r}
-#| label: plot-compile
-
-library(patchwork)
-
-g_full <- g + 
-  inset_element(
-    p = g_inset,
-    left = 0, right = 0.4,
-    bottom = 0.35, top = 0.65,
-    align_to = "panel"
+# Add Annotations
+g_full <- g +
+  annotate(
+    geom = "text",
+    x = 0, y = 6.62/2,
+    label = "Longest Dataset: Drought FIPS.\n2022, Week 24. 3.7 million observations, 4 variables.",
+    hjust = 0.5,
+    vjust = 0,
+    lineheight = 0.3,
+    colour = text_col,
+    family = "caption_font",
+    size = bts / 3
   ) +
-  plot_annotation(
-    theme = theme(
-      plot.background = element_rect(
-        fill = "transparent",
-        colour = "transparent"
-      ),
-      panel.background = element_rect(
-        fill = "transparent",
-        colour = "transparent"
-      )
-    )
+  annotate(
+    geom = "text",
+    x = 1.94 / 2, y = 5.67 / 2,
+    label = "Largest Dataset: Rstats Tweets.\n2019, Week 1. 429k observations, 88 variables.",
+    hjust = 0.8,
+    vjust = 0,
+    lineheight = 0.3,
+    colour = text_col,
+    family = "caption_font",
+    size = bts / 3
+  ) +
+  annotate(
+    geom = "text",
+    x = -2.13 / 2, y = 0,
+    label = "Widest Dataset: OWID Energy.\n2023, Week 23. 21k observations, 129 variables.",
+    hjust = 0.5,
+    vjust = 0,
+    lineheight = 0.3,
+    colour = text_col,
+    family = "caption_font",
+    size = bts / 3,
+    angle = 90
+  ) +
+  annotate(
+    geom = "text",
+    x = 0, y = 0.63 / 2,
+    label = "Smallest Dataset: City Rural.\n2021, Week 8. 4 observations, 2 variables.",
+    hjust = 0.5,
+    vjust = 0,
+    lineheight = 0.3,
+    colour = text_col,
+    family = "caption_font",
+    size = bts / 3
   )
 ```
 
@@ -286,10 +306,20 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
+ggsave(
+  filename = here::here("data_vizs", "tidy_tuesday_datasets.png"),
+  plot = g_full,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+
+
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "tidy_rainbow.png")) |> 
+image_read(here::here("data_vizs", "tidy_tuesday_datasets.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_rainbow.png"))
+  image_write(here::here("data_vizs", "thumbnails", "tidy_tuesday_datasets.png"))
 
 ```
