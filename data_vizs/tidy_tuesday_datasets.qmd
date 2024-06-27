@@ -51,9 +51,9 @@ library(patchwork)            # Combining plots
 
 # Load data
 tt_datasets <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_datasets.csv')
-tt_summary <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_summary.csv')
-tt_urls <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_urls.csv')
-tt_variables <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_variables.csv')
+# tt_summary <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_summary.csv')
+# tt_urls <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_urls.csv')
+# tt_variables <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-02/tt_variables.csv')
 ```
 
 Exploratory Data Analysis & Data Wrangling
@@ -75,8 +75,8 @@ plotdf1 <- tt_datasets |>
   mutate(overall = variables * observations) |> 
   arrange(desc(overall)) |> 
   mutate(
-    variables = log2(variables),
-    observations = log2(observations)
+    variables1 = log10(variables),
+    observations1 = log10(observations)
   ) |> 
   mutate(
     x_min = -variables / 2,
@@ -84,8 +84,20 @@ plotdf1 <- tt_datasets |>
     y_min = -observations / 2,
     y_max = observations / 2,
     year = as_factor(year)
-  ) 
+  ) |> 
+  mutate(
+    var_col = case_when(
+      overall == max(overall) ~ TRUE,
+      overall == min(overall) ~ TRUE,
+      variables == max(variables) ~ TRUE,
+      observations == max(observations) ~ TRUE,
+      .default = FALSE
+    )
+  ) |> 
+  arrange(var_col)
 
+plotdf1 |> 
+  filter(var_col)
 ```
 
 Visualization Parameters
@@ -111,13 +123,12 @@ font_add_google("Dosis",
 showtext_auto()
 
 # Credits for coffeee palette
-mypal <- paletteer::paletteer_d("PrettyCols::Rainbow")
+mypal <- paletteer::paletteer_d("nbapalettes::cavaliers_retro")
 
 bg_col <- "white"
-text_col <-  "#00007FFF"
-text_hil <-  "#00009BFF"
-
-bts = 11
+text_col <-  mypal[2]
+text_hil <- mypal[2]
+bts = 80
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -137,7 +148,7 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- "................................."
+plot_title <- "#TidyTuesday Datasets"
 
 plot_caption <- paste0(
   "**Data:** #TidyTuesday Datasets", 
@@ -147,15 +158,13 @@ plot_caption <- paste0(
   social_caption_2
   )
 
-plot_subtitle <- str_wrap("......................", 80)
+plot_subtitle <- str_wrap("...............................", 80)
 ```
 
 The static plot
 
 ```{r}
 #| label: static-plot
-
-bg_col = "white"
 
 g <- plotdf1 |> 
   ggplot() +
@@ -165,15 +174,72 @@ g <- plotdf1 |>
       ymax = y_max,
       xmin = x_min,
       xmax = x_max,
-      fill = year
+      colour = var_col,
+      linewidth = var_col
     ),
     alpha = 0.1,
-    colour = "grey95",
-    linewidth = 0.05
+    fill = mypal[1]
   ) +
-  theme_classic() +
+  scale_colour_manual(values = c("white", mypal[2])) +
+  scale_linewidth_manual(values = c(0.05,  0.75)) +
+  scale_x_continuous(
+    breaks = c(-3, -2, -1, 0, 1, 2, 3),
+    labels = c(1000, 100, 10, 0, 10, 100, 1000)
+  ) +
+  scale_y_continuous(
+    breaks = c(-5:-1, 0, 1:5),
+    labels = c(10^(5:1), 0, 10^(1:5))
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = "Number of Variables (Rows)",
+    y = "Number of Observations (Columns)"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
   theme(
-    legend.position = "none"
+    legend.position = "none",
+    axis.line = element_line(
+      arrow = arrow(
+        ends = "both",
+        length = unit(5, "mm"), 
+        angle = 20
+      ),
+      linewidth = 0.2
+    ),
+    plot.title = element_text(
+      colour = text_col,
+      margin = margin(10,0,0,0, "mm"),
+      hjust = 0.5,
+      size = bts * 3
+    ),
+    plot.subtitle = element_text(
+      colour = text_col,
+      margin = margin(10,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      margin = margin(0,0,10,0, "mm"),
+      colour = text_col
+    ),
+    plot.margin = margin(5,5,5,5, "mm"),
+    axis.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks = element_line(
+      colour = text_col,
+      linewidth = 0.2
+    ),
+    axis.ticks.length = unit(2, "mm")
   )
 
 ggsave(
