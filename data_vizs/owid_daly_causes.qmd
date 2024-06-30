@@ -33,7 +33,9 @@ The dataset from [Our World in Data](https://ourworldindata.org/) provides compr
 
 ![This graphic displays the top 25 health issues in 2021 using packed circles. Each circle's size (area) corresponds to the impact of the health issue, measured in Disability Adjusted Life Years (DALYs), which account for years of life lost due to illness, disability, or premature death. Different colors represent different types of health conditions, providing a clear visual comparison of their relative burdens.](owid_daly_causes.png)
 
-### How I made this graphic?
+![This plot compares the major causes of health issues across four income groups: High Income, Upper Middle Income, Lower Middle Income, and Low Income countries. Each facet displays packed circles representing the top 25 health issues, with the size of each circle proportional to the impact measured in Disability Adjusted Life Years (DALYs) and different colors indicating different types of health conditions. This visual allows for a clear comparison of health burdens across economic levels.](a4_owid_daly_causes.png)
+
+### How I made these graphics?
 
 Getting the data
 
@@ -50,9 +52,10 @@ library(fontawesome)          # Icons display in ggplot2
 library(ggtext)               # Markdown text support
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
 
 # Circle Packing Algorithm
-library(packcircles)
+library(packcircles)          # To draw packed circles
 
 search1 <- owidR::owid_search("burden of disease")
 
@@ -111,6 +114,11 @@ font_add_google("Barlow Condensed",
 font_add_google("Poiret One",
   family = "body_font"
 ) 
+
+# Font for the Strip Text 
+font_add_google("Yanone Kaffeesatz",
+  family = "strip_font"
+)
 
 showtext_auto()
 
@@ -332,7 +340,7 @@ plot_circles_year <- function(selected_year, selected_country, bts){
       ),
       colour = text_col,
       alpha = 0.9,
-      linewidth = 0.4
+      linewidth = 0.1
     ) +
     # Add text at center of each bubble
     geom_text(
@@ -345,6 +353,9 @@ plot_circles_year <- function(selected_year, selected_country, bts){
       colour = text_col,
       family = "body_font",
       lineheight = 0.3
+    ) +
+    scale_size_continuous(
+      range = c(bts / 20, bts / 3)
     ) +
     scale_x_continuous(expand = expansion(0)) +
     scale_y_continuous(expand = expansion(0)) +
@@ -362,38 +373,21 @@ plot_circles_year <- function(selected_year, selected_country, bts){
     theme(
       legend.position = "none",
       plot.title = element_text(
-        margin = margin(0,0,0,0, "mm"),
+        margin = margin(5,0,0,0, "mm"),
         size = bts * 2,
         hjust = 0.5,
-        colour = text_hil
+        colour = text_hil,
+        family = "strip_font"
       ),
-      plot.margin = margin(0,0,0,0, "mm")
+      plot.margin = margin(2,2,2,2, "mm")
     )
 }
-
-plot_circles_year(2020, "Afghanistan", 11)
-
-
-ggsave(
-  filename = here::here("data_vizs", "owid_daly_causes.png"),
-  plot = g,
-  height = 210 * 2,
-  width = 297 * 2,
-  units = "mm",
-  bg = bg_col
-)
-```
-
-Add annotations and insets
-
-```{r}
-#| label: insets
 
 # QR Code for the plot
 url_graphics <- paste0(
   "https://aditya-dahiya.github.io/projects_presentations/projects/",
   # The file name of the current .qmd file
-  "owid_gender_ratio_ages",
+  "owid_daly_causes",
   ".qmd"
 )
 # remotes::install_github('coolbutuseless/ggqr')
@@ -422,18 +416,45 @@ plot_qr <- ggplot(
     )
   )
 
+bts = 80
 
-library(patchwork)
-
-g <- g_base +
+g <- patchwork::wrap_plots(
+  plot_circles_year(2021, "High-income countries", bts),
+  plot_circles_year(2021, "Upper-middle-income countries", bts),
+  plot_circles_year(2021, "Lower-middle-income countries", bts),
+  plot_circles_year(2021, "Low-income countries", bts)
+  ) +
   inset_element(
     p = plot_qr,
-    left = 0.85, right = 1,
-    bottom = 0.8, top = 0.95, 
+    left = 0.75, right = 1,
+    bottom = 0.05, top = 0.15,
     align_to = "full"
   ) +
   plot_annotation(
+    title = "Health by Wealth: DALYs in High vs. Low Income Nations",
+    subtitle = str_wrap("The comparison across income groups reveals stark contrasts in health burdens: high-income countries face predominantly non-communicable diseases like cancers and lifestyle disorders, reflecting advanced healthcare and longevity challenges. In contrast, low-income countries contend with a significant burden from infectious and preventable diseases, underscoring persistent health disparities and limited access to healthcare resources. Middle-income countries show transitional patterns, grappling with both infectious diseases and rising rates of non-communicable conditions. These findings underscore the critical link between economic development, healthcare access, and the shifting landscape of global health challenges.", 100),
+    caption = plot_caption,
     theme = theme(
+      plot.title = element_text(
+        colour = text_hil,
+        family = "strip_font",
+        size = bts * 3,
+        margin = margin(10,0,5,0, "mm")
+      ),
+      plot.subtitle = element_text(
+        lineheight = 0.3,
+        family = "body_font", 
+        colour = text_hil,
+        size = bts * 1.2,
+        hjust = 0.5
+      ),
+      plot.caption = element_textbox(
+        colour = text_hil,
+        family = "caption_font",
+        size = bts * 0.8,
+        hjust = 0.5,
+        margin = margin(30,0,5,0, "mm")
+      ),
       plot.background = element_rect(
         fill = "transparent",
         colour = "transparent"
@@ -444,6 +465,22 @@ g <- g_base +
       )
     )
   )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_causes.png"),
+  plot = g,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
 ```
 
 Save graphic and a thumbnail
