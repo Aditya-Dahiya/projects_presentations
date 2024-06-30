@@ -1,0 +1,470 @@
+---
+title: "Global Health Burden: Visualizing the Top 25 Causes of Illness"
+author: "Aditya Dahiya"
+date: "2024-06-25"
+subtitle: "Exploring the Global Burden of Disease: Analyzing Leading Causes of DALYs globally, and across Countries over the years"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_daly_causes.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions, including communicable, maternal, neonatal, nutritional diseases, injuries, and non-communicable diseases (NCDs). The data is sourced from the IHME's Global Burden of Disease (GBD) study, which offers a detailed assessment of global health trends, encompassing death and DALY counts and rates for 371 diseases and injuries. The dataset, which spans from 1990 to 2021, was last updated on May 20, 2024, with the next update expected in May 2028. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
+
+![This graphic displays the top 25 health issues in 2021 using packed circles. Each circle's size (area) corresponds to the impact of the health issue, measured in Disability Adjusted Life Years (DALYs), which account for years of life lost due to illness, disability, or premature death. Different colors represent different types of health conditions, providing a clear visual comparison of their relative burdens.](owid_daly_causes.png)
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+
+# Circle Packing Algorithm
+library(packcircles)
+
+search1 <- owidR::owid_search("burden of disease")
+
+df1 <- owid("burden-of-disease-by-cause")
+
+df2 <- df1 |> 
+  as_tibble() |> 
+  pivot_longer(
+    cols = -c(year, entity, code),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  mutate(
+    indicator = str_remove(
+      indicator,
+      "Total number of DALYs from "
+    ),
+    indicator = str_remove(
+      indicator,
+      "\n"
+    )
+  ) |>
+  mutate(
+    indicator = str_to_title(
+      indicator
+    ),
+    indicator = str_replace(
+      indicator,
+      "Hiv/Aids",
+      "HIV / AIDS"
+    ),
+    indicator = str_replace_all(
+      indicator,
+      "And",
+      "and"
+    )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Sail",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Poiret One",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+set.seed(41)
+mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
+mypal <- sample(mypal, 25, replace = F)
+# Background Colour
+bg_col <- "#F1F9F3FF"
+text_col <- "grey20"
+text_hil <- "#004616FF"
+
+# Base Text Size
+bts <- 11
+
+plot_title <- ""
+
+plot_subtitle <- ""
+
+data_annotation <- "About the Data: "
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Data Wrangling & Visualization for the year 2021: Technique Credits [R Graph Gallery](https://r-graph-gallery.com/305-basic-circle-packing-with-one-level.html) by [Yan Holtz](https://www.yan-holtz.com/)
+
+```{r}
+#| label: data-wrangling-visualize-1
+
+df2 |> 
+  distinct(indicator) |> 
+  pull() |> 
+  paste0(collapse = ", ")
+
+plotdf2021 <- df2 |> 
+  filter(entity == "World") |> 
+  filter(year == 2021) |> 
+  select(-year, -entity, -code) |> 
+  mutate(
+    indicator = str_wrap(
+      indicator,
+      width = 15
+    )
+  )
+
+# Create the layout using circleProgressiveLayout()
+# This function returns a dataframe with a row for each bubble.
+# It includes the center coordinates (x and y) and the radius, which is proportional to the value.
+packing <- circleProgressiveLayout(
+      plotdf2021$value,
+      sizetype = "area"
+    )
+
+plotdf2021 <- bind_cols(
+  plotdf2021,
+  packing
+  )
+
+# Ensure that the radius is proportional to the value. 
+# A linear relationship is not desired, 
+# as the AREA must be proportional to the value.
+# ggplot(
+#   data = plotdf2021,
+#   mapping = aes(
+#     x = radius,
+#     y = value
+#   )
+# ) +
+#   geom_point()
+
+# The next step is to convert a center point and radius into 
+# the coordinates of a circle that is approximated by 
+# multiple straight lines.
+plotdf2021_circles <- circleLayoutVertices(
+  packing,
+  npoints = 100
+) |> 
+  as_tibble() |> 
+  mutate(id = as_factor(id))
+
+bts = 80
+
+g <- ggplot() +
+  geom_polygon(
+    data = plotdf2021_circles,
+    mapping = aes(
+      x, y, 
+      group = id,
+      fill = id
+    ),
+    colour = text_col,
+    alpha = 0.9,
+    linewidth = 0.2
+  ) +
+  # Add text at center of each bubble
+  geom_text(
+    data = plotdf2021,
+    mapping = aes(
+      x, y,
+      label = indicator,
+      size = value
+    ),
+    colour = text_col,
+    family = "body_font",
+    lineheight = 0.3
+  ) +
+  scale_size_continuous(
+    range = c(bts / 15, bts / 2)
+  ) +
+  # Equal coordinates for circles
+  coord_equal() +
+  labs(
+    title = "Circles of Suffering:\nLeading Causes of Health Issues",
+    subtitle = str_wrap("Highlighting the leading global health problems of 2021, with each circle sized by Disability Adjusted Life Years (DALYs). A DALY accounts for years of life lost to poor health, disability, or premature death.", 80),
+    caption = plot_caption
+  ) +
+  scale_fill_manual(values = mypal) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      colour = text_hil,
+      family = "title_font",
+      hjust = 0.5,
+      margin = margin(10,0,0,0, "mm"),
+      lineheight = 0.35,
+      size = bts * 3
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      lineheight = 0.35,
+      margin = margin(5,0,0,0, "mm"),
+      size = bts * 1.2
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,10,0, "mm")
+    ),
+    plot.margin = margin(0,0,0,0, "mm")
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_daly_causes.png"),
+  plot = g,
+  height = 500,
+  width = 400,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Data Wrangling and Faceted Visualization - for an A4 size info-graphic comparing countries
+
+```{r}
+#| label: data-wrangling-visualize-2
+
+# Create a function to reproduce graph for each country
+plot_circles_year <- function(selected_year, selected_country, bts){
+  x1 <- df2 |> 
+    filter(year == selected_year) |>
+    filter(entity == selected_country) |> 
+    mutate(
+      indicator = str_wrap(
+        indicator,
+        width = 15
+      )
+    )
+  packing <- circleProgressiveLayout(
+        x1$value,
+        sizetype = "area"
+      )
+  
+  x1 <- bind_cols(
+    x1,
+    packing
+    )
+  
+  x1c <- circleLayoutVertices(
+    packing,
+    npoints = 100
+  ) |> 
+    as_tibble() |> 
+    mutate(id = as_factor(id))
+  
+  ggplot() +
+    geom_polygon(
+      data = x1c,
+      mapping = aes(
+        x, y, 
+        group = id,
+        fill = id
+      ),
+      colour = text_col,
+      alpha = 0.9,
+      linewidth = 0.4
+    ) +
+    # Add text at center of each bubble
+    geom_text(
+      data = x1,
+      mapping = aes(
+        x, y,
+        label = indicator,
+        size = value
+      ),
+      colour = text_col,
+      family = "body_font",
+      lineheight = 0.3
+    ) +
+    scale_x_continuous(expand = expansion(0)) +
+    scale_y_continuous(expand = expansion(0)) +
+    coord_equal(
+      clip = "off"
+    ) +
+    labs(
+      title = selected_country
+    ) +
+    scale_fill_manual(values = mypal) +
+    theme_void(
+      base_family = "body_font",
+      base_size = bts
+    ) +
+    theme(
+      legend.position = "none",
+      plot.title = element_text(
+        margin = margin(0,0,0,0, "mm"),
+        size = bts * 2,
+        hjust = 0.5,
+        colour = text_hil
+      ),
+      plot.margin = margin(0,0,0,0, "mm")
+    )
+}
+
+plot_circles_year(2020, "Afghanistan", 11)
+
+
+ggsave(
+  filename = here::here("data_vizs", "owid_daly_causes.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Add annotations and insets
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_gender_ratio_ages",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+
+library(patchwork)
+
+g <- g_base +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 1,
+    bottom = 0.8, top = 0.95, 
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+```
+
+Save graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_causes.png"),
+  plot = g,
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_daly_causes.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_daly_causes.png"))
+```
