@@ -31,11 +31,17 @@ bibliography: references.bib
 
 The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions, including communicable, maternal, neonatal, nutritional diseases, injuries, and non-communicable diseases (NCDs). The data is sourced from the IHME's Global Burden of Disease (GBD) study, which offers a detailed assessment of global health trends, encompassing death and DALY counts and rates for 371 diseases and injuries. The dataset, which spans from 1990 to 2021, was last updated on May 20, 2024, with the next update expected in May 2028. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
 
-![This graphic displays the top 25 health issues in 2021 using packed circles. Each circle's size (area) corresponds to the impact of the health issue, measured in Disability Adjusted Life Years (DALYs), which account for years of life lost due to illness, disability, or premature death. Different colors represent different types of health conditions, providing a clear visual comparison of their relative burdens.](owid_daly_causes.png)
+![This graphic displays the top 25 health issues in 2021 using packed circles. Each circle's size (area) corresponds to the impact of the health issue, measured in Disability Adjusted Life Years (DALYs), which account for years of life lost due to illness, disability, or premature death. Different colors represent different types of health conditions, providing a clear visual comparison of their relative burdens.](owid_daly_causes.png){#fig-1}
 
 ### Comparing DALYs causes across income-groups
 
-![This plot compares the major causes of health issues across four income groups: High Income, Upper Middle Income, Lower Middle Income, and Low Income countries. Each facet displays packed circles representing the top 25 health issues, with the size of each circle proportional to the impact measured in Disability Adjusted Life Years (DALYs) and different colors indicating different types of health conditions. This visual allows for a clear comparison of health burdens across economic levels.](a4_owid_daly_causes.png)
+![This plot compares the major causes of health issues across four income groups: High Income, Upper Middle Income, Lower Middle Income, and Low Income countries. Each facet displays packed circles representing the top 25 health issues, with the size of each circle proportional to the impact measured in Disability Adjusted Life Years (DALYs) and different colors indicating different types of health conditions. This visual allows for a clear comparison of health burdens across economic levels.](a4_owid_daly_causes.png){#fig-2}
+
+### Comparing Health Impacts: Cardiovascular and Diabetes DALYs Across Nations
+
+The line graphs illustrate the trends in DALYs per 1000 persons for Cardiovascular Diseases and Diabetes and Kidney Diseases from 1990 to 2021 in the World, United States, India, and China. The data, sourced from the Global Burden of Disease study and population estimates from the United Nations and Our World in Data, reveals that Cardiovascular DALYs are rising in India and China, reflecting increasing lifestyle-related health issues with rising prosperity. In contrast, the United States shows a decline in Cardiovascular DALYs, indicating effective management and treatment strategies, while the global rate remains stable. For Diabetes and Kidney Diseases, the DALYs per 1000 persons are increasing in all regions, with a notably rapid rise in the United States compared to India, China, and the World, highlighting the growing health impact of these conditions, particularly in the U.S.
+
+![This graphic displays the trends in DALYs per 1000 persons for Cardiovascular Diseases and Diabetes and Kidney Diseases from 1990 to 2021. The x-axis represents the years, while the y-axis shows the number of DALYs per 1000 persons. Different colors indicate the data for the World (grey), United States (blue), India (orange), and China (red), providing a comparative view of health burdens across these regions.](a4_owid_daly_cvddb.png){#fig-3}
 
 ### How I made these graphics?
 
@@ -500,10 +506,10 @@ ggsave(
 )
 ```
 
-Another Anslysis
+Comparing the rising and falling health burdens of cardiovascular and diabetes diseases across the world, USA, India, and China from 1990 to 2021, shown in @fig-3
 
 ```{r}
-#| label: vis-3
+#| label: new-parameters
 
 # df2 |> 
 #   filter(indicator == "Cardiovascular Diseases") |> 
@@ -524,6 +530,26 @@ Another Anslysis
 #   coord_cartesian(clip = "off") +
 #   theme(legend.position = "none")
 
+
+font_add_google(
+  "PT Sans",
+  family = "body_font"
+)
+
+font_add_google(
+  "Trochut",
+  family = "title_font"
+)
+
+text_col <- "grey25"
+
+text_hil <- "grey35"
+```
+
+```{r}
+#| label: vis-3
+
+
 popdf1 <- popdf |> 
   as_tibble() |> 
   select(entity, code, year, 
@@ -537,15 +563,43 @@ df3 <- df2 |>
 sel_cons <- popdf1 |> 
   filter(!is.na(code)) |> 
   filter(year == 2021) |> 
-  slice_max(population, n = 6) |> 
+  slice_max(population, n = 4) |> 
   pull(entity)
 
 df4 <- df3 |> 
-  filter(indicator == "Cardiovascular Diseases") |> 
+  filter(indicator %in% c("Cardiovascular Diseases", 
+                          "Diabetes and Kidney Diseases")) |> 
   filter(entity %in% sel_cons) |> 
-  mutate(perc_cwd = 100 * value / population)
-  
-df4 |> 
+  mutate(perc_cwd = 1000 * value / population)
+
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = "white",
+    size = 2.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+
+bts = 90
+
+g <- df4 |> 
   ggplot(
     mapping = aes(
       x = year,
@@ -553,31 +607,126 @@ df4 |>
       colour = entity
     )
   ) +
-  geom_point(
-    pch = 19,
-    fill = "white"
+  geom_line(
+    aes(linewidth = (entity == "United States"))
   ) +
-  geom_line() +
+  geom_point(
+    #aes(stroke = (entity == "United States")),
+    pch = 21,
+    fill = "white",
+    size = 5
+  ) +
   ggrepel::geom_text_repel(
     data = df4 |> filter(year == 2021),
     mapping = aes(label = entity),
     hjust = 0,
     nudge_x = 0.25,
-    direction = "y"
+    direction = "y",
+    family = "body_font",
+    min.segment.length = unit(10, "mm"),
+    size = bts / 3
+  ) +
+  scale_linewidth_manual(
+    values = c(0.5, 1.5)
   ) +
   scale_x_continuous(
-    expand = expansion(c(0,0.2))
+    expand = expansion(c(0,0.2)),
+    breaks = seq(1990, 2020, 5)
+  ) +
+  scale_colour_manual(
+    values = c("red", "orange", "blue", "grey50")
   ) +
   coord_cartesian(clip = "off") +
-  theme_classic() +
+  facet_wrap(~ indicator, scales = "free_y", nrow = 2) +
+  labs(
+    title = "Comparing Health Impacts:\nCardiovascular vs. Diabetes and Kidney Diseases",
+    subtitle = str_wrap("Disability Adjusted Life Years (DALYs) measure the overall disease burden by accounting for years lost due to illness, disability, or early death. This graphic reveals rising DALYs from cardiovascular diseases in India and China, while the United States shows a decline. Conversely, DALYs from diabetes and kidney diseases are increasing in all regions, with the most rapid rise seen in the United States.", 75),
+    caption = plot_caption,
+    x = NULL, y = "DALYs per 1000 persons"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
   theme(
-    plot.margin = margin(0,10,0,0, "mm"),
+    plot.margin = margin(10,10,10,10, "mm"),
     legend.position = "none",
     axis.line = element_line(
-      arrow = arrow(length = unit(2, "mm"))
+      arrow = arrow(length = unit(2, "mm")),
+      colour = text_col,
+      linewidth = 0.5
+    ),
+    strip.background = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 2,
+      linewidth = 0.5,
+      colour = lighten(text_col, 0.75)
+    ),
+    strip.text = element_text(
+      family = "title_font",
+      colour = text_hil,
+      margin = margin(0,0,0,0,"mm"),
+      size = bts * 2
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5, 
+      family = "caption_font",
+      colour = text_hil
+    ),
+    axis.title.y = element_text(
+      colour = text_col,
+      size = 1.2 * bts
+    ),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.ticks = element_line(
+      linewidth = 0.3
+    ),
+    axis.ticks.length = unit(2, "mm"),
+    plot.title = element_text(
+      colour = text_hil,
+      size = 2.2 * bts,
+      lineheight = 0.35,
+      family = "title_font",
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.25,
+      colour = text_hil,
+      hjust = 0
+    ),
+    plot.title.position = "plot"
+  )
+
+g2 <- g + 
+    inset_element(
+    p = plot_qr,
+    left = 0.8, right = 1,
+    bottom = 0.75, top = 0.9,
+    align_to = "full"
+  ) + 
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
     )
   )
 
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_cvddb.png"),
+  plot = g2,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = "white"
+)
 ```
 
 Save a thumbnail
