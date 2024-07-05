@@ -63,6 +63,8 @@ search1 <- owidR::owid_search("burden of disease")
 
 df1 <- owid("burden-of-disease-by-cause")
 
+popdf <- owid("population-with-un-projections")
+
 df2 <- df1 |> 
   as_tibble() |> 
   pivot_longer(
@@ -503,26 +505,79 @@ Another Anslysis
 ```{r}
 #| label: vis-3
 
-df2 |> 
+# df2 |> 
+#   filter(indicator == "Cardiovascular Diseases") |> 
+#   ggplot(aes(year, value, group = entity, colour = entity)) +
+#   geom_line() +
+#   theme(legend.position = "none")
+# 
+# df2 |> 
+#   filter(entity == "India") |> 
+#   ggplot(aes(x = year, y = value, fill = indicator)) +
+#   geom_col(position = "fill", colour = "white") +
+#   geom_text(
+#     data = df2 |> filter(entity == "India") |> filter(year == 1990),
+#     aes(x = 1989, label = indicator, colour = indicator), 
+#     hjust = 1, vjust = 0.5,
+#     position = "fill",
+#     check_overlap = T) +
+#   coord_cartesian(clip = "off") +
+#   theme(legend.position = "none")
+
+popdf1 <- popdf |> 
+  as_tibble() |> 
+  select(entity, code, year, 
+         `Population - Sex: all - Age: all - Variant: estimates`) |> 
+  janitor::clean_names() |> 
+  rename(population = population_sex_all_age_all_variant_estimates)
+
+df3 <- df2 |> 
+  left_join(popdf1)
+
+sel_cons <- popdf1 |> 
+  filter(!is.na(code)) |> 
+  filter(year == 2021) |> 
+  slice_max(population, n = 6) |> 
+  pull(entity)
+
+df4 <- df3 |> 
   filter(indicator == "Cardiovascular Diseases") |> 
-  ggplot(aes(year, value, group = entity, colour = entity)) +
+  filter(entity %in% sel_cons) |> 
+  mutate(perc_cwd = 100 * value / population)
+  
+df4 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = perc_cwd,
+      colour = entity
+    )
+  ) +
+  geom_point(
+    pch = 19,
+    fill = "white"
+  ) +
   geom_line() +
-  theme(legend.position = "none")
-
-df2 |> 
-  filter(entity == "India") |> 
-  ggplot(aes(x = year, y = value, fill = indicator)) +
-  geom_col(position = "fill", colour = "white") +
-  geom_text(
-    data = df2 |> filter(entity == "India") |> filter(year == 1990),
-    aes(x = 1989, label = indicator, colour = indicator), 
-    hjust = 1, vjust = 0.5,
-    position = "fill",
-    check_overlap = T) +
+  ggrepel::geom_text_repel(
+    data = df4 |> filter(year == 2021),
+    mapping = aes(label = entity),
+    hjust = 0,
+    nudge_x = 0.25,
+    direction = "y"
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0,0.2))
+  ) +
   coord_cartesian(clip = "off") +
-  theme(legend.position = "none")
+  theme_classic() +
+  theme(
+    plot.margin = margin(0,10,0,0, "mm"),
+    legend.position = "none",
+    axis.line = element_line(
+      arrow = arrow(length = unit(2, "mm"))
+    )
+  )
 
-df2
 ```
 
 Save a thumbnail
