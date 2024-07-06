@@ -1,0 +1,404 @@
+---
+title: "Comparing Health Impacts: Cardiovascular vs. Diabetes and Kidney Diseases"
+author: "Aditya Dahiya"
+date: "2024-07-05"
+subtitle: "Exploring the Global Burden of Disease: Analyzing Leading Causes of DALYs globally, and across Countries over the years"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_daly_cvddb.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+### Comparing Health Impacts: Cardiovascular and Diabetes DALYs Across Nations
+
+The line graphs illustrate the trends in DALYs per 1000 persons for Cardiovascular Diseases and Diabetes and Kidney Diseases from 1990 to 2021 in the World, United States, India, and China. The data, sourced from the Global Burden of Disease study and population estimates from the United Nations and Our World in Data, reveals that Cardiovascular DALYs are rising in India and China, reflecting increasing lifestyle-related health issues with rising prosperity. In contrast, the United States shows a decline in Cardiovascular DALYs, indicating effective management and treatment strategies, while the global rate remains stable. For Diabetes and Kidney Diseases, the DALYs per 1000 persons are increasing in all regions, with a notably rapid rise in the United States compared to India, China, and the World, highlighting the growing health impact of these conditions, particularly in the U.S.
+
+![This graphic displays the trends in DALYs per 1000 persons for Cardiovascular Diseases and Diabetes and Kidney Diseases from 1990 to 2021. The x-axis represents the years, while the y-axis shows the number of DALYs per 1000 persons. Different colors indicate the data for the World (grey), United States (blue), India (orange), and China (red), providing a comparative view of health burdens across these regions.](a4_owid_daly_cvddb.png){#fig-3}
+
+### How I made these graphics?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+
+# Circle Packing Algorithm
+library(packcircles)          # To draw packed circles
+
+search1 <- owidR::owid_search("burden of disease")
+
+df1 <- owid("burden-of-disease-by-cause")
+
+popdf <- owid("population-with-un-projections")
+
+df2 <- df1 |> 
+  as_tibble() |> 
+  pivot_longer(
+    cols = -c(year, entity, code),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  mutate(
+    indicator = str_remove(
+      indicator,
+      "Total number of DALYs from "
+    ),
+    indicator = str_remove(
+      indicator,
+      "\n"
+    )
+  ) |>
+  mutate(
+    indicator = str_to_title(
+      indicator
+    ),
+    indicator = str_replace(
+      indicator,
+      "Hiv/Aids",
+      "HIV / AIDS"
+    ),
+    indicator = str_replace_all(
+      indicator,
+      "And",
+      "and"
+    )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Sail",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Poiret One",
+  family = "body_font"
+) 
+
+# Font for the Strip Text 
+font_add_google("Yanone Kaffeesatz",
+  family = "strip_font"
+)
+
+showtext_auto()
+
+# Colour Palette
+set.seed(41)
+mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
+mypal <- sample(mypal, 25, replace = F)
+# Background Colour
+bg_col <- "#F1F9F3FF"
+text_col <- "grey20"
+text_hil <- "#004616FF"
+
+# Base Text Size
+bts <- 11
+
+plot_title <- ""
+
+plot_subtitle <- ""
+
+data_annotation <- "About the Data: "
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Comparing the rising and falling health burdens of cardiovascular and diabetes diseases across the world, USA, India, and China from 1990 to 2021
+
+```{r}
+#| label: new-parameters
+
+# df2 |> 
+#   filter(indicator == "Cardiovascular Diseases") |> 
+#   ggplot(aes(year, value, group = entity, colour = entity)) +
+#   geom_line() +
+#   theme(legend.position = "none")
+# 
+# df2 |> 
+#   filter(entity == "India") |> 
+#   ggplot(aes(x = year, y = value, fill = indicator)) +
+#   geom_col(position = "fill", colour = "white") +
+#   geom_text(
+#     data = df2 |> filter(entity == "India") |> filter(year == 1990),
+#     aes(x = 1989, label = indicator, colour = indicator), 
+#     hjust = 1, vjust = 0.5,
+#     position = "fill",
+#     check_overlap = T) +
+#   coord_cartesian(clip = "off") +
+#   theme(legend.position = "none")
+
+
+font_add_google(
+  "PT Sans",
+  family = "body_font"
+)
+
+font_add_google(
+  "Trochut",
+  family = "title_font"
+)
+
+text_col <- "grey25"
+
+text_hil <- "grey35"
+```
+
+```{r}
+#| label: vis-3
+
+
+popdf1 <- popdf |> 
+  as_tibble() |> 
+  select(entity, code, year, 
+         `Population - Sex: all - Age: all - Variant: estimates`) |> 
+  janitor::clean_names() |> 
+  rename(population = population_sex_all_age_all_variant_estimates)
+
+df3 <- df2 |> 
+  left_join(popdf1)
+
+sel_cons <- popdf1 |> 
+  filter(!is.na(code)) |> 
+  filter(year == 2021) |> 
+  slice_max(population, n = 4) |> 
+  pull(entity)
+
+df4 <- df3 |> 
+  filter(indicator %in% c("Cardiovascular Diseases", 
+                          "Diabetes and Kidney Diseases")) |> 
+  filter(entity %in% sel_cons) |> 
+  mutate(perc_cwd = 1000 * value / population)
+
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = "white",
+    size = 2.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+
+bts = 90
+
+g <- df4 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = perc_cwd,
+      colour = entity
+    )
+  ) +
+  geom_line(
+    aes(linewidth = (entity == "United States"))
+  ) +
+  geom_point(
+    #aes(stroke = (entity == "United States")),
+    pch = 21,
+    fill = "white",
+    size = 5
+  ) +
+  ggrepel::geom_text_repel(
+    data = df4 |> filter(year == 2021),
+    mapping = aes(label = entity),
+    hjust = 0,
+    nudge_x = 0.25,
+    direction = "y",
+    family = "body_font",
+    min.segment.length = unit(10, "mm"),
+    size = bts / 3
+  ) +
+  scale_linewidth_manual(
+    values = c(0.5, 1.5)
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0,0.2)),
+    breaks = seq(1990, 2020, 5)
+  ) +
+  scale_colour_manual(
+    values = c("red", "orange", "blue", "grey50")
+  ) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ indicator, scales = "free_y", nrow = 2) +
+  labs(
+    title = "Comparing Health Impacts:\nCardiovascular vs. Diabetes and Kidney Diseases",
+    subtitle = str_wrap("Disability Adjusted Life Years (DALYs) measure the overall disease burden by accounting for years lost due to illness, disability, or early death. This graphic reveals rising DALYs from cardiovascular diseases in India and China, while the United States shows a decline. Conversely, DALYs from diabetes and kidney diseases are increasing in all regions, with the most rapid rise seen in the United States.", 75),
+    caption = plot_caption,
+    x = NULL, y = "DALYs per 1000 persons"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(10,10,10,10, "mm"),
+    legend.position = "none",
+    axis.line = element_line(
+      arrow = arrow(length = unit(2, "mm")),
+      colour = text_col,
+      linewidth = 0.5
+    ),
+    strip.background = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 2,
+      linewidth = 0.5,
+      colour = lighten(text_col, 0.75)
+    ),
+    strip.text = element_text(
+      family = "title_font",
+      colour = text_hil,
+      margin = margin(0,0,0,0,"mm"),
+      size = bts * 2
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5, 
+      family = "caption_font",
+      colour = text_hil
+    ),
+    axis.title.y = element_text(
+      colour = text_col,
+      size = 1.2 * bts
+    ),
+    axis.text = element_text(
+      colour = text_col
+    ),
+    axis.ticks = element_line(
+      linewidth = 0.3
+    ),
+    axis.ticks.length = unit(2, "mm"),
+    plot.title = element_text(
+      colour = text_hil,
+      size = 2.2 * bts,
+      lineheight = 0.35,
+      family = "title_font",
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.25,
+      colour = text_hil,
+      hjust = 0
+    ),
+    plot.title.position = "plot"
+  )
+
+g2 <- g + 
+    inset_element(
+    p = plot_qr,
+    left = 0.8, right = 1,
+    bottom = 0.75, top = 0.9,
+    align_to = "full"
+  ) + 
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_cvddb.png"),
+  plot = g2,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = "white"
+)
+```
+
+Save a thumbnail
+
+```{r}
+#| label: save-plot
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "a4_owid_daly_cvddb.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_daly_cvddb.png"))
+```
