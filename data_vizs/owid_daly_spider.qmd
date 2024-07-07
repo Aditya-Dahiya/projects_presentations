@@ -1,0 +1,315 @@
+---
+title: "Global Health Burden: Visualizing the Top 25 Causes of Illness"
+author: "Aditya Dahiya"
+date: "2024-06-30"
+subtitle: "Exploring the Global Burden of Disease: Analyzing Leading Causes of DALYs globally, and across Countries over the years"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_daly_causes.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions. The data is sourced from the IHME's Global Burden of Disease (GBD) study and spans from 1990 to 2021. It was last updated on May 20, 2024. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
+
+### How I made these graphics?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+# devtools::install_github("ricardo-bion/ggradar", 
+#                           dependencies = TRUE)
+library(ggradar)              # To draw Radar Maps
+
+# search1 <- owidR::owid_search("burden of disease")
+
+df1 <- owid("burden-of-disease-by-cause")
+
+popdf <- owid("population-with-un-projections") |> 
+  as_tibble() |> 
+  janitor::clean_names() |> 
+  rename(population = population_sex_all_age_all_variant_estimates) |> 
+  select(-population_sex_all_age_all_variant_medium)
+
+df2 <- df1 |> 
+  as_tibble() |> 
+  pivot_longer(
+    cols = -c(year, entity, code),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  mutate(
+    indicator = str_remove(
+      indicator,
+      "Total number of DALYs from "
+    ),
+    indicator = str_remove(
+      indicator,
+      "\n"
+    )
+  ) |>
+  mutate(
+    indicator = str_to_title(
+      indicator
+    ),
+    indicator = str_replace(
+      indicator,
+      "Hiv/Aids",
+      "HIV / AIDS"
+    ),
+    indicator = str_replace_all(
+      indicator,
+      "And",
+      "and"
+    )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters
+
+# Font for titles
+font_add_google("Yatra One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Ropa Sans",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- c("#c91400", "#fa9c19", "#4754ff", "#8f8f8f")
+# Background Colour
+bg_col <- "#f7f7f7"
+text_col <- "#210038"
+text_hil <- "#36005c"
+
+# Base Text Size
+bts <- 90
+
+plot_title <- "Comparison of major causes of death and disabilty"
+
+plot_subtitle <- "::::::::::::::::::::::::"
+
+data_annotation <- "About the Data: "
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+df2 |> 
+  filter(entity == "World") |> 
+  group_by(indicator) |> 
+  summarise(total = sum(value)) |> 
+  arrange(desc(total)) |> 
+  print(n  = Inf)
+
+sel_cons <- c("India", "World", "China", "United States")
+
+plotdf <- df2 |> 
+  filter(entity %in% sel_cons) |> 
+  group_by(entity, year) |> 
+  mutate(
+    indicator = case_when(
+      indicator %in% c(
+        "Cardiovascular Diseases",
+        "Diabetes and Kidney Diseases"
+      ) ~ "Lifestyle Diseases",
+      indicator %in% c(
+        "Other Infectious Diseases",
+        "Respiratory Infections and Tuberculosis",
+        "Enteric Infections",
+        "Neglected Tropical Diseases and Malaria",
+        "HIV / AIDS and Sexually Transmitted Infections"
+      ) ~ "Infections",
+      indicator %in% c(
+        "Neoplasms"
+      ) ~ "Cancers",
+      indicator %in% c(
+        "Other Non-Communicable Diseases",
+        "Musculoskeletal Disorders",
+        "Chronic Respiratory Diseases",
+        "Digestive Diseases",
+        "Skin and Subcutaneous Diseases",
+        "Maternal Disorders"
+      ) ~ "Other Diseases",
+      indicator %in% c(
+        "Unintentional Injuries",
+        "Transport Injuries",
+        "Self-Harm",
+        "Interpersonal Violence",
+        "Conflict and Terrorism",
+        "Exposure To Forces Of Nature"
+      ) ~ "Injuries & Violence",
+      indicator %in% c(
+        "Neurological Disorders",
+        "Substance Use Disorders"
+      ) ~ "Mental Disorders",
+       .default = "Other Causes"
+    )
+  ) |> 
+  ungroup() |> 
+  group_by(entity, code, year, indicator) |> 
+  summarise(value = sum(value)) |> 
+  ungroup() |> 
+  left_join(popdf |> filter(entity %in% sel_cons)) |> 
+  group_by(entity, code, year) |> 
+  mutate(
+    perc = 100 * value / sum(value),
+    daly_pop = 100 * value / population
+    ) |> 
+  ungroup() |> 
+  mutate(
+    indicator = fct(
+      indicator,
+      levels = c(
+        "Lifestyle Diseases",
+        "Cancers",
+        "Infections",
+        "Mental Disorders",
+        "Injuries & Violence",
+        "Other Causes",
+        "Other Diseases"
+      )
+    )
+  )
+
+
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+
+# Attempt with ggradar
+g <- plotdf |> 
+  filter(year == 2021) |> 
+  ungroup() |> 
+  select(year, entity, indicator, daly_pop) |> 
+  pivot_wider(
+    id_cols = c(entity, year),
+    names_from = indicator,
+    values_from = daly_pop
+  ) |>
+  select(-year) |> 
+  relocate(
+    `Lifestyle Diseases`,
+    .after = entity
+  ) |> 
+  ggradar::ggradar(
+    base.size = bts * 2,
+    font.radar = "body_font",
+    grid.line.width = 0.5,
+    gridline.min.colour = "grey80",
+    gridline.mid.colour = "grey80",
+    gridline.max.colour = "grey80",
+    grid.label.size = bts / 5,
+    axis.label.offset = 1.05,
+    axis.label.size = bts / 3,
+    background.circle.colour = "grey95",
+    fill = TRUE,
+    fill.alpha = 0.1
+  ) +
+  coord_equal(clip = "off") +
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  theme_void(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "bottom"
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_daly_spider.png"),
+  plot = g,
+  height = 500,
+  width = 400,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Save a thumbnail
+
+```{r}
+#| label: save-plot
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_daly_causes.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_daly_causes.png"))
+```
