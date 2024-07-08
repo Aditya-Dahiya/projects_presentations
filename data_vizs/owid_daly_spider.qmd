@@ -33,7 +33,9 @@ The dataset from [Our World in Data](https://ourworldindata.org/) provides compr
 
 The radar chart reveals distinct health burden patterns among the USA, China, India, and the world in 2021. Infections remain a significant health issue in India, comparable to or exceeding global trends. China faces a higher burden from lifestyle disorders and cancers, reflecting its unique health challenges. In contrast, mental conditions are notably more impactful in the USA, causing more DALYs than in China, India, or globally. This visualization highlights the varying predominant health concerns across different regions.
 
-![This radar chart illustrates the percentage contribution of seven major health causes to the total Disability Adjusted Life Years (DALYs) in 2021 for the USA, China, India, and the world. Each vertex represents a different cause category, with colored polygons showing the distribution for each region, allowing for a comparative view of the health burdens across these entities.](owid_daly_spider.png)
+![This radar chart illustrates the percentage contribution of seven major health causes to the total Disability Adjusted Life Years (DALYs) in 2021 for the USA, China, India, and the world. Each vertex represents a different cause category, with colored polygons showing the distribution for each region, allowing for a comparative view of the health burdens across these entities.](owid_daly_spider.png){#fig-1 width="900"}
+
+![This graphic presents four radar charts comparing the percentage contributions of seven major health causes to the total Disability Adjusted Life Years (DALYs) in India, USA, and China for the years 1990, 2000, 2010, and 2020. Each chart provides a visual representation of how the burden of disease has shifted across these countries over the past four decades. Different colors represent each country, highlighting changes in health burdens over time.](a4_owid_daly_spiders.png){#fig-2 width="900"}
 
 ### How I made these graphics?
 
@@ -53,8 +55,8 @@ library(ggtext)               # Markdown text support
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # To lighten and darken colours
 library(patchwork)            # Combining plots
-# devtools::install_github("ricardo-bion/ggradar", 
-#                           dependencies = TRUE)
+devtools::install_github("ricardo-bion/ggradar",
+                          dependencies = TRUE)
 library(ggradar)              # To draw Radar Maps
 
 # search1 <- owidR::owid_search("burden of disease")
@@ -349,7 +351,7 @@ g <- plotdf |>
   )
 ```
 
-Adding Insets
+Adding Insets and visualizing @fig-1
 
 ```{r}
 #| label: insets
@@ -368,7 +370,6 @@ p_data <- ggplot() +
   ) +
   theme_void()
 
-str_view(data_annotation)
 # QR Code for the plot
 url_graphics <- paste0(
   "https://aditya-dahiya.github.io/projects_presentations/projects/",
@@ -435,6 +436,214 @@ g2 <- g +
     )
   )
 
+```
+
+Making an A4 size graphic for comparison across years shown in @fig-2
+
+```{r}
+#| label: a4-viz
+
+mypal <- c("#c91400", "#fa9c19", "#4754ff")
+
+plot_title <- glue::glue("Health Transitions: 4 decades of Change<br>in Disease Burden via Radar Charts in<br><b style='color:{mypal[3]}'>USA</b>, <b style='color:{mypal[1]}'>China</b>, and, <b style='color:{mypal[2]}'>India</b>")
+
+plot_subtitle <- str_wrap("Disability Adjusted Life Years (DALYs) measure the total burden of disease by accounting for years lost to illness, disability, or early death. These four radar charts compare the percentage contributions of seven major health causes to total DALYs in India, USA, and China for the years 1990, 2000, 2010, and 2020. The charts reveal a decrease in infection-related DALYs in India, an increase in lifestyle disorder DALYs in China, and a rising share of mental health disorder DALYs in the USA over the past four decades.", 95)
+
+radar_plot <- function(year_plot = 2010){
+  plotdf |> 
+  filter(year == year_plot) |> 
+  filter(entity != "World") |> 
+  ungroup() |> 
+  select(year, entity, indicator, perc) |> 
+  pivot_wider(
+    id_cols = c(entity, year),
+    names_from = indicator,
+    values_from = perc
+  ) |>
+  select(-year) |> 
+  relocate(
+    `Lifestyle Diseases`,
+    .after = entity
+  ) |> 
+  mutate(
+    entity = fct(
+      entity, 
+      levels = plotdf |> distinct(entity) |> 
+               pull(entity) |> sort(decreasing = T)
+      )
+  ) |> 
+  ggradar::ggradar(
+    base.size = bts,
+    font.radar = "body_font",
+    values.radar = c("0%", "15%", "30%"),
+    grid.line.width = 0.5,
+    gridline.min.colour = "grey70",
+    gridline.mid.colour = "grey70",
+    gridline.max.colour = "grey70",
+    grid.label.size = bts/6,
+    axis.label.offset = 1.05,
+    axis.label.size = bts/4,
+    background.circle.colour = "grey90",
+    fill = TRUE,
+    fill.alpha = 0.1
+  ) +
+  coord_equal(clip = "off") +
+  scale_colour_manual(values = rev(mypal)) +
+  scale_fill_manual(values = rev(mypal)) +
+  guides(
+    fill = "none",
+    colour = guide_legend(
+      override.aes = list(
+        size = 15
+      )
+    )
+  ) +
+  labs(
+    subtitle = year_plot
+  ) +
+  theme_void(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.subtitle = element_text(
+      size = bts * 1,
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5,
+      margin = margin(10,0,0,0, "mm")
+    ),
+    plot.margin = margin(0,0,0,0, "mm")
+  )
+}
+
+g <- patchwork::wrap_plots(
+  radar_plot(1990),
+  radar_plot(2000),
+  radar_plot(2010),
+  radar_plot(2020),
+  ncol = 2,
+  nrow = 2,
+  byrow = TRUE
+) +
+  plot_annotation(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    theme = theme(
+        plot.title = element_markdown(
+        colour = text_hil,
+        hjust = 0.5,
+        size = bts * 2,
+        margin = margin(20,0,0,0, "mm"),
+        family = "title_font",
+        lineheight = 0.3
+      ),
+      plot.subtitle = element_text(
+        colour = text_hil,
+        lineheight = 0.3,
+        hjust = 0,
+        margin = margin(10,0,0,10, "mm"),
+        size = bts * 1.2,
+        family = "caption_font"
+      ),
+      plot.caption = element_textbox(
+        hjust = 0,
+        colour = text_hil,
+        margin = margin(0,0,20,0, "mm"),
+        family = "caption_font",
+        size = bts * 0.75
+      ),
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+p_data <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = str_wrap(data_annotation, 40),
+    family = "caption_font",
+    lineheight = 0.25,
+    size = bts / 6,
+    colour = text_hil,
+    hjust = 0,
+    vjust = 1
+  ) +
+  theme_void()
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_daly_spider",
+  ".qmd"
+)
+
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+g2 <- g + 
+  inset_element(
+    p = plot_qr,
+    left = 0.8, right = 1,
+    top = 0.1, bottom = -0.15,
+    align_to = "full",
+    clip = FALSE,
+    on_top = TRUE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_spiders.png"),
+  plot = g2,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Save a thumbnail
