@@ -55,26 +55,54 @@ library(packcircles)          # Circles graph
 drob_funs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-09/drob_funs.csv')
 ```
 
-Exploratory Data Analysis & Data Wrangling
+Data Wrangling: Inspiration - [this article](https://r-graph-gallery.com/circle-packing.html) at [R Graph gallery](https://r-graph-gallery.com/) by [Yan Holtz](https://www.yan-holtz.com/)
 
 ```{r}
 #| label: eda
 
-# Cleaned data
+# Cleaned data on top 100 functions (only to display top 100)
 df0 <- drob_funs |> 
   filter(!in_multiple_pkgs) |> 
-  count(pkgs, funs, sort = T) |> 
-  arrange(pkgs, funs)
-
-# Cleaned data on top 100 functions (only to display top 100)
-df1 <- drob_funs |> 
-  filter(!in_multiple_pkgs) |> 
-  count(pkgs, funs, sort = T) |> 
+  count(pkgs, funs, sort = T) |>
+  # mutate(
+  #   pkgs = case_when(
+  #         pkgs == "ggplot" ~ "{ggplot}",
+  #         pkgs == "glue" ~ "{glue}",
+  #         pkgs == "tune" ~ "{tune}",
+  #         .default = name
+  #       )
+  # )
   arrange(pkgs, funs) |> 
+  mutate(
+    pkgs = paste0("{", pkgs, "}")
+  )
+
+df1 <- df0 |> 
   slice_max(order_by = n, n = 100)
+
+library(treemapify)
+
+ggplot(
+  data = df1,
+  mapping = aes(
+    area = n,
+    fill = pkgs,
+    subgroup = pkgs
+  )
+) +
+  geom_treemap() +
+  geom_treemap_text(
+    aes(
+      label = funs
+    )
+  ) +
+  geom_treemap_subgroup_border()
+
+# A hierarchical circular packing diagram
 
 # Make an edges dataframe from outr data df1
 edges1 <- df1 |> 
+  filter(pkgs!= "{(unknown)}") |> 
   rename(
     from = pkgs,
     to = funs
@@ -84,32 +112,55 @@ edges1 <- df1 |>
 
 # Make a vertices dataframe
 vertices1 <- df1 |> 
+  filter(pkgs!= "{(unknown)}") |> 
   select(
     name = funs,
     n
   ) |> 
   # add rows for package sizes also by functions
   bind_rows(
-    df0 |>
+    df1 |>
       group_by(pkgs) |> 
       summarize(n = sum(n)) |> 
-      rename(name = pkgs) |> 
-      # Remove duplication in some package and function names
-      mutate(
-        name = case_when(
-          name == "ggplot" ~ "{ggplot}",
-          name == "glue" ~ "{glue}",
-          name == "tune" ~ "{tune}",
-          .default = name
-        )
-      )
+      rename(name = pkgs)
   )
 
+edges1
+vertices1
 plotdf <- graph_from_data_frame(
   d = edges1,
   vertices = vertices1,
   directed = TRUE
 )
+
+as_tbl_graph(
+  nodes = vertices1,
+  edges = edges1
+)
+ggraph(
+  plotdf, 
+  layout = "circlepack",
+  weight = n
+  ) +
+  geom_node_circle(
+    mapping = aes(
+      fill = depth
+    )
+  ) +
+  geom_node_text(
+    mapping = aes(
+      label = name,
+      size = n
+    )
+  ) +
+  coord_equal() + 
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
+
+flare$edges |> as_tibble()
+flare$vertices |> as_tibble()
 ```
 
 ```{r}
@@ -239,7 +290,7 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 ```
 
-The static plot: Inspiration - [this article](https://r-graph-gallery.com/circle-packing.html) at [R Graph gallery](https://r-graph-gallery.com/) by [Yan Holtz](https://www.yan-holtz.com/)
+The static plot:
 
 ```{r}
 #| label: static-plot
