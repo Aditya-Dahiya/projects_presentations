@@ -56,13 +56,108 @@ Exploratory Data Analysis & Data Wrangling
 ```{r}
 #| label: eda
 
-df <- drob_funs |> 
+# Cleaned data
+df0 <- drob_funs |> 
+  filter(!in_multiple_pkgs) |> 
+  count(pkgs, funs, sort = T) |> 
+  arrange(pkgs, funs)
+
+# Cleaned data on top 100 functions (only to display top 100)
+df1 <- drob_funs |> 
   filter(!in_multiple_pkgs) |> 
   count(pkgs, funs, sort = T) |> 
   arrange(pkgs, funs) |> 
   slice_max(order_by = n, n = 100)
 
-df
+library(igraph)           # Underlying node edges library
+library(ggraph)           # Grpahics and ggplot2 with igraph
+library(tidygraph)        # to manuipulate graph objects
+
+# Make an edges dataframe from outr data df1
+edges1 <- df1 |> 
+  rename(
+    from = pkgs,
+    to = funs
+  ) |> 
+  select(-n) |> 
+  arrange(from)
+
+# Make a vertices dataframe
+vertices1 <- df1 |> 
+  select(
+    name = funs,
+    n
+  ) |> 
+  # add rows for package sizes also by functions
+  bind_rows(
+    df0 |>
+      group_by(pkgs) |> 
+      summarize(n = sum(n)) |> 
+      rename(name = pkgs) |> 
+      # Remove duplication in some package and function names
+      mutate(
+        name = case_when(
+          name == "ggplot" ~ "{ggplot}",
+          name == "glue" ~ "{glue}",
+          name == "tune" ~ "{tune}",
+          .default = name
+        )
+      )
+  )
+
+plotdf <- graph_from_data_frame(
+  d = edges1,
+  vertices = vertices1,
+  directed = TRUE
+)
+```
+
+```{r}
+#| label: eda-2
+
+df1 <- drob_funs |> 
+  filter(!in_multiple_pkgs) |> 
+  count(pkgs, funs, sort = T) |> 
+  arrange(pkgs, funs) |> 
+  slice_max(order_by = n, n = 200) |> 
+  mutate(
+    funs = paste0(funs, "\n{", pkgs, "}")
+  )
+
+library(packcircles)
+# Create the layout using circleProgressiveLayout()
+# This function returns a dataframe with a row for each bubble.
+# It includes the center coordinates (x and y) and the radius, which is proportional to the value.
+packing1 <- circleProgressiveLayout(
+  df1$n,
+  sizetype = "area"
+)
+plotdf1 <- bind_cols(
+  df1,
+  packing1
+)
+plotdf_circle <- circleLayoutVertices(
+  packing1,
+  npoints = 100
+  ) |> 
+  as_tibble()
+
+ggplot() +
+  geom_polygon(
+    data = plotdf_circle,
+    mapping = aes(x, y, group = id, fill = as_factor(id))
+  ) +
+  # Add text at center of each bubble
+  geom_text(
+    data = plotdf1,
+    mapping = aes(
+      x, y, label = funs, size = n
+    )
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
 ```
 
 Visualization Parameters
@@ -131,12 +226,25 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 ```
 
-The static plot
+The static plot: Inspiration - [this article](https://r-graph-gallery.com/circle-packing.html) at [R Graph gallery](https://r-graph-gallery.com/) by [Yan Holtz](https://www.yan-holtz.com/)
 
 ```{r}
 #| label: static-plot
 
-
+ggraph(
+  graph = plotdf,
+  layout = "circlepack",
+  circular = F,
+  weight = n
+) +
+  geom_node_circle(
+    mapping = aes(
+      fill = name
+    )
+  ) +
+  coord_equal() +
+  theme_void() +
+  theme(legend.position = "none")
 ```
 
 Savings the graphics
