@@ -1,0 +1,549 @@
+---
+title: "Global Fertility Decline: A 70-Year Trend"
+author: "Aditya Dahiya"
+date: "2024-07-11"
+subtitle: "The fertility rate, or average number of live births per woman, has significantly declined from the 1950s to the 2010s. This graphic illustrates the downward trend in fertility rates across different decades and countries worldwide."
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_fertility.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+**Source of the Data:** The fertility rate data is sourced from the United Nations' World Population Prospects (2022) and has been processed and presented by Our World in Data. The dataset provides the average number of live births a hypothetical cohort of women would have at the end of their reproductive period, assuming they experienced the fertility rates of a specific period throughout their lives without mortality impact. The data covers the period from 1950 to 2021 and is measured in live births per woman. Age-specific fertility rates are included, indicating the number of births to women in particular age groups, divided by the number of women in those groups, across annual civil calendar years. This dataset, part of the 27th edition of the official global population estimates, is based on extensive data on population size, fertility, mortality, and international migration for 237 countries or areas. For more information, visit the UN's World Population Prospects page [here](https://population.un.org/wpp/Download/) and [here](https://population.un.org/wpp/Publications/). The data was retrieved on September 9, 2022. Our World in Data processes the data through various steps to ensure accuracy, including standardizing country names, converting units, and calculating derived indicators. Detailed information on their data processing can be found [here](https://population.un.org/wpp/Download/). For citation purposes, use: UN, World Population Prospects (2022) – processed by Our World in Data.
+
+![This graphic shows the changes in global fertility rates from the 1950s to the 2010s. The X-axis represents the proportion of the world population (0% to 100%), while the Y-axis shows the fertility rate levels (number of births per woman). The lines, colored by decade, illustrate the shift from highest to lowest fertility rate countries over time.](a4_owid_fertility.png){#fig-2 width="900"}
+
+### How I made these graphics?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+
+search1 <- owidR::owid_search("fertility")
+
+df1 <- owid("children-per-woman-un")
+
+popdf <- owid("population-with-un-projections")
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Chakra Petch",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Semi Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Changa",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+mypal <- rev(paletteer::paletteer_d("LaCroixColoR::Lime")[c(1,2,4:6)])
+
+# Background Colour
+bg_col <- "grey98"
+text_col <- "grey10"
+text_hil <- "grey25"
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "Declining Global Fertility Rates (1950-2020)"
+
+plot_subtitle <- "The fertility rate, representing the average number of live births per woman, has notably declined from 1950 to 2020, driven largely by reductions in middle-income countries such as India and China. This graphic highlights this global trend, while also showing that the poorest and war-torn nations have experienced minimal decline in fertility rates. Nearly half of the world's population now has fertility rates below the replacement level."
+
+data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** United Nations & Our World in Data  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# A tibble for the fertility levels in each decade
+df2 <- df1 |> 
+  as_tibble() |> 
+  janitor::clean_names() |> 
+  rename(fertility = fertility_rate_sex_all_age_all_variant_estimates) |> 
+  filter(!is.na(code)) |> 
+  filter(entity != "World")
+
+
+# A tibble of populations for each coutnry in each decade
+popdf1 <- popdf |> 
+  as_tibble() |> 
+  janitor::clean_names() |> 
+  filter(!is.na(code)) |> 
+  filter(entity != "World") |> 
+  mutate(
+    population = ifelse(
+      is.na(population_sex_all_age_all_variant_estimates),
+      population_sex_all_age_all_variant_medium,
+      population_sex_all_age_all_variant_estimates
+    )
+  ) |> 
+  select(-c(population_sex_all_age_all_variant_estimates,
+            population_sex_all_age_all_variant_medium))
+
+# Creating a separate data frame for each decade by a common function so 
+# that we can create descending order of fertility for beautiful plotting.
+# Creating a factor levels of Countries sorted by fertility levels
+# in descending order of fertility levels in each decade.
+
+make_decade_df <- function(years_to_select, to_label){
+
+    temp_df_fertility <- df2 |> 
+      filter(year %in% years_to_select) |> 
+      group_by(entity, code) |> 
+      summarize(fertility = mean(fertility, na.rm = T)) |> 
+      arrange(desc(fertility)) |> 
+      ungroup()
+    
+    temp_df_pop <- popdf1 |> 
+      filter(year %in% years_to_select) |> 
+      group_by(entity, code) |> 
+      summarise(population = mean(population, na.rm = TRUE)) |> 
+      ungroup()
+      
+    levels_con <- temp_df_fertility |> 
+      arrange(fertility) |> 
+      pull(entity)
+    
+    # labels_con <- temp_df_pop |> 
+    #   ungroup() |> 
+    #   slice_max(order_by = population, n = to_label) |> 
+    #   pull(entity)
+    
+    temp_df_fertility |> 
+      left_join(temp_df_pop) |> 
+      arrange(desc(fertility)) |> 
+      # mutate(entity = fct(entity, levels = levels_con)) |> 
+      mutate(population = replace_na(population, 0)) |> 
+      mutate(cum_population = cumsum(population)) |> 
+      mutate(cum_pop_perc = cum_population / max(cum_population)) |>
+      arrange(fertility) |> 
+      mutate(
+        label_entity = if_else(
+          entity %in% to_label,
+          paste0(entity, " (", round(fertility, 1), ")"),
+          NA
+        )
+      )
+      
+
+}
+
+df1950s <- make_decade_df(
+  1950:1959, 
+  c("India", "China", "Rwanda", "Philippines", "Thailand", "Brazil", "United States",
+    "Norway")
+  )
+df1970s <- make_decade_df(
+  1970:1979, 
+  c("India", "China")
+  )
+df1990s <- make_decade_df(
+  1990:1999, 
+  c("China", "India")
+  )
+df2010s <- make_decade_df(
+  2010:2019, 
+  c("Saudi Arabia", "India", "China")
+  )
+
+
+global_mean <- function(decadedf) {
+  decadedf |> 
+    summarise(global = weighted.mean(x = fertility, w = population)) |> 
+    pull(global) |> 
+    round(2)
+}
+```
+
+Visualization
+
+```{r}
+#| label: visualize-1
+
+text_annotate <- function(label_val, y_val, temp_col, vjust = 0){
+  annotate(
+    geom = "text",
+    x = -0.01,
+    y = y_val,
+    hjust = 1,
+    vjust = vjust,
+    label = label_val,
+    lineheight = 0.25,
+    colour = temp_col,
+    family = "caption_font",
+    size = bts / 3.5
+  )
+}
+  
+  
+g <- ggplot(
+    mapping = aes(
+      x = cum_pop_perc,
+      y = fertility,
+      label = label_entity
+    )
+  ) +
+  
+  # Annotations
+  geom_hline(
+    yintercept = 2.1,
+    colour = text_col,
+    linetype = 2,
+    linewidth = 0.4,
+    alpha = 0.75
+  ) +
+  text_annotate(
+    paste0("(Decade: 1950-1959)\nGlobal Average: ", global_mean(df1950s)), 
+    global_mean(df1950s), mypal[1]) +
+  text_annotate(
+    paste0("(Decade: 1970-1979)\nGlobal Average: ", global_mean(df1970s)), 
+    global_mean(df1970s), mypal[2]) +
+  text_annotate(
+    paste0("(Decade: 1990-1999)\nGlobal Average: ", global_mean(df1990s)), 
+    global_mean(df1990s), mypal[3]) +
+  text_annotate(
+    paste0("(Decade: 2010-2019)\nGlobal Average: ", global_mean(df2010s)), 
+    global_mean(df2010s), mypal[4]) +
+  text_annotate("Global Replacement\nFertility Level: 2.10\n(At this level, the\npopulation stays\nconstant)", 2.3, text_col, vjust = 1) +
+  
+  # Decade 1950s
+  geom_line(
+    data = df1950s,
+    colour = mypal[1],
+    linewidth = 0.75
+  ) +
+  geom_text(
+    data = df1950s,
+    hjust = 0,
+    nudge_y = 0.2,
+    colour = mypal[1],
+    family = "caption_font",
+    size = bts / 3
+  ) +
+  geom_point(
+    data = df1950s,
+    colour = mypal[1],
+    size = 2,
+    pch = 3
+  ) +
+  
+  # Decade 1970s
+  geom_line(
+    data = df1970s,
+    colour = mypal[2],
+    linewidth = 0.75
+  ) +
+  geom_text(
+    data = df1970s,
+    hjust = 0.5,
+    nudge_y = 0.2,
+    colour = mypal[2],
+    family = "caption_font",
+    size = bts / 3
+  ) +
+  geom_point(
+    data = df1970s,
+    colour = mypal[2],
+    size = 2,
+    pch = 3
+  ) +
+  
+  # Decade 1990s
+  geom_line(
+    data = df1990s,
+    colour = mypal[3],
+    linewidth = 0.75
+  ) +
+  geom_text(
+    data = df1990s,
+    hjust = 1,
+    nudge_y = 0.2,
+    nudge_x = -0.075,
+    colour = mypal[3],
+    family = "caption_font",
+    size = bts / 3
+  ) +
+  geom_point(
+    data = df1990s,
+    colour = mypal[3],
+    size = 2,
+    pch = 3
+  ) +
+  
+  # Decade 2010s
+  geom_line(
+    data = df2010s,
+    colour = mypal[4],
+    linewidth = 0.75
+  ) +
+  geom_text(
+    data = df2010s,
+    hjust = 1,
+    vjust = 1,
+    nudge_x = -0.02,
+    nudge_y = - 0.1,
+    colour = mypal[4],
+    family = "caption_font",
+    size = bts / 3
+  ) +
+  geom_point(
+    data = df2010s,
+    colour = mypal[4],
+    size = 2,
+    pch = 3
+  ) +
+  
+  # Scales and Coordinates
+  scale_x_continuous(
+    labels = label_percent(),
+    expand = expansion(0)
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    position = "right",
+    limits = c(0.5, 8.4),
+    breaks = 1:8,
+    labels = 1:8
+  ) +
+  coord_cartesian(
+    xlim = c(0, 1),
+    clip = "off"
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 125),
+    caption = plot_caption,
+    x = "Share of the total Global Population",
+    y = "Fertility Rate (average number of babies per woman)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    panel.grid.major = element_line(
+      linetype = 3,
+      linewidth = 0.25,
+      colour = "grey70"
+    ),
+    panel.grid.minor = element_line(
+      linetype = 3,
+      linewidth = 0.25,
+      colour = "grey70"
+    ),
+    axis.line.y = element_line(
+      linetype = 1,
+      linewidth = 0.6,
+      colour = text_col,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    axis.line.x = element_line(
+      linetype = 1,
+      linewidth = 0.6,
+      colour = text_col,
+      arrow = arrow(
+        angle = 90,
+        ends = "both",
+        length = unit(7, "mm")
+      )
+    ),
+    plot.margin = margin(10,10,10,80, "mm"),
+    plot.title = element_text(
+      colour = text_hil,
+      size = 2.7 * bts,
+      family = "title_font",
+      margin = margin(10,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      size = bts * 0.9, 
+      family = "title_font",
+      margin = margin(5,0,5,0, "mm"),
+      lineheight = 0.3
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.title.position = "plot"
+  )
+```
+
+Adding insets and annotations using [@patchwork]
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_fertility",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2.2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+plot_data <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = str_wrap(data_annotation, 30),
+    family = "caption_font",
+    colour = text_hil,
+    lineheight = 0.3, 
+    size = bts / 6,
+    hjust = 0
+  ) +
+  theme_void()
+
+g_full <- g +
+  inset_element(
+    p = plot_data,
+    left = -0.07, right = 0.12,
+    top = 0.8, bottom = 0.6,
+    align_to = "full",
+    clip = FALSE
+  ) +
+  inset_element(
+    p = plot_qr,
+    left = 0.025, right = 0.12,
+    top = 0.98, bottom = 0.77,
+    align_to = "full",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+```
+
+Save the graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_fertility.png"),
+  plot = g_full,
+  width = 297 * 2,
+  height = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "a4_owid_fertility.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_fertility.png"))
+```
