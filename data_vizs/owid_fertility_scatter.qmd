@@ -29,9 +29,11 @@ share:
 bibliography: references.bib
 ---
 
-**Source of the Data:** The fertility rate data is sourced from the United Nations' World Population Prospects (2022) and has been processed and presented by Our World in Data. The dataset provides the average number of live births a hypothetical cohort of women would have at the end of their reproductive period, assuming they experienced the fertility rates of a specific period throughout their lives without mortality impact. The data covers the period from 1950 to 2021 and is measured in live births per woman. Age-specific fertility rates are included, indicating the number of births to women in particular age groups, divided by the number of women in those groups, across annual civil calendar years. This dataset, part of the 27th edition of the official global population estimates, is based on extensive data on population size, fertility, mortality, and international migration for 237 countries or areas. For more information, visit the UN's World Population Prospects page [here](https://population.un.org/wpp/Download/) and [here](https://population.un.org/wpp/Publications/). The data was retrieved on September 9, 2022. Our World in Data processes the data through various steps to ensure accuracy, including standardizing country names, converting units, and calculating derived indicators. Detailed information on their data processing can be found [here](https://population.un.org/wpp/Download/). For citation purposes, use: UN, World Population Prospects (2022) – processed by Our World in Data.
+**Source of the Data:** The fertility rate data is sourced from the United Nations' World Population Prospects (2022) and has been processed and presented by Our World in Data. The dataset provides the average number of live births a hypothetical cohort of women would have at the end of their reproductive period, assuming they experienced the fertility rates of a specific period throughout their lives without mortality impact. The data covers the period from 1950 to 2021 and is measured in live births per woman. For more information, visit the UN's World Population Prospects page [here](https://population.un.org/wpp/Download/) and [here](https://population.un.org/wpp/Publications/).
 
-![.....................](owid_fertility_scatter.png){#fig-2}
+**Total Fertility Rate (TFR)** The Total Fertility Rate (TFR) is the average number of children a woman is expected to have in her lifetime based on current birth rates. It's a measure used to understand how many children are born in a population.
+
+![This scatter plot illustrates the average fertility rate for each country across seven decades, from the 1950s to the 2010s. The X-axis represents the decades, while the Y-axis shows the fertility rate. Each dot, sized by population, represents a country and is colored by continent. Translucent bands indicate the global average fertility rate for each decade.](owid_fertility_scatter.png){#fig-2 width="900"}
 
 ### How I made these graphics?
 
@@ -54,10 +56,9 @@ library(patchwork)            # Combining plots
 
 search1 <- owidR::owid_search("fertility")
 
-df1 <- owid("children-per-woman-un")
+df1 <- owid("children-per-woman")
 
 popdf <- owid("population-with-un-projections")
-
 ```
 
 Visualization Parameters
@@ -93,9 +94,9 @@ text_hil <- "grey25"
 # Base Text Size
 bts <- 80
 
-plot_title <- "Declining Global Fertility Rates (1950-2020)"
+plot_title <- "Global Fertility Drop (1950-2021)"
 
-plot_subtitle <- "The fertility rate, representing the average number of live births per woman, has notably declined from 1950 to 2020, driven largely by reductions in middle-income countries such as India and China. This graphic highlights this global trend, while also showing that the poorest and war-torn nations have experienced minimal decline in fertility rates. Nearly half of the world's population now has fertility rates below the replacement level."
+plot_subtitle <- "The global Total Fertility Rate (TFR) has dropped from 5 (1950s) to 2.1 (2021), driven primarily by declines in middle-income countries, like China and India. Poor and war-torn nations, particularly in Africa, maintain high fertility rates. Wealthy European countries have seen minimal declines but have gone below replacement levels."
 
 data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
 
@@ -133,8 +134,9 @@ df2 <- df1 |>
   janitor::clean_names() |> 
   rename(fertility = fertility_rate_sex_all_age_all_variant_estimates) |> 
   filter(!is.na(code)) |> 
-  filter(entity != "World")
-
+  filter(entity != "World") |> 
+  select(-countries_continents) |> 
+  filter(!str_detect(code, "OWID"))
 
 # A tibble of populations for each coutnry in each decade
 popdf1 <- popdf |> 
@@ -153,23 +155,15 @@ popdf1 <- popdf |>
             population_sex_all_age_all_variant_medium))
 
 
-# df2 |> 
-#   left_join(popdf1) |> 
-#   drop_na() |> 
-#   group_by(year) |> 
-#   summarise(
-#     fertility = weighted.mean(x = fertility, w = population, na.rm = T)
-#   ) |> 
-#   ggplot(aes(x = year, y = fertility)) +
-#   geom_point() +
-#   geom_line()
-
 df_continents <- rnaturalearth::ne_countries() |> 
   as_tibble() |> 
   janitor::clean_names() |> 
   select(iso_a3, continent) |> 
   rename(code = iso_a3)
 
+levels_x <- c("1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2021")
+
+# A tibble to use for final plotting
 df3 <- df2 |> 
   left_join(popdf1) |>
   left_join(df_continents) |> 
@@ -186,8 +180,18 @@ df3 <- df2 |>
   summarise(
     fertility = weighted.mean(fertility, w = population, na.rm = T),
     population = mean(population, na.rm = T)
-  )
+  ) |> 
+  bind_rows(
+    df2 |> 
+      left_join(popdf1) |>
+      left_join(df_continents) |> 
+      drop_na() |> 
+      filter(year == 2021) |> 
+      mutate(year = as.character(year))
+  ) |> 
+  mutate(year = fct(year, levels = levels_x))
 
+# A tibble to use for global averages
 df4 <- df2 |> 
   left_join(popdf1) |>
   drop_na() |> 
@@ -202,9 +206,19 @@ df4 <- df2 |>
   group_by(year) |> 
   summarise(
     fertility = weighted.mean(fertility, w = population, na.rm = T)
-  )
-
-
+  ) |> 
+  bind_rows(
+    df2 |> 
+      left_join(popdf1) |>
+      drop_na() |> 
+      filter(year == 2021) |> 
+      group_by(year) |> 
+      summarise(
+        fertility = weighted.mean(fertility, w = population, na.rm = T)
+      ) |> 
+      mutate(year = as.character(year))
+  ) |> 
+  mutate(year = fct(year, levels = levels_x))
 ```
 
 Visualization
@@ -212,7 +226,7 @@ Visualization
 ```{r}
 #| label: visualize-1
 
-df3 |> 
+g <- df3 |> 
   ggplot(
     aes(
       x = year, 
@@ -221,8 +235,9 @@ df3 |>
   ) +
   geom_hline(
     yintercept = 2.1,
-    linetype = 3,
-    colour = "grey50"
+    linetype = "longdash",
+    linewidth = 0.5,
+    colour = "grey10"
   ) +
   geom_point(
     mapping = aes(
@@ -230,7 +245,7 @@ df3 |>
       colour = continent
     ),
     pch = 20,
-    alpha = 0.7,
+    alpha = 0.5,
     position = position_jitter(
       width = 0.2,
       height = 0
@@ -239,13 +254,13 @@ df3 |>
   geom_segment(
     data = df4,
     mapping = aes(
-      x = as.numeric(year) - 0.3,
-      xend = as.numeric(year) + 0.3,
+      x = as.numeric(year) - 0.4,
+      xend = as.numeric(year) + 0.4,
       y = fertility,
       yend = fertility
     ),
     colour = "black",
-    linewidth = 3,
+    linewidth = 12,
     alpha = 0.2
   ) +
   geom_text(
@@ -256,28 +271,58 @@ df3 |>
       label = paste0("TFR: ", round(fertility, 1))
     ),
     colour = "grey10",
-    family = "body_font"
+    family = "body_font",
+    size = bts / 3,
+    fontface = "bold"
+  ) +
+  annotate(
+    geom = "text",
+    label = str_wrap("Replacement TFR: 2.10 births per woman. At this level, population remains constant in the long-run.", 25),
+    family = "caption_font",
+    colour = text_hil,
+    x = 0.52, y = 2.05,
+    hjust = 0,
+    vjust = 1,
+    lineheight = 0.35,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "label",
+    x = 0.52, y = 4.7,
+    hjust = 0,
+    vjust = 1,
+    fill = "grey95",
+    label = str_wrap("The value in grey stripes depicts the global average Fertility Rate", 30),
+    colour = text_hil,
+    family = "caption_font",
+    lineheight = 0.35,
+    label.size = NA,
+    size = bts / 3.8,
+    alpha = 0.3,
+    label.padding = unit(0.1, "lines"),
+    label.r = unit(0.1, "lines")
   ) +
   scale_y_continuous(
     expand = expansion(0),
-    limits = c(1, 8.5),
+    limits = c(0.8, 8.5),
     breaks = 1:8
   ) +
   paletteer::scale_color_paletteer_d("awtools::spalette") +
   scale_size_continuous(
-    range = c(0.2, 10)
+    range = c(1, 50)
   ) +
   guides(
     size = "none",
     colour = guide_legend(
+      nrow = 1,
       override.aes = list(
-        size = 5
+        size = 15
       )
     )
   ) +
   labs(
     title = plot_title,
-    subtitle = plot_subtitle,
+    subtitle = str_wrap(plot_subtitle, 95),
     caption = plot_caption,
     x = NULL,
     y = "Fertility rate (average children per woman)",
@@ -285,96 +330,59 @@ df3 |>
   ) +
   theme_minimal(
     base_family = "body_font",
-    base_size = 11
+    base_size = bts
   ) +
   theme(
     panel.grid = element_blank(),
     axis.line.y = element_line(
-      arrow = arrow(ends = "both", length = unit(2, "mm"))
+      arrow = arrow(ends = "both", length = unit(2, "mm")),
+      colour = text_hil,
+      linewidth = 0.3
     ),
-    legend.position = "right",
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.2,
+      face = "bold"
+    ),
+    
+    legend.position = "top",
+    legend.margin = margin(0,0,-10,0, "mm"),
+    legend.box.margin = margin(5,0,-10,0, "mm"),
+    legend.text = element_text(
+      family = "caption_font",
+      size = bts,
+      margin = margin(0,0,0,0, "mm")
+      ),
+    legend.key.spacing.y = unit(1, "mm"),
+    legend.direction = "horizontal",
+    
+    plot.title.position = "plot",
+    plot.margin = margin(10,5,10,5, "mm"),
     plot.caption = element_textbox(
       hjust = 0.5,
       family = "caption_font",
-      colour = text_hil
-    )
-  )
-```
-
-Adding insets and annotations using [@patchwork]
-
-```{r}
-#| label: insets
-
-# QR Code for the plot
-url_graphics <- paste0(
-  "https://aditya-dahiya.github.io/projects_presentations/projects/",
-  # The file name of the current .qmd file
-  "owid_fertility",
-  ".qmd"
-)
-# remotes::install_github('coolbutuseless/ggqr')
-# library(ggqr)
-plot_qr <- ggplot(
-  data = NULL, 
-  aes(x = 0, y = 0, label = url_graphics)
-  ) + 
-  ggqr::geom_qr(
-    colour = text_hil, 
-    fill = bg_col,
-    size = 2.2
-    ) +
-  # labs(caption = "Scan for the Interactive Version") +
-  coord_fixed() +
-  theme_void() +
-  theme(plot.background = element_rect(
-    fill = NA, 
-    colour = NA
+      colour = text_hil,
+      margin = margin(10,0,5,0, "mm")
     ),
-    plot.caption = element_text(
+    plot.subtitle = element_text(
+      lineheight = 0.25,
+      colour = text_hil,
       hjust = 0.5,
-      margin = margin(0,0,0,0, "mm"),
-      family = "caption_font",
-      size = bts/1.8
-    )
-  )
-
-plot_data <- ggplot() +
-  annotate(
-    geom = "text",
-    x = 0, y = 0,
-    label = str_wrap(data_annotation, 30),
-    family = "caption_font",
-    colour = text_hil,
-    lineheight = 0.3, 
-    size = bts / 6,
-    hjust = 0
-  ) +
-  theme_void()
-
-g_full <- g +
-  inset_element(
-    p = plot_data,
-    left = -0.07, right = 0.12,
-    top = 0.8, bottom = 0.6,
-    align_to = "full",
-    clip = FALSE
-  ) +
-  inset_element(
-    p = plot_qr,
-    left = 0.025, right = 0.12,
-    top = 0.98, bottom = 0.77,
-    align_to = "full",
-    clip = FALSE
-  ) +
-  plot_annotation(
-    theme = theme(
-      plot.background = element_rect(
-        fill = "transparent", colour = "transparent"
-      ),
-      panel.background = element_rect(
-        fill = "transparent", colour = "transparent"
-      )
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      family = "title_font",
+      colour = text_hil,
+      size = 2.5 * bts,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(15,0,0,0, "mm")
     )
   )
 ```
@@ -385,10 +393,10 @@ Save the graphic and a thumbnail
 #| label: save-plot
 
 ggsave(
-  filename = here::here("data_vizs", "a4_owid_fertility.png"),
-  plot = g_full,
-  width = 297 * 2,
-  height = 210 * 2,
+  filename = here::here("data_vizs", "owid_fertility_scatter.png"),
+  plot = g,
+  width = 400,
+  height = 500,
   units = "mm",
   bg = bg_col
 )
@@ -396,8 +404,8 @@ ggsave(
 library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "a4_owid_fertility.png")) |> 
+                      "owid_fertility_scatter.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", "thumbnails", 
-                         "owid_fertility.png"))
+                         "owid_fertility_scatter.png"))
 ```
