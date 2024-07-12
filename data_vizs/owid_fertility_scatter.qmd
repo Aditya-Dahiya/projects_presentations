@@ -33,7 +33,7 @@ bibliography: references.bib
 
 **Total Fertility Rate (TFR)** The Total Fertility Rate (TFR) is the average number of children a woman is expected to have in her lifetime based on current birth rates. It's a measure used to understand how many children are born in a population.
 
-![This scatter plot illustrates the average fertility rate for each country across seven decades, from the 1950s to the 2010s. The X-axis represents the decades, while the Y-axis shows the fertility rate. Each dot, sized by population, represents a country and is colored by continent. Translucent bands indicate the global average fertility rate for each decade.](owid_fertility_scatter.png){#fig-2 width="900"}
+![This scatter plot illustrates the average fertility rate for each country across seven decades, from the 1950s to the 2010s. The X-axis represents the decades, while the Y-axis shows the fertility rate. Each dot, sized by population, represents a country and is coloured by continent. Translucent bands indicate the global average fertility rate for each decade.](owid_fertility_scatter.png){#fig-2 width="900"}
 
 ### How I made these graphics?
 
@@ -385,6 +385,256 @@ g <- df3 |>
       margin = margin(15,0,0,0, "mm")
     )
   )
+```
+
+An A4-size Visualization on same pattern
+
+![This scatter plot illustrates the average fertility rate for each country across seven decades, from the 1950s to the 2010s. The X-axis represents the decades, while the Y-axis shows the fertility rate. Each dot, sized by population, represents a country and is colored by continent. Translucent bands indicate the global average fertility rate for each decade.](a4_owid_fertility_scatter.png)
+
+```{r}
+#| label: visualize-2
+
+
+g <- df3 |> 
+  ggplot(
+    aes(
+      x = year, 
+      y = fertility
+    )
+  ) +
+  geom_hline(
+    yintercept = 2.1,
+    linetype = "longdash",
+    linewidth = 0.5,
+    colour = "grey10"
+  ) +
+  geom_point(
+    mapping = aes(
+      size = population,
+      colour = continent
+    ),
+    pch = 20,
+    alpha = 0.5,
+    position = position_jitter(
+      width = 0.2,
+      height = 0
+    )
+  ) +
+  geom_segment(
+    data = df4,
+    mapping = aes(
+      x = as.numeric(year) - 0.4,
+      xend = as.numeric(year) + 0.4,
+      y = fertility,
+      yend = fertility
+    ),
+    colour = "black",
+    linewidth = 12,
+    alpha = 0.2
+  ) +
+  geom_text(
+    data = df4,
+    mapping = aes(
+      x = year,
+      y = fertility,
+      label = paste0("TFR: ", round(fertility, 1))
+    ),
+    colour = "grey10",
+    family = "body_font",
+    size = bts / 3,
+    fontface = "bold"
+  ) +
+  annotate(
+    geom = "text",
+    label = str_wrap("Replacement TFR: 2.10 births per woman. At this level, population remains constant in the long-run.", 25),
+    family = "caption_font",
+    colour = text_hil,
+    x = 0.52, y = 2.05,
+    hjust = 0,
+    vjust = 1,
+    lineheight = 0.35,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "label",
+    x = 0.52, y = 4.8,
+    hjust = 0,
+    vjust = 1,
+    fill = "grey95",
+    label = str_wrap("The value in grey stripes depicts the global average Fertility Rate", 30),
+    colour = text_hil,
+    family = "caption_font",
+    lineheight = 0.35,
+    label.size = NA,
+    size = bts / 3.8,
+    alpha = 0.3,
+    label.padding = unit(0.1, "lines"),
+    label.r = unit(0.1, "lines")
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    limits = c(0.8, 8.5),
+    breaks = 1:8
+  ) +
+  paletteer::scale_color_paletteer_d("awtools::spalette") +
+  scale_size_continuous(
+    range = c(1, 50)
+  ) +
+  guides(
+    size = "none",
+    colour = guide_legend(
+      nrow = 1,
+      override.aes = list(
+        size = 15
+      )
+    )
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 95),
+    caption = plot_caption,
+    x = NULL,
+    y = "Fertility rate (average children per woman)",
+    colour = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    axis.line.y = element_line(
+      arrow = arrow(ends = "both", length = unit(2, "mm")),
+      colour = text_hil,
+      linewidth = 0.3
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.2,
+      face = "bold"
+    ),
+    
+    legend.position = "top",
+    legend.margin = margin(0,0,-10,-18, "mm"),
+    legend.box.margin = margin(5,0,-10,0, "mm"),
+    legend.text = element_text(
+      size = bts,
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_hil,
+      family = "title_font"
+      ),
+    legend.key.spacing.y = unit(1, "mm"),
+    legend.direction = "horizontal",
+    
+    plot.title.position = "plot",
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(10,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.25,
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      family = "title_font",
+      colour = text_hil,
+      size = 2.5 * bts,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(15,0,0,0, "mm")
+    )
+  )
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_fertility_scatter",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.5
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
+  )
+
+plot_data <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = str_wrap(data_annotation, 50),
+    family = "caption_font",
+    colour = text_hil,
+    lineheight = 0.3, 
+    size = bts / 7,
+    hjust = 1,
+    vjust = 1
+  ) +
+  theme_void()
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.88, right = 1,
+    top = 1.02, bottom = 0.9,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  inset_element(
+    p = plot_data,
+    left = 0.75, right = 1.23,
+    top = 0.95, bottom = 0.82,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_fertility_scatter.png"),
+  plot = g_full,
+  width = 210 * 2,
+  height = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+
+
+
 ```
 
 Save the graphic and a thumbnail
