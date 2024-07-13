@@ -218,9 +218,10 @@ df4 <- df3 |>
   arrange(desc(fertility)) |> 
   mutate(top_rank = row_number()) |> 
   ungroup() |> 
-  mutate(entity = fct(entity, levels = levels_sel_cons)) |> 
-  
-  # Adding dummy data to extend bump lines along x-axis
+  mutate(entity = fct(entity, levels = levels_sel_cons))
+
+# Adding dummy data to extend bump lines along x-axis
+df4 <- df4 |> 
   bind_rows(df4 |> filter(year == 1) |> mutate(year = 0.5)) |> 
   bind_rows(df4 |> filter(year == 8) |> mutate(year = 8.5))
 
@@ -438,3 +439,271 @@ image_read(here::here("data_vizs",
   image_write(here::here("data_vizs", "thumbnails", 
                          "owid_fertility_bumps.png"))
 ```
+
+An A4 size version, with highlight on China, added QR code and about the data shown in @fig-2
+
+```{r}
+#| label: a4-viz
+
+levels(df4$entity)
+
+cn_col <- paletteer::paletteer_d("awtools::bpalette")[1]
+
+# A colour palette to highlight China
+mypal <- c(
+ paletteer::paletteer_d("awtools::bpalette")[2:7],
+ 
+ # Red colour for China
+ paletteer::paletteer_d("awtools::bpalette")[1],
+ paletteer::paletteer_d("awtools::bpalette")[8:14]
+)
+
+# Improved markdown subtitle
+plot_subtitle <- glue::glue("The rankings of most populous countries based on their Total Fertility Rate (TFR) from the<br>1950 to 2021. TFR is the average number of children a woman is expected to have during her<br>lifetime. Notice the consistently high fertility rates in Pakistan, Bangladesh, and Nigeria,<br>and <b style='color:{cn_col}'>the significant decline in China's fertility due to its One Child Policy</b>. The number in<br>the coloured bands shows the TFR. Below the flags are country's name and population.")
+
+g <- df4 |> 
+  ggplot() +
+  
+  # Panel visualization
+  geom_bump(
+    mapping = aes(
+      x = year,
+      y = top_rank,
+      group = entity,
+      colour = entity,
+      alpha = (entity == "China")
+    ),
+    linewidth = 7
+  ) +
+  scale_alpha_manual(
+    values = c(0.3, 0.9)
+  ) +
+  geom_label(
+    mapping = aes(
+      label = paste0(
+        round(fertility, 1)
+        ),
+      x = year,
+      y = top_rank
+      ),
+    colour = text_col,
+    lineheight = 0.6,
+    family = "caption_font",
+    size = bts / 6,
+    fontface = "bold",
+    fill = "white",
+    alpha = 0.3,
+    label.size = NA,
+    label.padding = unit(0.1, "lines")
+  ) +
+  
+  # Left Y-Axis Ranks
+  geom_text(
+    data = tibble(
+      rank_var = 1:14,
+      y_var = 1:14
+    ),
+    mapping = aes(
+      x = -0.1,
+      y = y_var,
+      label = rank_var
+    ),
+    size = bts / 2.2,
+    family = "title_font",
+    fontface = "bold",
+    colour = text_col
+  ) +
+  
+  # Left Y-Axis country labels
+  geom_text(
+    data = df4 |> filter(year == 1),
+    mapping = aes(
+      x = 0.5,
+      y = top_rank,
+      label = paste0(
+        entity,
+        " (", 
+        scales::number(
+          population,
+          accuracy = 0.1,
+          scale_cut = cut_short_scale()
+        ),
+        ")"
+      )
+    ),
+    nudge_y = -0.4,
+    lineheight = 0.3,
+    hjust = 0.5,
+    family = "caption_font",
+    size = bts / 6
+  ) +
+  
+  # Right Y-Axis country labels
+  geom_text(
+    data = df4 |> filter(year == 8),
+    mapping = aes(
+      x = 8.5,
+      y = top_rank,
+      label = paste0(
+        entity,
+        " (", 
+        scales::number(
+          population,
+          accuracy = 0.1,
+          scale_cut = cut_short_scale()
+        ),
+        ")"
+      )
+    ),
+    nudge_y = -0.4,
+    lineheight = 0.3,
+    hjust = 0.5,
+    family = "caption_font",
+    size = bts / 6
+  ) +
+  
+  # Adding country flags on top of chart - Right-end
+  ggflags::geom_flag(
+    data = df4 |> filter(year == 8),
+    mapping = aes(
+      x = 8.5, y = top_rank,
+      country = country
+    ),
+    size = 19
+  ) +
+  # Adding country flags on top of chart - Left-end
+  ggflags::geom_flag(
+    data = df4 |> filter(year == 1),
+    mapping = aes(
+      x = 0.5, y = top_rank,
+      country = country
+    ),
+    size = 19
+  ) +
+  
+  # Scales and Coordinates
+  scale_colour_manual(values = mypal) +
+  scale_y_reverse() +
+  scale_x_continuous(
+    breaks = 1:8,
+    labels = x_axis_labels,
+    expand = expansion(c(0.02, 0.1))
+  ) +
+  scale_size_continuous(
+    range = c(5, 20)
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 95),
+    caption = plot_caption,
+    x = NULL,
+    y = "Ranking of these Countries  (on Total Fertility Rate)",
+    colour = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    plot.margin = margin(10,10,10,10, "mm"),
+    axis.text.x = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.2,
+      face = "bold"
+    ),
+    plot.title.position = "plot",
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.subtitle = element_markdown(
+      lineheight = 0.28,
+      colour = text_hil,
+      hjust = 0,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      family = "caption_font",
+      colour = text_hil,
+      size = 2.5 * bts,
+      face = "bold",
+      hjust = 0,
+      margin = margin(10,0,0,0, "mm")
+    )
+  )
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_fertility_bumps",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.6
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
+  )
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.83, right = 0.98,
+    top = 1.125, bottom = 0.97,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_fertility_bumps.png"),
+  plot = g_full,
+  width = 210 * 2,
+  height = 297 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+![This graphic presents the rankings of the most populous countries based on their Total Fertility Rate (TFR) from the 1950s to 2021. The x-axis represents the decades and the year 2021, while the y-axis shows the rankings from 1 to 14. Each colored line represents a different country, with country flags and population figures shown at the ends of the lines. The red colour focuses on China, showing the rapidly falling TFR.](a4_owid_fertility_bumps.png){#fig-2 width="900"}
