@@ -1,12 +1,13 @@
 ---
-title: ".............GeOM - TEXTPATH............"
+title: "Changing Fertility Rates in South Asia"
 author: "Aditya Dahiya"
 date: "2024-07-14"
-subtitle: "........................."
+subtitle: "Comparing rate of change of fertility amongst five South-Asian countries."
 categories:
   - "A4 Size Viz"
   - "Our World in Data"
   - "Public Health"
+  - "{geomtextpath}"
 image: "thumbnails/owid_fertility_textpath.png"
 format:
   html:
@@ -31,7 +32,7 @@ bibliography: references.bib
 
 The data used in this graphic is sourced from the [United Nations' World Population Prospects](https://population.un.org/wpp/Publications/) [(2022)](https://population.un.org/wpp/Download/) and processed by [Our World in Data](https://ourworldindata.org/fertility-rate). It encompasses the Total Fertility Rate (TFR) for the top 10 most populous countries from the 1950s to 2021. TFR is the average number of children a woman is expected to have during her lifetime.
 
-![....................................](owid_fertility_textpath.png){#fig-1 width="900"}
+![A line graph on fertility rates from 1950 to 2021 in five South Asian Nations. Using geom_textline(), the names of the countries have been inserted along the lines.](owid_fertility_textpath.png){#fig-1 width="900"}
 
 ### How I made this graphic?
 
@@ -86,21 +87,23 @@ font_add_google("Roboto Condensed",
 showtext_auto()
 
 # Colour Palette
-mypal <- rev(paletteer::paletteer_d("LaCroixColoR::Lime")[c(1,2,4:6)])
-
+# mypal1 <- paletteer::paletteer_d("waRhol::marilyn_orange_62")
+# mypal2 <- paletteer::paletteer_d("MoMAColors::ustwo")
+# mypal3 <- c("#FF7F00FF", "#577F3FFF", "#D2848DFF", 
+#             "#D7433BFF", "#677E8EFF", "#5FA1F7FF")
+mypal3 <- c("#ff9500", "darkgreen", "grey30", "blue", "red")
+# mypal3 <- mypal1[c(2, 5, 1, 4, 6)]
 # Background Colour
-bg_col <- "grey95"
+bg_col <- "white"
 text_col <- "grey10"
 text_hil <- "grey25"
 
 # Base Text Size
 bts <- 80
 
-plot_title <- "Fertility Rate Rankings among most populous Nations"
+plot_title <- "Fertility Rates in South-Asian Nations"
 
-plot_subtitle <- "The rankings of most populous countries based on their Total Fertility Rate (TFR) from the 1950 to 2021. TFR is the average number of children a woman is expected to have during her lifetime. Notice the consistently high fertility rates in Pakistan, Bangladesh, and Nigeria, and the significant decline in China's fertility due to its One Child Policy. The number in the coloured bands shows the TFR. Below the flags are country's name and population."
-
-data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
+plot_subtitle <- "Total Fertility Rate (TFR) is the average number of children a woman is expected to have during her lifetime.  This data on fertility rates, sourced from the United Nations' World Population Prospects (2022), show different rates of change in the world's fastest population growth region: South-Asia."
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -225,6 +228,59 @@ df4 <- df4 |>
   bind_rows(df4 |> filter(year == 1) |> mutate(year = 0.5)) |> 
   bind_rows(df4 |> filter(year == 8) |> mutate(year = 8.5))
 
+
+labels_df <- tribble(
+  ~entity, ~description,
+  "India", "India's fertility rate has declined gradually since 1960s.",
+  "Pakistan", "Pakistan's fertility rate started declining late, and continues to be high to the present day.",
+  "Bangladesh", "Bangladesh's rapid drop in 1980s.",
+  "Afghanistan", "Afghanistan's wars, poor literacy levels and healthcare have led to persistently high fertility rate.",
+  "Sri Lanka", "Sri Lanka witnessed rapid declines starting in 1960, and stabilized by 2000."
+)
+
+plotdf <- df2 |> 
+  filter(entity %in% c(
+    "India", "Pakistan",
+    "Afghanistan", "Sri Lanka",
+    "Bangladesh"
+    )
+  ) |> 
+  left_join(popdf1) |> 
+  group_by(entity) |> 
+  mutate(
+    size_var = population / min(population)
+  ) |> 
+  left_join(labels_df) |> 
+  ungroup() |> 
+  mutate(entity = fct(
+    entity, 
+    levels = c(
+      "India", "Pakistan",
+      "Afghanistan", 
+      "Sri Lanka",
+      "Bangladesh"
+      )
+    )
+  ) |> 
+  left_join(
+    df4 |> select(entity, country) |> distinct()
+  ) |> 
+  mutate(
+    country = case_when(
+      entity == "Afghanistan" ~ "af",
+      entity == "Sri Lanka" ~ "lk",
+      .default = country
+    )
+  ) |> 
+  # Manually Move Sri Lanka flag down a little
+  mutate(
+    fertility = if_else(
+      condition = (entity == "Sri Lanka") & (year == 1950),
+      true = 5.4,
+      false = fertility
+    )
+  )
+
 ```
 
 Visualization
@@ -232,12 +288,7 @@ Visualization
 ```{r}
 #| label: visualize-1
 
-df2 |> 
-  filter(entity %in% c(
-    sel_cons[c(1,2,12,11,6)], 
-    "Afghanistan"
-    )
-  ) |> 
+g <- plotdf |> 
   ggplot(
     mapping = aes(
       x = year, 
@@ -246,32 +297,102 @@ df2 |>
       colour = entity
     )
   ) +
-  geom_point(
-    stat = "smooth",
-    pch = 21,
-    fill = "white",
-    size = 1
+  
+  # Annotations
+  geom_hline(
+    yintercept = 2.1,
+    colour = "grey50",
+    linetype = "longdash",
+    linewidth = 0.5
   ) +
-  geom_textsmooth(
+  annotate(
+    geom = "text",
+    size = bts / 3,
+    x = 1948,
+    y = 2.15,
+    vjust = 0,
+    hjust = 0,
+    label = "Replacement-level TFR  (2.10): Population stays stable",
+    colour = text_hil,
+    family = "caption_font"
+  ) +
+  
+  # Actual line plots
+  geom_line(
+    lineend = "round",
+    linejoin = "round",
+    alpha = 0.3,
+    linewidth = 14
+  ) +
+  scale_colour_manual(
+    values = mypal3
+  ) +
+  ggnewscale::new_scale_colour() +
+  geom_textline(
+    data = plotdf |> filter(!(entity %in% c("Pakistan", "Bangladesh"))),
     mapping = aes(
-      label = entity
+      label = entity,
+      colour = entity
     ),
-    vjust = -0.1
+    vjust = 0.57,
+    hjust = 0.2,
+    text_only = FALSE,
+    family = "body_font",
+    fontface = "bold",
+    text_smoothing = 10,
+    size = bts / 3
   ) +
-  theme(
-    legend.position = "none"
-  )
-
-
-
-
+  scale_colour_manual(
+    values = colorspace::darken(mypal3[c(1,3,4)], 0.4)
+  ) +
+  ggnewscale::new_scale_colour() +
+  
+  # Add textpath for Bangladesh
+  geom_textline(
+    data = plotdf |> filter(entity %in% c("Pakistan", "Bangladesh")),
+    mapping = aes(
+      label = entity,
+      colour = entity
+    ),
+    vjust = 0.57,
+    hjust = 0.4,
+    text_only = FALSE,
+    family = "body_font",
+    fontface = "bold",
+    # text_smoothing = 10,
+    size = bts / 3
+  ) +
+  
+  # Insert Flags
+  ggflags::geom_flag(
+    data = plotdf |> filter(year == 1950),
+    mapping = aes(
+      country = country
+    ),
+    size = 24
+  ) +
+  
+  scale_colour_manual(
+    values = colorspace::darken(mypal3[c(2, 5)], 0.4)
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0.05, 0)),
+    breaks = seq(1950, 2020, 10)
+  ) +
+  scale_y_continuous(
+    position = "right", 
+    breaks = 2:8
+  ) +
+  scale_linewidth_continuous(
+    range = c(5, 12)
+  ) +
   # Labels and Themes
   labs(
     title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 95),
+    subtitle = str_wrap(plot_subtitle, 105),
     caption = plot_caption,
     x = NULL,
-    y = "Ranking of these Countries  (on Total Fertility Rate)",
+    y = "Total Fertility Rate (Children born per woman)",
     colour = NULL
   ) +
   theme_minimal(
@@ -281,12 +402,21 @@ df2 |>
   theme(
     legend.position = "none",
     panel.grid = element_blank(),
-    axis.text.y = element_blank(),
+    axis.text.y = element_text(
+      colour = text_hil, 
+      margin = margin(0,0,0,0, "mm")
+    ),
     axis.title.x = element_blank(),
     axis.title.y = element_text(
       margin = margin(0,0,0,0, "mm"),
       colour = text_hil,
       hjust = 0.5
+    ),
+    axis.line.y = element_line(
+      colour = text_hil,
+      linewidth = 0.5,
+      arrow = arrow(ends = "both"),
+      linetype = 1
     ),
     axis.ticks.length = unit(0, "mm"),
     plot.margin = margin(10,10,10,10, "mm"),
@@ -312,12 +442,13 @@ df2 |>
     plot.title = element_text(
       family = "caption_font",
       colour = text_hil,
-      size = 2.5 * bts,
+      size = 3 * bts,
       face = "bold",
       hjust = 0.5,
       margin = margin(10,0,0,0, "mm")
     )
   )
+
 ```
 
 Save the graphic and a thumbnail
