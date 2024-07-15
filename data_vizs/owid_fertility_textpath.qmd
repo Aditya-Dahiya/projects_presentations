@@ -57,11 +57,34 @@ library(patchwork)            # Combining plots
 # install.packages("ggbump")
 library(geomtextpath)         # Text on the path 
 
-search1 <- owidR::owid_search("fertility")
+# Data on fertility rates
+# search1 <- owidR::owid_search("fertility")
 
 df1 <- owid("children-per-woman")
 
-popdf <- owid("population-with-un-projections")
+# Data on yearwise population
+# popdf <- owid("population-with-un-projections")
+
+# Data on GDP growth rate
+# search2 <- owid_search("gdp")
+gdpdf <- owid("annual-gdp-growth")
+owid_source(gdpdf)
+
+
+# Data on female literacy
+search3 <- owid_search("literacy")
+
+search3 |> 
+  as_tibble() |> 
+  print(n = Inf)
+
+gdp_df1 <- gdpdf |> 
+  as_tibble() |> 
+  filter(year >= 1950 & year <= 2021) |> 
+  filter(!is.na(code)) |> 
+  filter(!str_detect(code, "OWID")) |> 
+  janitor::clean_names() |> 
+  rename(gdp_growth = x17_13_1_annual_gdp_growth_percent_ny_gdp_mktp_kd_zg)
 ```
 
 Visualization Parameters
@@ -88,11 +111,12 @@ showtext_auto()
 
 # Colour Palette
 # mypal1 <- paletteer::paletteer_d("waRhol::marilyn_orange_62")
-# mypal2 <- paletteer::paletteer_d("MoMAColors::ustwo")
+mypal2 <- paletteer::paletteer_d("MoMAColors::ustwo")
 # mypal3 <- c("#FF7F00FF", "#577F3FFF", "#D2848DFF", 
 #             "#D7433BFF", "#677E8EFF", "#5FA1F7FF")
 mypal3 <- c("#ff9500", "darkgreen", "grey30", "blue", "red")
 # mypal3 <- mypal1[c(2, 5, 1, 4, 6)]
+
 # Background Colour
 bg_col <- "white"
 text_col <- "grey10"
@@ -278,6 +302,148 @@ plotdf <- df2 |>
       condition = (entity == "Sri Lanka") & (year == 1950),
       true = 5.4,
       false = fertility
+    )
+  ) |> 
+  left_join(gdp_df1)
+```
+
+Another Attempt - dual Y-Axis
+
+```{r}
+
+bts = 11
+
+plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = fertility, 
+      group = entity,
+      colour = entity
+    )
+  ) +
+  
+  # Annotations
+  geom_hline(
+    yintercept = 2.1,
+    colour = "grey50",
+    linetype = "longdash",
+    linewidth = 0.5
+  ) +
+  annotate(
+    geom = "text",
+    size = bts / 3,
+    x = 1948,
+    y = 2.15,
+    vjust = 0,
+    hjust = 0,
+    label = "Replacement-level TFR  (2.10): Population stays stable",
+    colour = text_hil,
+    family = "caption_font"
+  ) +
+  
+  # Actual line plots
+  geom_line(
+    lineend = "round",
+    linejoin = "round",
+    alpha = 0.3,
+    linewidth = 1
+  ) +
+  scale_colour_manual(
+    values = mypal3
+  ) +
+  ggnewscale::new_scale_colour() +
+  geom_textline(
+    mapping = aes(
+      label = entity,
+      colour = entity
+    ),
+    vjust = -0.1,
+    hjust = 0.5,
+    text_only = FALSE,
+    family = "body_font",
+    fontface = "bold",
+    size = bts / 3
+  ) +
+  scale_colour_manual(
+    values = colorspace::darken(mypal3, 0.4)
+  ) +
+  ggnewscale::new_scale_colour() +
+  
+  scale_colour_manual(
+    values = colorspace::darken(mypal3[c(2, 5)], 0.4)
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0.05, 0)),
+    breaks = seq(1950, 2020, 10)
+  ) +
+  scale_y_continuous(
+    position = "right", 
+    breaks = 2:8
+  ) +
+  scale_linewidth_continuous(
+    range = c(5, 12)
+  ) +
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 105),
+    caption = plot_caption,
+    x = NULL,
+    y = "Total Fertility Rate (Children born per woman)",
+    colour = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    panel.grid = element_blank(),
+    axis.text.y = element_text(
+      colour = text_hil, 
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    axis.line.y = element_line(
+      colour = text_hil,
+      linewidth = 0.5,
+      arrow = arrow(ends = "both"),
+      linetype = 1
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    plot.margin = margin(10,10,10,10, "mm"),
+    axis.text.x = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.2,
+      face = "bold"
+    ),
+    plot.title.position = "plot",
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.28,
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      family = "caption_font",
+      colour = text_hil,
+      size = 3 * bts,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(10,0,0,0, "mm")
     )
   )
 
