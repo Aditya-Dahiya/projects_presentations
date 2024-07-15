@@ -1,8 +1,8 @@
 ---
-title: "Changing Fertility Rates in South Asia"
+title: "Comparing Fertility Rates in South Asia"
 author: "Aditya Dahiya"
 date: "2024-07-14"
-subtitle: "Comparing rate of change of fertility amongst five South-Asian countries."
+subtitle: "Comparing rates and timings of change of fertility amongst five South-Asian countries."
 categories:
   - "A4 Size Viz"
   - "Our World in Data"
@@ -31,6 +31,8 @@ bibliography: references.bib
 ---
 
 The data used in this graphic is sourced from the [United Nations' World Population Prospects](https://population.un.org/wpp/Publications/) [(2022)](https://population.un.org/wpp/Download/) and processed by [Our World in Data](https://ourworldindata.org/fertility-rate). It encompasses the Total Fertility Rate (TFR) for the top 10 most populous countries from the 1950s to 2021. TFR is the average number of children a woman is expected to have during her lifetime.
+
+This line graph shows that the TFR fell at different times in the five South-Asian Nations. Pakistan and Afghanistan continue to have high fertility rates. India, Bangladesh and Sri Lanka have achieved near-replacement levels of fertility. TFR in Sri Lanka and Bangladesh fell early and rapidly, while India's TFR has declined slowly yet steadily.
 
 ![A line graph on fertility rates from 1950 to 2021 in five South Asian Nations. Using geom_textline(), the names of the countries have been inserted along the lines.](owid_fertility_textpath.png){#fig-1 width="900"}
 
@@ -61,30 +63,6 @@ library(geomtextpath)         # Text on the path
 # search1 <- owidR::owid_search("fertility")
 
 df1 <- owid("children-per-woman")
-
-# Data on yearwise population
-# popdf <- owid("population-with-un-projections")
-
-# Data on GDP growth rate
-# search2 <- owid_search("gdp")
-gdpdf <- owid("annual-gdp-growth")
-owid_source(gdpdf)
-
-
-# Data on female literacy
-search3 <- owid_search("literacy")
-
-search3 |> 
-  as_tibble() |> 
-  print(n = Inf)
-
-gdp_df1 <- gdpdf |> 
-  as_tibble() |> 
-  filter(year >= 1950 & year <= 2021) |> 
-  filter(!is.na(code)) |> 
-  filter(!str_detect(code, "OWID")) |> 
-  janitor::clean_names() |> 
-  rename(gdp_growth = x17_13_1_annual_gdp_growth_percent_ny_gdp_mktp_kd_zg)
 ```
 
 Visualization Parameters
@@ -107,6 +85,12 @@ font_add_google("Roboto Condensed",
   family = "body_font"
 ) 
 
+# Font for Country Names
+font_add_google(
+  "Kanit",
+  family = "cn_font"
+)
+
 showtext_auto()
 
 # Colour Palette
@@ -127,7 +111,9 @@ bts <- 80
 
 plot_title <- "Fertility Rates in South-Asian Nations"
 
-plot_subtitle <- "Total Fertility Rate (TFR) is the average number of children a woman is expected to have during her lifetime.  This data on fertility rates, sourced from the United Nations' World Population Prospects (2022), show different rates of change in the world's fastest population growth region: South-Asia."
+plot_subtitle <- glue::glue("Total Fertility Rate (TFR) is the average number of children a woman is expected to have during her lifetime.<br>TFR decline in these South-Asian nations happened at different times. <b style='color:{mypal3[1]}'>India</b>, <b style='color:{mypal3[5]}'>Bangladesh</b> and <b style='color:{mypal3[4]}'>Sri Lanka</b><br>have reached near-replacement levels. <b style='color:{mypal3[2]}'>Pakistan</b> and <b style='color:{mypal3[3]}'>Afghanistan</b> continue to have high fertility rates.")
+
+data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -168,18 +154,18 @@ df2 <- df1 |>
   filter(!str_detect(code, "OWID"))
 
 # A clean tibble of populations for each coutnry in each year
-popdf1 <- popdf |> 
-  as_tibble() |> 
-  janitor::clean_names() |> 
-  filter(!is.na(code)) |> 
-  filter(entity != "World") |> 
+popdf1 <- popdf |>
+  as_tibble() |>
+  janitor::clean_names() |>
+  filter(!is.na(code)) |>
+  filter(entity != "World") |>
   mutate(
     population = ifelse(
       is.na(population_sex_all_age_all_variant_estimates),
       population_sex_all_age_all_variant_medium,
       population_sex_all_age_all_variant_estimates
     )
-  ) |> 
+  ) |>
   select(-c(population_sex_all_age_all_variant_estimates,
             population_sex_all_age_all_variant_medium))
 
@@ -262,6 +248,16 @@ labels_df <- tribble(
   "Sri Lanka", "Sri Lanka witnessed rapid declines starting in 1960, and stabilized by 2000."
 )
 
+df_hjusts <- tibble(
+  country = c("af", "bd", "in", "pk", "lk"),
+  hjust_var = c(0.8, 0.5, 0.3, 0.8, 0.4)
+)
+
+df_flags <- tibble(
+  country = c("af", "bd", "in", "pk", "lk"),
+  y_var = c(7.35, 6.35, 5.9, 6.8, 5.4)
+)
+
 plotdf <- df2 |> 
   filter(entity %in% c(
     "India", "Pakistan",
@@ -296,163 +292,19 @@ plotdf <- df2 |>
       .default = country
     )
   ) |> 
-  # Manually Move Sri Lanka flag down a little
-  mutate(
-    fertility = if_else(
-      condition = (entity == "Sri Lanka") & (year == 1950),
-      true = 5.4,
-      false = fertility
-    )
-  ) |> 
-  left_join(gdp_df1)
-```
-
-Another Attempt - dual Y-Axis
-
-```{r}
-
-bts = 11
-
-plotdf |> 
-  ggplot(
-    mapping = aes(
-      x = year, 
-      y = fertility, 
-      group = entity,
-      colour = entity
-    )
-  ) +
+  # Adding dataframe for horizontal justifications of labels
+  left_join(df_hjusts) |> 
   
-  # Annotations
-  geom_hline(
-    yintercept = 2.1,
-    colour = "grey50",
-    linetype = "longdash",
-    linewidth = 0.5
-  ) +
-  annotate(
-    geom = "text",
-    size = bts / 3,
-    x = 1948,
-    y = 2.15,
-    vjust = 0,
-    hjust = 0,
-    label = "Replacement-level TFR  (2.10): Population stays stable",
-    colour = text_hil,
-    family = "caption_font"
-  ) +
-  
-  # Actual line plots
-  geom_line(
-    lineend = "round",
-    linejoin = "round",
-    alpha = 0.3,
-    linewidth = 1
-  ) +
-  scale_colour_manual(
-    values = mypal3
-  ) +
-  ggnewscale::new_scale_colour() +
-  geom_textline(
-    mapping = aes(
-      label = entity,
-      colour = entity
-    ),
-    vjust = -0.1,
-    hjust = 0.5,
-    text_only = FALSE,
-    family = "body_font",
-    fontface = "bold",
-    size = bts / 3
-  ) +
-  scale_colour_manual(
-    values = colorspace::darken(mypal3, 0.4)
-  ) +
-  ggnewscale::new_scale_colour() +
-  
-  scale_colour_manual(
-    values = colorspace::darken(mypal3[c(2, 5)], 0.4)
-  ) +
-  scale_x_continuous(
-    expand = expansion(c(0.05, 0)),
-    breaks = seq(1950, 2020, 10)
-  ) +
-  scale_y_continuous(
-    position = "right", 
-    breaks = 2:8
-  ) +
-  scale_linewidth_continuous(
-    range = c(5, 12)
-  ) +
-  # Labels and Themes
-  labs(
-    title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 105),
-    caption = plot_caption,
-    x = NULL,
-    y = "Total Fertility Rate (Children born per woman)",
-    colour = NULL
-  ) +
-  theme_minimal(
-    base_family = "body_font",
-    base_size = bts
-  ) +
-  theme(
-    legend.position = "none",
-    panel.grid = element_blank(),
-    axis.text.y = element_text(
-      colour = text_hil, 
-      margin = margin(0,0,0,0, "mm")
-    ),
-    axis.title.x = element_blank(),
-    axis.title.y = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      colour = text_hil,
-      hjust = 0.5
-    ),
-    axis.line.y = element_line(
-      colour = text_hil,
-      linewidth = 0.5,
-      arrow = arrow(ends = "both"),
-      linetype = 1
-    ),
-    axis.ticks.length = unit(0, "mm"),
-    plot.margin = margin(10,10,10,10, "mm"),
-    axis.text.x = element_text(
-      colour = text_hil,
-      margin = margin(0,0,0,0, "mm"),
-      size = bts * 1.2,
-      face = "bold"
-    ),
-    plot.title.position = "plot",
-    plot.caption = element_textbox(
-      hjust = 0.5,
-      family = "caption_font",
-      colour = text_hil,
-      margin = margin(5,0,0,0, "mm")
-    ),
-    plot.subtitle = element_text(
-      lineheight = 0.28,
-      colour = text_hil,
-      hjust = 0.5,
-      margin = margin(5,0,0,0, "mm")
-    ),
-    plot.title = element_text(
-      family = "caption_font",
-      colour = text_hil,
-      size = 3 * bts,
-      face = "bold",
-      hjust = 0.5,
-      margin = margin(10,0,0,0, "mm")
-    )
-  )
+  # Adding dataframe for flags location
+  left_join(df_flags)
+
 
 ```
 
 Visualization
 
 ```{r}
-#| label: visualize-1
+#| label: visualize-2
 
 g <- plotdf |> 
   ggplot(
@@ -467,95 +319,95 @@ g <- plotdf |>
   # Annotations
   geom_hline(
     yintercept = 2.1,
-    colour = "grey50",
+    colour = "grey80",
     linetype = "longdash",
-    linewidth = 0.5
+    linewidth = 0.8
   ) +
   annotate(
     geom = "text",
-    size = bts / 3,
-    x = 1948,
+    size = bts / 2.5,
+    x = 1946,
     y = 2.15,
     vjust = 0,
     hjust = 0,
-    label = "Replacement-level TFR  (2.10): Population stays stable",
+    label = "Replacement-level TFR  (2.10): Population stays stable at this TFR",
     colour = text_hil,
     family = "caption_font"
   ) +
   
   # Actual line plots
-  geom_line(
+  geom_smooth(
     lineend = "round",
     linejoin = "round",
     alpha = 0.3,
-    linewidth = 14
+    linewidth = 2,
+    se = FALSE,
+    span = 0.2
   ) +
   scale_colour_manual(
     values = mypal3
   ) +
+  
+  # Text along the smoothened path - different hjusts
   ggnewscale::new_scale_colour() +
-  geom_textline(
-    data = plotdf |> filter(!(entity %in% c("Pakistan", "Bangladesh"))),
+  geom_textsmooth(
+    data = plotdf,
     mapping = aes(
       label = entity,
-      colour = entity
+      colour = entity,
+      hjust = hjust_var
     ),
-    vjust = 0.57,
-    hjust = 0.2,
-    text_only = FALSE,
-    family = "body_font",
+    text_only = TRUE,
+    vjust = 0.1,
+    span = 0.5,
+    family = "cn_font",
     fontface = "bold",
-    text_smoothing = 10,
     size = bts / 3
   ) +
   scale_colour_manual(
-    values = colorspace::darken(mypal3[c(1,3,4)], 0.4)
+    values = colorspace::darken(mypal3, 0.4)
   ) +
-  ggnewscale::new_scale_colour() +
-  
-  # Add textpath for Bangladesh
-  geom_textline(
-    data = plotdf |> filter(entity %in% c("Pakistan", "Bangladesh")),
-    mapping = aes(
-      label = entity,
-      colour = entity
-    ),
-    vjust = 0.57,
-    hjust = 0.4,
-    text_only = FALSE,
-    family = "body_font",
-    fontface = "bold",
-    # text_smoothing = 10,
-    size = bts / 3
-  ) +
-  
   # Insert Flags
   ggflags::geom_flag(
     data = plotdf |> filter(year == 1950),
     mapping = aes(
-      country = country
+      country = country,
+      y = y_var
     ),
-    size = 24
-  ) +
-  
-  scale_colour_manual(
-    values = colorspace::darken(mypal3[c(2, 5)], 0.4)
+    size = 30
   ) +
   scale_x_continuous(
-    expand = expansion(c(0.05, 0)),
+    expand = expansion(c(0.01, 0)),
     breaks = seq(1950, 2020, 10)
   ) +
   scale_y_continuous(
     position = "right", 
-    breaks = 2:8
+    breaks = 2:8,
+    limits = c(1.8, 8.05),
+    expand = expansion(0)
   ) +
   scale_linewidth_continuous(
     range = c(5, 12)
   ) +
+  
+  # Adding data annotation
+  annotate(
+    geom = "label",
+    x = 1949, y = 4.5,
+    label = str_wrap(data_annotation, 30),
+    family = "caption_font",
+    hjust = 0, vjust = 1,
+    lineheight = 0.25,
+    label.size = NA,
+    fill = bg_col,
+    colour = text_hil,
+    size = bts / 4
+  ) +
+  
   # Labels and Themes
   labs(
     title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 105),
+    subtitle = str_wrap(plot_subtitle, 110),
     caption = plot_caption,
     x = NULL,
     y = "Total Fertility Rate (Children born per woman)",
@@ -568,9 +420,15 @@ g <- plotdf |>
   theme(
     legend.position = "none",
     panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linewidth = 1,
+      linetype = 3,
+      colour = "grey70"
+    ),
     axis.text.y = element_text(
       colour = text_hil, 
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.5
     ),
     axis.title.x = element_blank(),
     axis.title.y = element_text(
@@ -580,7 +438,7 @@ g <- plotdf |>
     ),
     axis.line.y = element_line(
       colour = text_hil,
-      linewidth = 0.5,
+      linewidth = 0.8,
       arrow = arrow(ends = "both"),
       linetype = 1
     ),
@@ -599,11 +457,12 @@ g <- plotdf |>
       colour = text_hil,
       margin = margin(5,0,0,0, "mm")
     ),
-    plot.subtitle = element_text(
-      lineheight = 0.28,
+    plot.subtitle = element_markdown(
+      lineheight = 0.35,
       colour = text_hil,
       hjust = 0.5,
-      margin = margin(5,0,0,0, "mm")
+      margin = margin(5,0,10,0, "mm"),
+      size = bts
     ),
     plot.title = element_text(
       family = "caption_font",
@@ -614,6 +473,68 @@ g <- plotdf |>
       margin = margin(10,0,0,0, "mm")
     )
   )
+```
+
+Adding a QR Code to the plot
+
+```{r}
+#| label: add-insets
+
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_fertility_textpath",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.5
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
+  )
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.0168, right = 0.2,
+    top = 0.28, bottom = 0.1,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_fertility_textpath.png"),
+  plot = g_full,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
 
 ```
 
@@ -622,14 +543,6 @@ Save the graphic and a thumbnail
 ```{r}
 #| label: save-plot
 
-ggsave(
-  filename = here::here("data_vizs", "owid_fertility_textpath.png"),
-  plot = g,
-  width = 400,
-  height = 500,
-  units = "mm",
-  bg = bg_col
-)
 
 library(magick)
 # Saving a thumbnail for the webpage
