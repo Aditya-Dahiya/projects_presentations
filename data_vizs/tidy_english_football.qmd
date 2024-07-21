@@ -1,10 +1,11 @@
 ---
-title: "Tidy Tuesday English Women's Football"
+title: "English Women's Football"
 author: "Aditya Dahiya"
-date: "2024-07-10"
-subtitle: "English Women's Football"
+date: "2024-07-21"
+subtitle: "English Women's Football Tier 1 team rankings over the years"
 categories:
   - "#TidyTuesday"
+  - "{ggbump}"
 image: "thumbnails/tidy_english_football.png"
 format:
   html:
@@ -27,11 +28,11 @@ share:
 bibliography: references.bib
 ---
 
-![..................................](tidy_english_football.png)
+![Ranking Chart (a bump chart) of Tier 1 English Women's Football Teams from 2011 to 2023-24 seasons. The best performing teams are coloured, while others are greyed out to highlight the dominance of 3 teams - Chelsea, Manchester City and Arsenal.](tidy_english_football.png)
 
 ### **How I made this graphic?**
 
-Loading required libraries, data import & creating custom functions
+Loading libraries & data
 
 ```{r}
 #| label: setup
@@ -53,23 +54,45 @@ ewf_matches <- readr::read_csv('https://raw.githubusercontent.com/rfordatascienc
 ewf_standings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-16/ewf_standings.csv')
 ```
 
-Data Wrangling: Inspiration - [this article](https://r-graph-gallery.com/circle-packing.html) at [R Graph gallery](https://r-graph-gallery.com/) by [Yan Holtz](https://www.yan-holtz.com/)
+Data Wrangling
 
 ```{r}
 #| label: eda
 
 df <- ewf_standings |> 
-  select(season, tier, team_name, position) |> 
+  select(season, tier, team_name, position, 
+         goals_for, goals_against, goal_difference) |> 
   filter(tier == 1) |> 
   mutate(team_name = str_remove_all(team_name, " Ladies")) |> 
   mutate(team_name = str_remove_all(team_name, " Women"))
 
-sel_cons <- df |> 
-  filter(season %in% c("2011-2011", "2023-2024")) |> 
+sel_teams <- df |> 
+  count(team_name, sort = TRUE) |> 
+  slice_max(order_by = n, n = 7) |> 
   pull(team_name)
 
+xlabels <- c("2011", "2012", "2013", "2014", "2015", "2016", "2017",
+             "2017-18", "2018-19", "2019-20",
+             "2020-21", "2021-22", "2022-23", "2023-24")
+
 plotdf <- df |> 
-  filter(team_name %in% sel_cons)
+  mutate(
+    colour_var = if_else(
+      team_name %in% sel_teams,
+      team_name,
+      "Others"
+    ),
+    colour_var = fct(colour_var, level = c(sel_teams, "Others")),
+    season = str_replace_all(season, "-20", "-")
+  ) |> 
+  mutate(
+    label_var = paste0(
+      "**", goals_for, "**  ", 
+      "   |  ", 
+      goals_against
+    ),
+    .keep = "unused"
+  )
 ```
 
 Visualization Parameters
@@ -78,7 +101,7 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Nova Mono",
+font_add_google("Bangers",
   family = "title_font"
 ) 
 
@@ -88,20 +111,23 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Wellfleet",
-  family = "body_font"
+font_add_google("Martel Sans",
+  family = "body_font",
+  regular.wt = 300,
+  bold.wt = 900
 ) 
 
 showtext_auto()
 
 # Credits for coffeee palette
-mypal <- paletteer::paletteer_d("palettesForR::Named")
+mypal <- c(paletteer::paletteer_d("MoMAColors::Panton"), "grey70")
+mypal |> seecolor::print_color()
 
 bg_col <- "white"
-text_col <-  "grey10"
-text_hil <- "#004C4CFF"
+text_col <-  mypal[5]
+text_hil <- mypal[4]
 
-bts <- 11
+bts <- 80
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -123,11 +149,11 @@ Annotation Text for the Plot
 
 plot_title <- "English Women's Football"
 
-plot_subtitle <- str_wrap("English Women's Football", 50)
+plot_subtitle <- str_wrap("3 teams donimate the Rankings in the Tier 1 since 2015: Chelsea, Manchester City and Aresnal.", 53)
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
-  "**Data:** #TidyTuesday", 
+  "**Data:** EWF Database by Rob Clapp & Data is Plural", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -144,55 +170,124 @@ The static plot:
 ```{r}
 #| label: static-plot
 
-plotdf |> 
+# Start the plot and build it layer by layer
+g <- plotdf |> 
   ggplot(
     mapping = aes(
       x = season, 
       y = position, 
       group = team_name,
-      colour = team_name
+      colour = colour_var
       )
     ) +
-  ggbump::geom_bump() +
+  ggbump::geom_bump(
+    alpha = 0.5,
+    linewidth = 4
+  ) +
+  geom_point(
+    pch = 21,
+    fill = bg_col,
+    stroke = 0.3,
+    size = 15,
+    alpha = 1
+  ) +
   
   # Left side labels
   geom_text(
-    data = plotdf |> filter(season == "2011-2011"),
+    data = plotdf |> filter(
+      season == "2011-11"
+      ),
     mapping = aes(
       label = str_wrap(team_name,1)
     ),
-    lineheight = 0.75,
-    size = 2,
+    lineheight = 0.3,
+    size = bts / 3,
     hjust = 1,
-    nudge_x = 0.05,
-    nudge_y = -0.4
+    nudge_x = -0.4,
+    # nudge_y = -0.4,
+    family = "caption_font"
   ) +
   
   # Right side labels
   geom_text(
-    data = plotdf |> filter(season == "2023-2024"),
+    data = plotdf |> filter(
+      season == "2023-24"
+      ),
     mapping = aes(
       label = str_wrap(team_name,1)
     ),
-    lineheight = 0.75,
-    size = 2,
+    lineheight = 0.3,
+    size = bts / 3,
     hjust = 0,
-    nudge_x = 0.05,
-    nudge_y = -0.4
+    nudge_x = 0.4,
+    # nudge_y = -0.4,
+    family = "caption_font"
   ) +
+  
+  # Labels inside circle for goals data
+  geom_richtext(
+    mapping = aes(
+      label = label_var,
+      colour = colour_var
+    ),
+    size = bts / 8,
+    family = "body_font",
+    lineheight = 0.3,
+    hjust = 0.5,
+    vjust = 0.5,
+    fill = "transparent",
+    label.size = NA
+  ) +
+  scale_colour_manual(values = mypal) +
+  
+  # Coordinates and Scales
   coord_cartesian(
     clip = "off"
   ) +
-  scale_y_reverse() +
-  theme_void(
-    base_size = 11,
-    base_family = "caption_font"
+  scale_y_reverse(
+    breaks = 1:12
+  ) +
+  
+  scale_x_discrete(
+    expand = expansion(c(0.18, 0.14)),
+    labels = xlabels
+  ) +
+  
+  # Labels for the plot
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = NULL, y = NULL
+  ) +
+
+  # Theme Elements
+  theme_minimal(
+    base_size = bts,
+    base_family = "body_font"
   ) +
   theme(
     legend.position = "none",
+    panel.grid = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.y = element_text(
+      size = bts * 1.5,
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      face = "bold"
+    ),
+    axis.text.x = element_text(
+      size = bts * 0.5,
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    ),
     plot.background = element_rect(
       fill = bg_col,
-      colour= "transparent"
+      colour = "transparent"
     ),
     panel.background = element_rect(
       fill = "transparent",
@@ -205,54 +300,138 @@ plotdf |>
     ),
     plot.title = element_text(
       hjust = 0.5,
-      size = 3 * bts,
+      size = 4.2 * bts,
       colour = text_hil,
-      margin = margin(10,0,0,0, "mm")
+      margin = margin(10,0,0,0, "mm"),
+      family = "title_font"
     ),
     plot.subtitle = element_text(
       colour = text_hil,
-      size = 2 * bts,
+      size = 1.7 * bts,
       hjust = 0.5, 
       lineheight = 0.3,
-      margin = margin(10,0,10,0, "mm")
-    ),
-    legend.title = element_text(
-      colour = text_hil,
-      margin = margin(0,10,0,0, "mm"),
-      hjust = 0.5,
-      size = 1.5 * bts,
-      family = "body_font"
-    ),
-    legend.text = element_text(
-      colour = text_hil,
-      margin = margin(0,0,0,5, "mm"),
-      size = 1.5 * bts,
-      family = "body_font"
+      margin = margin(7,0,3,0, "mm"),
+      face = "italic"
     ),
     plot.margin = margin(10,10,10,10, "mm")
   )
+```
 
+Annotation
+
+```{r}
+#| label: annotate
+
+g_inset <- ggplot(
+  data = tibble(
+    x = cos(seq(0, 2 * pi, length.out = 1000)),
+    y = sin(seq(0, 2 * pi, length.out = 1000))
+    ),
+  mapping = aes(x = x, y = y)
+  ) +
+  geom_polygon(
+    fill = "transparent",
+    colour = text_hil,
+    linewidth = 3
+  ) +
+  annotate(
+    geom = "richtext",
+    x = 0, y = 0,
+    label = "**24**  |  12",
+    size = bts / 3.5,
+    label.size = NA,
+    fill = "transparent",
+    colour = text_hil,
+    family = "body_font"
+  ) +
+  
+  # Arrows
+  annotate(
+    geom = "curve",
+    x = -0.5, xend = -1.5,
+    y = -0.3, yend = -1.5,
+    curvature = -0.25,
+    arrow = arrow(),
+    colour = text_hil,
+    linewidth = 1.5
+  ) +
+  annotate(
+    geom = "curve",
+    x = 0.5, xend = 1.5,
+    y = -0.3, yend = -1.5,
+    curvature = 0.25,
+    arrow = arrow(),
+    colour = text_hil,
+    linewidth = 1.5
+  ) +
+  
+  # Annotation Text
+  annotate(
+    geom = "richtext",
+    x = -1.5, y = -1.5,
+    label = "**Goals scored**",
+    size = bts / 3,
+    label.size = NA,
+    hjust = 1, vjust = 1,
+    fill = "transparent",
+    colour = text_hil,
+    family = "body_font"
+  ) +
+  annotate(
+    geom = "richtext",
+    x = 1.5, y = -1.5,
+    label = "Goals against",
+    size = bts / 3,
+    label.size = NA,
+    hjust = 0, vjust = 1,
+    fill = "transparent",
+    colour = text_hil,
+    family = "body_font"
+  ) +
+  coord_equal(
+    xlim = c(-2,2),
+    ylim = c(-2, 1),
+    clip = "off"
+  ) +
+  theme_void()
+
+g_full <- g +
+  inset_element(
+    p = g_inset,
+    left = 0.2, right = 0.4,
+    top = 0.3, bottom = 0,
+    clip = FALSE,
+    align_to = "panel"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        colour = "transparent", fill = "transparent"
+      )
+    )
+  )
 ```
 
 Savings the graphics
 
 ```{r}
 #| label: save-image
-
 ggsave(
   filename = here::here("data_vizs", "tidy_english_football.png"),
-  plot = g,
+  plot = g_full,
   width = 400,    # Best Twitter Aspect Ratio = 5:4
   height = 500,   
   units = "mm",
   bg = bg_col
 )
 
-
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "tidy_drob.png")) |> 
+image_read(here::here("data_vizs", "tidy_english_football.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_drob.png"))
+  image_write(here::here("data_vizs", "thumbnails", "tidy_english_football.png"))
 
 ```
