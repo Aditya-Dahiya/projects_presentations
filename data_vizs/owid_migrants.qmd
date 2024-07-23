@@ -1,0 +1,294 @@
+---
+title: "International Migration Levels"
+author: "Aditya Dahiya"
+date: "2024-07-22"
+subtitle: "................................"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+  - "{circlize}"
+image: "thumbnails/owid_migrants.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+
+# Getting the data
+# search1 <- owid_search("migrant")
+
+# rawdf <- owid("migrant-stock-total")
+
+url1 <- "https://www.un.org/development/desa/pd/sites/www.un.org.development.desa.pd/files/undesa_pd_2020_ims_stock_by_sex_destination_and_origin.xlsx"
+
+rawdf2 <- openxlsx::read.xlsx(
+  xlsxFile = url1,
+  sheet = "Table 2",
+  startRow = 10,
+  colNames = TRUE
+)
+
+sel_continents <- c("AFRICA", "ASIA", "EUROPE", 
+                    "LATIN AMERICA AND THE CARIBBEAN", 
+                    "NORTHERN AMERICA", "OCEANIA")
+
+df1 <- rawdf2 |> 
+  janitor::clean_names() |> 
+  as_tibble() |> 
+  rename(origin = region_development_group_of_destination) |> 
+  mutate(origin = str_squish(origin)) |> 
+  select(-c(x1, x3, x4)) |> 
+  pivot_longer(
+    cols = -origin,
+    names_to = "destination",
+    values_to = "value"
+  ) |> 
+  filter(origin %in% sel_continents) |> 
+  filter(destination %in% str_to_lower(sel_continents)) |> 
+  mutate(
+    origin = str_to_title(origin),
+    destination = str_to_title(destination)
+  ) |> 
+  rename(
+    from = origin,
+    to = destination
+  )
+
+library(circlize)
+df1 |> 
+  circlize::chordDiagram(
+    transparency = 0.3,
+    symmetric = TRUE,
+    small.gap = 100
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("News Cycle",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Roboto Condensed",
+  family = "body_font"
+) 
+
+# Font for Country Names
+font_add_google(
+  "Kanit",
+  family = "cn_font"
+)
+
+showtext_auto()
+
+# Colour Palette
+
+# Background Colour
+bg_col <- "white"
+text_col <- "grey10"
+text_hil <- "grey25"
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "Migration Chord Diagram"
+
+plot_subtitle <- glue::glue("......................")
+
+data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** United Nations & Our World in Data  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+```
+
+Visualization
+
+```{r}
+#| label: visualize
+
+df1 |> 
+  distinct(from)
+
+chordDiagram(
+  x = df1, 
+  # grid.col = mycolor,
+  transparency = 0.25,
+  directional = FALSE,
+  direction.type = c("arrows", "diffHeight"), 
+  diffHeight  = -0.04,
+  annotationTrack = "grid", 
+  annotationTrackHeight = c(0.05, 0.1),
+  link.arr.type = "big.arrow", 
+  link.sort = TRUE, 
+  link.largest.ontop = TRUE
+  )
+
+# Add text and axis
+circos.trackPlotRegion(
+  track.index = 1, 
+  bg.border = NA, 
+  panel.fun = function(x, y) {
+    
+    xlim = get.cell.meta.data("xlim")
+    sector.index = get.cell.meta.data("sector.index")
+    
+    # Add names to the sector. 
+    circos.text(
+      x = mean(xlim), 
+      y = 3.2, 
+      labels = sector.index, 
+      facing = "bending", 
+      cex = 0.8
+      )
+
+    # Add graduation on axis
+    circos.axis(
+      h = "top", 
+      major.at = seq(from = 0, to = xlim[2], by = ifelse(test = xlim[2]>10, yes = 2, no = 1)), 
+      minor.ticks = 1, 
+      major.tick.percentage = 0.5,
+      labels.niceFacing = FALSE)
+  }
+)
+
+```
+
+Adding a QR Code to the plot
+
+```{r}
+#| label: add-insets
+
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_fertility_textpath",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.5
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
+  )
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.0168, right = 0.2,
+    top = 0.28, bottom = 0.1,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+```
+
+Save the graphic and a thumbnail
+
+```{r}
+#| label: save-plot
+
+ggsave(
+  filename = here::here("data_vizs", "owid_fertility_textpath.png"),
+  plot = g_full,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_fertility_textpath.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_fertility_textpath.png"))
+```
