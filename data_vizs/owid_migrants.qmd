@@ -62,6 +62,13 @@ rawdf2 <- openxlsx::read.xlsx(
   startRow = 10,
   colNames = TRUE
 )
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
 
 sel_continents <- c("AFRICA", "ASIA", "EUROPE", 
                     "LATIN AMERICA AND THE CARIBBEAN", 
@@ -87,14 +94,6 @@ df1 <- rawdf2 |>
   rename(
     from = origin,
     to = destination
-  )
-
-library(circlize)
-df1 |> 
-  circlize::chordDiagram(
-    transparency = 0.3,
-    symmetric = TRUE,
-    small.gap = 100
   )
 ```
 
@@ -165,56 +164,47 @@ rm(github, github_username, xtwitter,
    xtwitter_username, social_caption_1, social_caption_2)
 ```
 
-Visualization
+Visualization: A Sankey Diagram using [@ggsankeyfier]
 
 ```{r}
 #| label: visualize
 
-df1 |> 
-  distinct(from)
+library(ggsankeyfier)
+sankey_pos <- position_sankey(
+  v_space = "auto", 
+  order = "ascending", 
+  align = "justify")
 
-chordDiagram(
-  x = df1, 
-  # grid.col = mycolor,
-  transparency = 0.25,
-  directional = FALSE,
-  direction.type = c("arrows", "diffHeight"), 
-  diffHeight  = -0.04,
-  annotationTrack = "grid", 
-  annotationTrackHeight = c(0.05, 0.1),
-  link.arr.type = "big.arrow", 
-  link.sort = TRUE, 
-  link.largest.ontop = TRUE
-  )
 
-# Add text and axis
-circos.trackPlotRegion(
-  track.index = 1, 
-  bg.border = NA, 
-  panel.fun = function(x, y) {
-    
-    xlim = get.cell.meta.data("xlim")
-    sector.index = get.cell.meta.data("sector.index")
-    
-    # Add names to the sector. 
-    circos.text(
-      x = mean(xlim), 
-      y = 3.2, 
-      labels = sector.index, 
-      facing = "bending", 
-      cex = 0.8
-      )
+plotdf1 <- df1 |> 
+   pivot_longer(
+    cols = c(from, to),
+    names_to = "connector_var",
+    values_to = "node_var"
+  ) |> 
+  relocate(node_var, connector_var, value)
 
-    # Add graduation on axis
-    circos.axis(
-      h = "top", 
-      major.at = seq(from = 0, to = xlim[2], by = ifelse(test = xlim[2]>10, yes = 2, no = 1)), 
-      minor.ticks = 1, 
-      major.tick.percentage = 0.5,
-      labels.niceFacing = FALSE)
-  }
-)
-
+plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      x = connector_var,
+      y = value,
+      connector = connector_var,
+      group = node_var,
+      edge_id = value,
+      fill = node_var,
+      colour = node_var
+    )
+  ) +
+  geom_sankeyedge(position = sankey_pos) +
+  geom_bar(position = sankey_pos, stat = "sankeynode") +
+  # geom_text(
+  #   mapping = aes(label = node_var),
+  #   colour = "black",
+  #   position = sankey_pos
+  # ) +
+  theme_minimal()
+  
 ```
 
 Adding a QR Code to the plot
@@ -291,4 +281,55 @@ image_read(here::here("data_vizs",
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", "thumbnails", 
                          "owid_fertility_textpath.png"))
+```
+
+Other attempts
+
+```{r}
+#| label: visualize
+#| eval: false
+
+chordDiagram(
+  x = df1, 
+  # grid.col = mycolor,
+  transparency = 0.25,
+  directional = TRUE,
+  direction.type = c("arrows", "diffHeight"), 
+  diffHeight  = -0.04,
+  annotationTrack = "grid", 
+  annotationTrackHeight = c(0.05, 0.1),
+  link.arr.type = "big.arrow", 
+  link.sort = TRUE, 
+  link.largest.ontop = TRUE
+  )
+
+# Add text and axis
+circos.trackPlotRegion(
+  track.index = 1, 
+  bg.border = NA, 
+  panel.fun = function(x, y) {
+    
+    xlim = get.cell.meta.data("xlim")
+    sector.index = get.cell.meta.data("sector.index")
+    
+    # Add names to the sector. 
+    circos.text(
+      x = mean(xlim), 
+      y = 3.2, 
+      labels = sector.index, 
+      facing = "bending", 
+      cex = 0.8
+      )
+
+    # Add graduation on axis
+    circos.axis(
+      h = "top", 
+      major.at = seq(from = 0, to = xlim[2], 
+                     by = ifelse(test = xlim[2]>10, yes = 2, no = 1)), 
+      minor.ticks = 1, 
+      major.tick.percentage = 0.5,
+      labels.niceFacing = FALSE)
+  }
+)
+
 ```
