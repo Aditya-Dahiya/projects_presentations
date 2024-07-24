@@ -49,9 +49,10 @@ library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # To lighten and darken colours
 library(patchwork)            # Combining plots
 
+library(ggsankeyfier)         # Sankey Diagrams with ggplot2
+
 # Getting the data
 # search1 <- owid_search("migrant")
-
 # rawdf <- owid("migrant-stock-total")
 
 url1 <- "https://www.un.org/development/desa/pd/sites/www.un.org.development.desa.pd/files/undesa_pd_2020_ims_stock_by_sex_destination_and_origin.xlsx"
@@ -69,14 +70,15 @@ Data Wrangling
 ```{r}
 #| label: data-wrangling
 
-
 sel_continents <- c("AFRICA", "ASIA", "EUROPE", 
                     "LATIN AMERICA AND THE CARIBBEAN", 
                     "NORTHERN AMERICA", "OCEANIA")
 
 df1 <- rawdf2 |> 
+  # Remove minor duplication of "Australia.And.New.Zealand"
+  select(-12) |> 
   janitor::clean_names() |> 
-  as_tibble() |> 
+  as_tibble() |>
   rename(origin = region_development_group_of_destination) |> 
   mutate(origin = str_squish(origin)) |> 
   select(-c(x1, x3, x4)) |> 
@@ -94,6 +96,42 @@ df1 <- rawdf2 |>
   rename(
     from = origin,
     to = destination
+  )
+
+df3 <- rawdf2 |> 
+  select(-12) |> 
+  as_tibble() |>
+  slice(23:n()) |> 
+  rename(origin = `Region,.development.group.of.destination`) |> 
+  select(-c(X1, X3, X4)) |> 
+  mutate(origin = str_squish(origin)) |> 
+  mutate(
+    group_var = if_else(
+      origin %in% sel_continents,
+      origin,
+      NA
+    )
+  ) |> 
+  relocate(group_var, .after = origin) |> 
+  fill(group_var) |> 
+  # group_by(group_var) |> 
+  # mutate(prop_var = WORLD / sum(WORLD)) |> 
+  # relocate(prop_var, .after = group_var) |> 
+  # ungroup() |> 
+  pivot_longer(
+    cols = -c(origin, group_var, WORLD),
+    names_to = "destination",
+    values_to = "value"
+  ) |> 
+  filter(origin != group_var) |> 
+  mutate(destination = snakecase::to_title_case(destination))
+
+  
+df_to_join <- df3 |> 
+  distinct(origin, group_var) |> 
+  rename(
+    destination = origin,
+    group_var_dest = group_var
   )
 ```
 
@@ -169,15 +207,21 @@ Visualization: A Sankey Diagram using [@ggsankeyfier]
 ```{r}
 #| label: visualize
 
-library(ggsankeyfier)
 sankey_pos <- position_sankey(
   v_space = "auto", 
   order = "ascending", 
-  align = "justify")
-
+  align = "justify"
+  )
 
 plotdf1 <- df1 |> 
-   pivot_longer(
+  mutate(
+    colour_var = if_else(
+      from == to,
+      "Within Continent",
+      "Inter-Continental"
+    )
+  ) |> 
+  pivot_longer(
     cols = c(from, to),
     names_to = "connector_var",
     values_to = "node_var"
@@ -196,14 +240,30 @@ plotdf1 |>
       colour = node_var
     )
   ) +
-  geom_sankeyedge(position = sankey_pos) +
+  geom_sankeyedge(
+    mapping = aes(
+      colour = colour_var,
+      fill = colour_var
+    ),
+    position = sankey_pos
+  ) +
   geom_bar(position = sankey_pos, stat = "sankeynode") +
-  # geom_text(
-  #   mapping = aes(label = node_var),
-  #   colour = "black",
-  #   position = sankey_pos
-  # ) +
-  theme_minimal()
+  geom_text(
+   mapping = aes(
+     label = node_var),
+   colour = "black",
+   position = sankey_pos,
+   stat = "sankeynode"
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = 11
+  ) +
+  theme(
+    axis.text.x = element_text(
+      family = "title_font"
+    )
+  )
   
 ```
 
