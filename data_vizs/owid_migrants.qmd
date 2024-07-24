@@ -88,51 +88,107 @@ df1 <- rawdf2 |>
     values_to = "value"
   ) |> 
   filter(origin %in% sel_continents) |> 
-  filter(destination %in% str_to_lower(sel_continents)) |> 
   mutate(
     origin = str_to_title(origin),
-    destination = str_to_title(destination)
-  ) |> 
+    destination = snakecase::to_title_case(destination),
+    destination = str_remove_all(destination, "\\d+")
+  ) |>
+  filter(destination %in% snakecase::to_title_case(sel_continents)) |> 
   rename(
-    from = origin,
-    to = destination
+    to = origin,
+    from = destination
   )
 
-df3 <- rawdf2 |> 
-  select(-12) |> 
-  as_tibble() |>
-  slice(23:n()) |> 
-  rename(origin = `Region,.development.group.of.destination`) |> 
-  select(-c(X1, X3, X4)) |> 
-  mutate(origin = str_squish(origin)) |> 
+# The final tibbles to use for plotting
+plotdf1 <- df1 |> 
   mutate(
-    group_var = if_else(
-      origin %in% sel_continents,
-      origin,
-      NA
+    fill_var = if_else(
+      from == to,
+      "Within Continent",
+      "Inter-Continental"
     )
   ) |> 
-  relocate(group_var, .after = origin) |> 
-  fill(group_var) |> 
-  # group_by(group_var) |> 
-  # mutate(prop_var = WORLD / sum(WORLD)) |> 
-  # relocate(prop_var, .after = group_var) |> 
-  # ungroup() |> 
   pivot_longer(
-    cols = -c(origin, group_var, WORLD),
-    names_to = "destination",
-    values_to = "value"
+    cols = c(from, to),
+    names_to = "connector_var",
+    values_to = "node_var"
   ) |> 
-  filter(origin != group_var) |> 
-  mutate(destination = snakecase::to_title_case(destination))
+  relocate(node_var, connector_var, value) |> 
+  mutate(
+    x_var = case_when(
+      connector_var == "from" ~ 1,
+      connector_var == "to" ~ 2,
+      .default = NA
+    )
+  ) |> 
+  mutate(node_var = if_else(
+    node_var == "Latin America And The Caribbean",
+    "Latin America and the Caribbean",
+    node_var
+  ))
 
-  
-df_to_join <- df3 |> 
-  distinct(origin, group_var) |> 
-  rename(
-    destination = origin,
-    group_var_dest = group_var
+# Arranging the Continents in proper order
+levels_continents <- plotdf1 |> 
+  group_by(node_var) |> 
+  summarise(value = sum(value)) |> 
+  arrange(desc(value)) |> 
+  pull(node_var)
+
+# The Flows to highlight in the final graphic
+top_flows <- plotdf1 |> 
+  filter(colour_var == "Inter-Continental") |> 
+  slice_max(order_by = value, n = 6) |> 
+  distinct(value) |> 
+  pull()
+
+plotdf2 <- plotdf1 |> 
+  mutate(
+    node_var = fct(node_var, levels = levels_continents),
+    colour_var = if_else(
+      value %in% top_flows,
+      "a",
+      "b"
+    )
   )
+
+
+# Another Analysis Sub-Region Wise: Didnt work out! So, skip it.
+
+# df3 <- rawdf2 |> 
+#   select(-12) |> 
+#   as_tibble() |>
+#   slice(23:n()) |> 
+#   rename(origin = `Region,.development.group.of.destination`) |> 
+#   select(-c(X1, X3, X4)) |> 
+#   mutate(origin = str_squish(origin)) |> 
+#   mutate(
+#     group_var = if_else(
+#       origin %in% sel_continents,
+#       origin,
+#       NA
+#     )
+#   ) |> 
+#   relocate(group_var, .after = origin) |> 
+#   fill(group_var) |> 
+#   group_by(group_var) |>
+#   mutate(prop_var = WORLD / sum(WORLD)) |>
+#   relocate(prop_var, .after = group_var) |>
+#   ungroup() |>
+#   pivot_longer(
+#     cols = -c(origin, group_var, WORLD),
+#     names_to = "destination",
+#     values_to = "value"
+#   ) |> 
+#   filter(origin != group_var) |> 
+#   mutate(destination = snakecase::to_title_case(destination))
+# 
+#   
+# df_to_join <- df3 |> 
+#   distinct(origin, group_var) |> 
+#   rename(
+#     destination = origin,
+#     group_var_dest = group_var
+#   )
 ```
 
 Visualization Parameters
@@ -207,55 +263,83 @@ Visualization: A Sankey Diagram using [@ggsankeyfier]
 ```{r}
 #| label: visualize
 
-sankey_pos <- position_sankey(
-  v_space = "auto", 
-  order = "ascending", 
-  align = "justify"
-  )
+# Learning how to use {ggsankeyfier}
+# vignette("data_management")
+# vignette("loopdeloop")
+# vignette("positioning")
+# vignette("decorating")
 
-plotdf1 <- df1 |> 
-  mutate(
-    colour_var = if_else(
-      from == to,
-      "Within Continent",
-      "Inter-Continental"
+sankey_pos <- function(...){
+  position_sankey(
+    width = 0.1,
+    v_space = "auto", 
+    order = "as_is", 
+    align = "justify",
+    ...
     )
-  ) |> 
-  pivot_longer(
-    cols = c(from, to),
-    names_to = "connector_var",
-    values_to = "node_var"
-  ) |> 
-  relocate(node_var, connector_var, value)
+}
 
-plotdf1 |> 
+plotdf2 |> 
   ggplot(
     mapping = aes(
-      x = connector_var,
+      x = x_var,
       y = value,
       connector = connector_var,
       group = node_var,
-      edge_id = value,
-      fill = node_var,
-      colour = node_var
+      edge_id = value
     )
   ) +
+  
+  # Sankey Flows
   geom_sankeyedge(
     mapping = aes(
-      colour = colour_var,
+      # colour = colour_var,
       fill = colour_var
     ),
-    position = sankey_pos
+    colour = "transparent",
+    slope = 0.5,
+    position = sankey_pos(),
+    alpha = 0.5
   ) +
-  geom_bar(position = sankey_pos, stat = "sankeynode") +
+  scale_fill_manual(
+    values = c("#008D98FF", "#C8102EFF")
+  ) +
+  ggnewscale::new_scale_fill() +
+  
+  # Bars at the ends to reflect totals
+  geom_bar(
+    mapping = aes(fill = node_var),
+    position = sankey_pos(), 
+    stat = "sankeynode",
+    colour = "transparent"
+  ) +
+  paletteer::scale_fill_paletteer_d("PNWColors::Sailboat") +
+  
+  # Left hand side labels
   geom_text(
-   mapping = aes(
-     label = node_var),
-   colour = "black",
-   position = sankey_pos,
-   stat = "sankeynode"
-  ) +
-  theme_void(
+    data = plotdf2 |> filter(connector_var == "from"),
+    mapping = aes(
+      label = str_wrap(node_var, 10)),
+    colour = "black",
+    hjust = 1,
+    position = sankey_pos(nudge_x = -0.06),
+    stat = "sankeynode",
+    lineheight = 0.5
+    ) +
+  # Right hand side labels
+  geom_text(
+    data = plotdf2 |> filter(connector_var == "to"),
+    mapping = aes(
+      label = str_wrap(node_var, 10)),
+    colour = "black",
+    hjust = 0,
+    position = sankey_pos(nudge_x = 0.06),
+    stat = "sankeynode",
+    lineheight = 0.5
+    ) +
+  
+  
+  theme_minimal(
     base_family = "body_font",
     base_size = 11
   ) +
@@ -264,7 +348,8 @@ plotdf1 |>
       family = "title_font"
     )
   )
-  
+
+
 ```
 
 Adding a QR Code to the plot
