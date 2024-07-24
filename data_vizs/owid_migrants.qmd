@@ -136,10 +136,11 @@ levels_continents <- plotdf1 |>
 
 # The Flows to highlight in the final graphic
 top_flows <- plotdf1 |> 
-  filter(colour_var == "Inter-Continental") |> 
+  filter(fill_var == "Inter-Continental") |> 
   slice_max(order_by = value, n = 6) |> 
   distinct(value) |> 
   pull()
+
 
 plotdf2 <- plotdf1 |> 
   mutate(
@@ -151,6 +152,19 @@ plotdf2 <- plotdf1 |>
     )
   )
 
+plotdf3 <- plotdf2 |> 
+  group_by(connector_var, x_var, node_var) |> 
+  summarise(
+    value = sum(value)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    label_value = paste0(round(value/1e6, 2), " million")
+  ) |> 
+  select(-value)
+
+plotdf4 <- plotdf2 |> 
+  left_join(plotdf3)
 
 # Another Analysis Sub-Region Wise: Didnt work out! So, skip it.
 
@@ -271,7 +285,7 @@ Visualization: A Sankey Diagram using [@ggsankeyfier]
 
 sankey_pos <- function(...){
   position_sankey(
-    width = 0.1,
+    width = 0.05,
     v_space = "auto", 
     order = "as_is", 
     align = "justify",
@@ -279,7 +293,7 @@ sankey_pos <- function(...){
     )
 }
 
-plotdf2 |> 
+g <- plotdf4 |> 
   ggplot(
     mapping = aes(
       x = x_var,
@@ -293,18 +307,17 @@ plotdf2 |>
   # Sankey Flows
   geom_sankeyedge(
     mapping = aes(
-      # colour = colour_var,
-      fill = colour_var
+      fill = node_var
     ),
-    colour = "transparent",
-    slope = 0.5,
+    # colour = "transparent",
+    # slope = 0.5,
     position = sankey_pos(),
     alpha = 0.5
   ) +
-  scale_fill_manual(
-    values = c("#008D98FF", "#C8102EFF")
-  ) +
-  ggnewscale::new_scale_fill() +
+  # scale_fill_manual(
+  #   values = c("#008D98FF", "#C8102EFF")
+  # ) +
+  # ggnewscale::new_scale_fill() +
   
   # Bars at the ends to reflect totals
   geom_bar(
@@ -317,37 +330,94 @@ plotdf2 |>
   
   # Left hand side labels
   geom_text(
-    data = plotdf2 |> filter(connector_var == "from"),
+    data = plotdf4 |> filter(connector_var == "from"),
     mapping = aes(
-      label = str_wrap(node_var, 10)),
-    colour = "black",
+      label = paste0(
+        str_wrap(node_var, 20),
+        "\n(",
+        label_value, ")"
+      )
+    ),
+    colour = text_col,
     hjust = 1,
-    position = sankey_pos(nudge_x = -0.06),
+    position = sankey_pos(nudge_x = -0.04),
     stat = "sankeynode",
-    lineheight = 0.5
+    lineheight = 0.3,
+    size = bts / 3,
+    family = "body_font"
     ) +
   # Right hand side labels
   geom_text(
-    data = plotdf2 |> filter(connector_var == "to"),
+    data = plotdf4 |> filter(connector_var == "to"),
     mapping = aes(
-      label = str_wrap(node_var, 10)),
-    colour = "black",
+      label = paste0(
+        str_wrap(node_var, 20),
+        "\n(",
+        label_value, ")"
+      )
+    ),
+    colour = text_col,
     hjust = 0,
-    position = sankey_pos(nudge_x = 0.06),
+    position = sankey_pos(nudge_x = 0.04),
     stat = "sankeynode",
-    lineheight = 0.5
+    lineheight = 0.3,
+    size = bts / 3,
+    family = "body_font"
     ) +
   
+  # Labels
+  labs(
+    title = "Migrant data",
+    subtitle = "details here",
+    caption = plot_caption
+  ) +
   
-  theme_minimal(
+  # Scales and Coordinates
+  scale_x_continuous(
+    expand = expansion(0.2)
+  ) +
+  scale_y_continuous(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  # Themes and beautification
+  theme_void(
     base_family = "body_font",
-    base_size = 11
+    base_size = bts
   ) +
   theme(
-    axis.text.x = element_text(
-      family = "title_font"
-    )
+    plot.title = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(10,0,10,0, "mm"),
+      size = 2 * bts
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(0,0,15,0, "mm"),
+      lineheight = 0.35
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5
+    ),
+    legend.position = "none",
+    plot.margin = margin(10,10,10,10, "mm")
   )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_migrants.png"),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
 
 
 ```
@@ -409,15 +479,6 @@ Save the graphic and a thumbnail
 
 ```{r}
 #| label: save-plot
-
-ggsave(
-  filename = here::here("data_vizs", "owid_fertility_textpath.png"),
-  plot = g_full,
-  width = 400,
-  height = 500,
-  units = "mm",
-  bg = bg_col
-)
 
 library(magick)
 # Saving a thumbnail for the webpage
