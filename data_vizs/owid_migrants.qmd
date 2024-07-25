@@ -1,13 +1,13 @@
 ---
-title: "International Migration Levels"
+title: "Migration: Internal and Inter-Continental Flows (2020)"
 author: "Aditya Dahiya"
-date: "2024-07-22"
-subtitle: "................................"
+date: "2024-07-25"
+subtitle: "The Sankey diagram visualizes the migration flows in 2020, highlighting the dominance of internal migration within Asia and Europe. Major inter-continental migration routes include Asia to Europe, Asia to North America, and Latin America to North America, illustrating key pathways in global population movement."
 categories:
   - "A4 Size Viz"
   - "Our World in Data"
   - "Public Health"
-  - "{circlize}"
+  - "{ggsankeyfier}"
 image: "thumbnails/owid_migrants.png"
 format:
   html:
@@ -29,6 +29,12 @@ share:
   mastodon: true
 bibliography: references.bib
 ---
+
+## Migration: Internal and Inter-Continental Flows (2020)
+
+The data for this Sankey diagram, depicting migration flows in 2020, is sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It includes comprehensive international migrant statistics, standardized and refined through several processing steps to ensure accuracy and clarity. The graphic highlights key findings, showing the dominance of internal migration within Asia and Europe and significant inter-continental routes from Asia to Europe, Asia to North America, and Latin America to North America, reflecting crucial patterns in global population movements. For more details, visit the [UN DESA International Migrant Stock](https://www.un.org/development/desa/pd/content/international-migrant-stock) page.
+
+![This graphic visualizes global migration flows for the year 2020 using data sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It highlights both internal and inter-continental migration patterns through a Sankey Diagram.](owid_migrants.png)
 
 ### How I made this graphic?
 
@@ -211,7 +217,7 @@ Visualization Parameters
 #| label: parameters2
 
 # Font for titles
-font_add_google("News Cycle",
+font_add_google("Acme",
   family = "title_font"
 ) 
 
@@ -221,15 +227,9 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Roboto Condensed",
+font_add_google("Changa",
   family = "body_font"
 ) 
-
-# Font for Country Names
-font_add_google(
-  "Kanit",
-  family = "cn_font"
-)
 
 showtext_auto()
 
@@ -237,17 +237,22 @@ showtext_auto()
 
 # Background Colour
 bg_col <- "white"
-text_col <- "grey10"
-text_hil <- "grey25"
+text_col <- "#2e5075"
+text_hil <- "#18304a"
 
 # Base Text Size
 bts <- 80
 
-plot_title <- "Migration Chord Diagram"
+plot_title <- "Global Migration Trends in 2020"
 
-plot_subtitle <- glue::glue("......................")
+plot_subtitle <- str_wrap(
+  glue::glue("There is dominance of internal migration within Asia and Europe. Major inter-continental migration routes include Asia to Europe, Asia to North America, and Latin America to North America."
+      ),
+  65
+  )
+str_view(plot_subtitle)
 
-data_annotation <- "About the Data: This data on fertility rates, sourced from the United Nations' World Population Prospects (2022) and processed by Our World in Data, spans from 1950 to 2021. It reflects the average number of live births per woman, with age-specific rates, providing insights into global fertility trends across decades."
+data_annotation <- "About the Data: The data comes from the United Nations (UN) and the United Nations Department of Economic and Social Affairs (UN DESA) for the year 2020."
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -309,23 +314,22 @@ g <- plotdf4 |>
     mapping = aes(
       fill = node_var
     ),
-    # colour = "transparent",
-    # slope = 0.5,
     position = sankey_pos(),
-    alpha = 0.5
+    alpha = 0.6
   ) +
-  # scale_fill_manual(
-  #   values = c("#008D98FF", "#C8102EFF")
-  # ) +
-  # ggnewscale::new_scale_fill() +
   
   # Bars at the ends to reflect totals
-  geom_bar(
+  geom_sankeynode(
     mapping = aes(fill = node_var),
-    position = sankey_pos(), 
-    stat = "sankeynode",
-    colour = "transparent"
-  ) +
+    position = sankey_pos()
+  ) +  
+  
+  # geom_bar(
+  #   mapping = aes(fill = node_var),
+  #   position = sankey_pos(), 
+  #   stat = "sankeynode",
+  #   colour = "transparent"
+  # ) +
   paletteer::scale_fill_paletteer_d("PNWColors::Sailboat") +
   
   # Left hand side labels
@@ -344,7 +348,8 @@ g <- plotdf4 |>
     stat = "sankeynode",
     lineheight = 0.3,
     size = bts / 3,
-    family = "body_font"
+    family = "caption_font",
+    fontface = "bold"
     ) +
   # Right hand side labels
   geom_text(
@@ -362,13 +367,14 @@ g <- plotdf4 |>
     stat = "sankeynode",
     lineheight = 0.3,
     size = bts / 3,
-    family = "body_font"
+    family = "caption_font",
+    fontface = "bold"
     ) +
   
   # Labels
   labs(
-    title = "Migrant data",
-    subtitle = "details here",
+    title = plot_title,
+    subtitle = plot_subtitle,
     caption = plot_caption
   ) +
   
@@ -393,13 +399,15 @@ g <- plotdf4 |>
       colour = text_hil,
       hjust = 0.5,
       margin = margin(10,0,10,0, "mm"),
-      size = 2 * bts
+      size = 3.5 * bts,
+      family = "title_font"
     ),
     plot.subtitle = element_text(
       colour = text_hil,
       hjust = 0.5,
       margin = margin(0,0,15,0, "mm"),
-      lineheight = 0.35
+      lineheight = 0.30,
+      size = 1.5 * bts
     ),
     plot.caption = element_textbox(
       colour = text_hil,
@@ -413,7 +421,7 @@ g <- plotdf4 |>
 ggsave(
   filename = here::here("data_vizs", "owid_migrants.png"),
   plot = g,
-  width = 400,
+  width = 500,
   height = 500,
   units = "mm",
   bg = bg_col
@@ -422,7 +430,7 @@ ggsave(
 
 ```
 
-Adding a QR Code to the plot
+An A4 size graphic: for the same data with references and QR Code to the plot
 
 ```{r}
 #| label: add-insets
@@ -432,7 +440,7 @@ Adding a QR Code to the plot
 url_graphics <- paste0(
   "https://aditya-dahiya.github.io/projects_presentations/projects/",
   # The file name of the current .qmd file
-  "owid_fertility_textpath",
+  "owid_migrants",
   ".qmd"
 )
 # remotes::install_github('coolbutuseless/ggqr')
