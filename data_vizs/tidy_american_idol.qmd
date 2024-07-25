@@ -1,7 +1,7 @@
 ---
 title: "American Idol Data"
 author: "Aditya Dahiya"
-date: "2024-07-25"
+date: "2024-07-26"
 subtitle: "#TidyTuesday American Idol Data"
 categories:
   - "#TidyTuesday"
@@ -46,14 +46,15 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
+library(ggshadow)             # Shadows and Glowing lines / points
 
 # Getting the data
-auditions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/auditions.csv')
-eliminations <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/eliminations.csv')
-finalists <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/finalists.csv')
+# auditions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/auditions.csv')
+# eliminations <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/eliminations.csv')
+# finalists <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/finalists.csv')
 ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/ratings.csv')
-seasons <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/seasons.csv')
-songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/songs.csv')
+# seasons <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/seasons.csv')
+# songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/songs.csv')
 ```
 
 Data Wrangling
@@ -65,8 +66,10 @@ plotdf <- ratings |>
   arrange(season, show_number) |> 
   mutate(id = row_number()) |> 
   select(id, season, show_number, viewers_in_millions,
-         weekrank) |> 
-  mutate(weekrank = as.numeric(weekrank))
+         weekrank, airdate, episode) |> 
+  mutate(
+    weekrank = as.numeric(weekrank)
+  )
 
 xaxis_df <- plotdf |> 
   group_by(season) |> 
@@ -76,11 +79,16 @@ xaxis_df <- plotdf |>
     x_mean = (min(id) + max(id)) / 2
   )
 
-  
-  
-  ggshadow::geom_glowline() +
-  ggshadow::geom_glowpoint()
-
+labels_df <- plotdf |> 
+  group_by(season) |> 
+  slice_max(viewers_in_millions, n = 1) |> 
+  filter(season %in% c(2, 5, 6, 10, 15)) |> 
+  ungroup() |> 
+  mutate(label_var = paste0(
+    episode, 
+    "\n", 
+    airdate, 
+    "  (", round(viewers_in_millions, 1), " million)"))
 ```
 
 Visualization Parameters
@@ -89,12 +97,12 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Bangers",
+font_add_google("Satisfy",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Saira Extra Condensed",
+font_add_google("Barlow Semi Condensed",
   family = "caption_font"
 ) 
 
@@ -108,12 +116,12 @@ font_add_google("Martel Sans",
 showtext_auto()
 
 # Credits for coffeee palette
-mypal 
-mypal |> seecolor::print_color()
+mypal <- paletteer::paletteer_d("ggthemes::Tableau_20")
+seecolor::print_color(mypal)
 
-bg_col <- "white"
-text_col <-  "grey10"
-text_hil <- "grey25"
+bg_col <- "grey5"
+text_col <-  "grey90"
+text_hil <- "#FFEE99FF"
 
 bts <- 80
 
@@ -131,11 +139,11 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 plot_title <- "American Idol viewership"
 
-plot_subtitle <- str_wrap("The popularity of American Idol has been declining over the seasons, and Seasons 4-6 enjoyed highest viewership.", 60)
+plot_subtitle <- str_wrap("The popularity (by viewership) of American Idol peaked in Seasons 4 - 6, and has been declining lately. Each dot represents an episode. The most popular episodes are labelled.", 65)
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
-  "**Data:** _#TidyTuesday_ &  ", 
+  "**Data:** _#TidyTuesday_ &  Kristen Akey", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -160,8 +168,8 @@ g <- plotdf |>
       colour = as_factor(season)
     )
   ) +
-  geom_line() +
-  geom_point() +
+  geom_glowline() +
+  geom_glowpoint() +
   geom_segment(
     data = xaxis_df,
     mapping = aes(
@@ -172,25 +180,44 @@ g <- plotdf |>
     arrow = arrow(
       ends = "both", 
       angle = 90,
-      length = unit(2, "mm")
+      length = unit(4, "mm")
     )
   ) +
   geom_text(
     data = xaxis_df,
     mapping = aes(
-      y = -2,
+      y = -1,
       x = x_mean,
       label = season
     ),
-    vjust = 1
+    vjust = 1,
+    size = bts / 4,
+    fontface = "bold",
+    family = "body_font"
   ) +
-
-    # Labels for the plot
+  ggrepel::geom_text_repel(
+    data = labels_df,
+    mapping = aes(label = label_var),
+    family = "caption_font",
+    lineheight = 0.2,
+    size = bts / 3,
+    vjust = 0,
+    nudge_y = 4
+  ) +
+  geom_glowpoint(
+    data = labels_df,
+    size = 6
+  ) +
+  scale_colour_manual(values = mypal) +
+  scale_y_continuous(expand = expansion(c(0, 0.05))) +
+  scale_x_continuous(expand = expansion(0)) +
+  coord_cartesian(clip = "off") +
+  # Labels for the plot
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
-    x = NULL, y = NULL
+    x = "Season", y = "Viewership (in millions)"
   ) +
 
   # Theme Elements
@@ -201,22 +228,30 @@ g <- plotdf |>
   
   theme(
     legend.position = "none",
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    axis.text.x.bottom = element_blank(),
-    axis.text.x.top = element_blank(),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      colour = lighten(bg_col, 0.4),
+      linewidth = 0.5, 
+      linetype = 3
+    ),
+    axis.text.x = element_blank(),
     axis.title = element_text(
-      colour = text_hil,
+      colour = text_col,
       margin = margin(0,0,0,0, "mm")
     ),
     axis.text.y = element_text(
-      size = bts * 1.5,
-      colour = text_hil,
+      size = bts,
+      colour = text_col,
       margin = margin(0,0,0,0, "mm"),
       face = "bold"
     ),
+    axis.line.y = element_line(
+      arrow = arrow(length = unit(4, "mm")),
+      colour = text_col,
+      linewidth = 0.75
+    ),
     plot.background = element_rect(
-      fill = bg_col,
+      fill = "transparent",
       colour = "transparent"
     ),
     panel.background = element_rect(
@@ -230,21 +265,31 @@ g <- plotdf |>
     ),
     plot.title = element_text(
       hjust = 0.5,
-      size = 4.2 * bts,
+      size = 4 * bts,
       colour = text_hil,
       margin = margin(10,0,0,0, "mm"),
       family = "title_font"
     ),
     plot.subtitle = element_text(
-      colour = text_hil,
-      size = 1.7 * bts,
+      colour = text_col,
+      size = 1.2 * bts,
       hjust = 0.5, 
       lineheight = 0.3,
-      margin = margin(7,0,3,0, "mm"),
+      margin = margin(10,0,3,0, "mm"),
       face = "italic"
     ),
-    plot.margin = margin(10,10,10,10, "mm")
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.title.position = "plot"
   )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_american_idol.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Annotation
@@ -276,19 +321,11 @@ Savings the graphics
 
 ```{r}
 #| label: save-image
-ggsave(
-  filename = here::here("data_vizs", "tidy_american_idol.png"),
-  plot = g_full,
-  width = 400,    # Best Twitter Aspect Ratio = 5:4
-  height = 500,   
-  units = "mm",
-  bg = bg_col
-)
 
 library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", "tidy_american_idol.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_english_football.png"))
+  image_write(here::here("data_vizs", "thumbnails", "tidy_american_idol.png"))
 
 ```
