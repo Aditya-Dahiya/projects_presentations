@@ -2,9 +2,8 @@
 title: "Is migration mainly driven by wealth?"
 author: "Aditya Dahiya"
 date: "2024-07-27"
-subtitle: "The Sankey diagram visualizes the migration flows in 2020, highlighting the dominance of migration to wealthier countries, and almost none in the reverse direction."
+subtitle: "The Sankey diagram visualizes the migration flows in 2020, highlighting the near universal migration to wealthier countries, and almost none in the reverse direction."
 categories:
-  - "A4 Size Viz"
   - "Our World in Data"
   - "Public Health"
   - "{ggsankeyfier}"
@@ -32,7 +31,7 @@ bibliography: references.bib
 
 ## Migration: Internal and Inter-Continental Flows (2020)
 
-The data for this Sankey diagram, depicting migration flows in 2020, is sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It includes comprehensive international migrant statistics, standardized and refined through several processing steps to ensure accuracy and clarity. The graphic highlights key findings, showing the dominance of internal migration within Asia and Europe and significant inter-continental routes from Asia to Europe, Asia to North America, and Latin America to North America, reflecting crucial patterns in global population movements. For more details, visit the [UN DESA International Migrant Stock](https://www.un.org/development/desa/pd/content/international-migrant-stock) page.
+The data for this Sankey diagram, depicting migration flows in 2020, is sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It includes comprehensive international migrant statistics, standardized and refined through several processing steps to ensure accuracy and clarity. The graphic highlights key findings, showing the near universal migration to High_income countries, especially from Middle-Income countries. For more details, visit the [UN DESA International Migrant Stock](https://www.un.org/development/desa/pd/content/international-migrant-stock) page.
 
 ![This graphic visualizes global migration flows for the year 2020 using data sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It highlights migration patterns in countries of different income groups through a Sankey Diagram.](owid_income_migrants.png)
 
@@ -93,68 +92,15 @@ font_add_google("Changa",
 
 showtext_auto()
 
-# Colour Palette
-
-# Background Colour
-bg_col <- "white"
-text_col <- "#2e5075"
-text_hil <- "#18304a"
-
 # Base Text Size
 bts <- 80
 
-plot_title <- "Global Migration Trends in 2020"
-
-plot_subtitle <- str_wrap(
-  glue::glue("There is dominance of internal migration within Asia and Europe. Major inter-continental migration routes include Asia to Europe, Asia to North America, and Latin America to North America."
-      ),
-  100
-  )
-str_view(plot_subtitle)
-
-data_annotation <- "About the Data: The data comes from the United Nations (UN) and the United Nations Department of Economic and Social Affairs (UN DESA) for the year 2020."
-
-# Caption stuff for the plot
-sysfonts::font_add(
-  family = "Font Awesome 6 Brands",
-  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
-)
-github <- "&#xf09b"
-github_username <- "aditya-dahiya"
-xtwitter <- "&#xe61b"
-xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-
-plot_caption <- paste0(
-  "**Data:** United Nations & Our World in Data  |  ",
-  "**Code:** ", 
-  social_caption_1, 
-  " |  **Graphics:** ", 
-  social_caption_2
-  )
-rm(github, github_username, xtwitter, 
-   xtwitter_username, social_caption_1, social_caption_2)
-```
-
-Data Wrangling
-
-```{r}
-#| label: temp-2
-
-income_levels <- c(
-  "Low Income Countries",
-  "Lower Middle Income Countries",
-  "Middle Income Countries",
-  "Upper Middle Income Countries",
-  "High Income Countries"
-)
+# Colour Palette
 mypal <- paletteer::paletteer_d("MoMAColors::Alkalay1")
 text_hil <- mypal[2]
 text_col <- mypal[1]
 bg_col <- lighten(mypal[5], 0.8)
 seecolor::print_color(bg_col)
-
 
 plot_title <- "Migration Towards Wealth: 2020"
 
@@ -184,10 +130,27 @@ plot_caption <- paste0(
   " |  **Graphics:** ", 
   social_caption_2
   )
+
 rm(github, github_username, xtwitter, 
    xtwitter_username, social_caption_1, social_caption_2)
 
+```
+
+Data Wrangling
+
+```{r}
+#| label: temp-2
+
+income_levels <- c(
+  "Low Income Countries",
+  "Lower Middle Income Countries",
+# "Middle Income Countries",
+  "Upper Middle Income Countries",
+  "High Income Countries"
+)
+
 income1 <- rawdf2 |> 
+  
   # Remove minor duplication of "Australia.And.New.Zealand"
   select(-12) |> 
   janitor::clean_names() |> 
@@ -208,13 +171,18 @@ income1 <- rawdf2 |>
     destination = snakecase::to_title_case(destination)
   ) |> 
   rename(from = destination, to = origin) |> 
-  # filter(from != to) |> 
+  filter(
+    (to != "Middle Income Countries")
+    &
+    (from != "Middle Income Countries")
+  ) |> 
   pivot_longer(
     cols = c(from, to),
     names_to = "connector_var",
     values_to = "node_var"
   ) |> 
   relocate(node_var, connector_var, value) |> 
+   
   mutate(
     node_var = fct(node_var, levels = income_levels),
     x_var = case_when(
@@ -230,8 +198,71 @@ income2 <- income1 |>
   mutate(total = paste0(round(total/1e6, 1), " million")) |> 
   ungroup() |> 
   right_join(income1)
-  
 
+# geo_regions <- rawdf2 |> 
+#   # Remove minor duplication of "Australia.And.New.Zealand"
+#   select(-12) |> 
+#   as_tibble() |> 
+#   slice(3:10) |> 
+#   pull(`Region,.development.group.of.destination`) |> 
+#   str_squish()
+# 
+# geo_regions |> snakecase::to_title_case()
+# 
+# level_geo_regions <- c(
+#   "Sub Saharan Africa",
+#   "Northern Africa and Western Asia",    
+#   "Central and Southern Asia",   
+#   "Eastern and South Eastern Asia",         
+#   "Oceania Excluding Australia and New Zealand",
+#   "Australia and New Zealand", 
+#   "Latin America and the Caribbean",   
+#   "Europe and Northern America"
+# )
+# 
+# geo1 <- rawdf2 |> 
+#   # Remove minor duplication of "Australia.And.New.Zealand"
+#   select(-49) |> 
+#   janitor::clean_names() |> 
+#   as_tibble() |> 
+#   slice(3:10) |> 
+#   select(2, 6:13) |> 
+#   rename(origin = region_development_group_of_destination) |> 
+#   mutate(origin = snakecase::to_title_case(str_squish(origin))) |> 
+#   pivot_longer(
+#     cols = -origin,
+#     names_to = "destination",
+#     values_to = "value"
+#   ) |> 
+#   mutate(destination = snakecase::to_title_case(destination)) |> 
+#   rename(from = destination, to = origin) |> 
+#   filter(
+#     (to != "Middle Income Countries")
+#     &
+#     (from != "Middle Income Countries")
+#   ) |> 
+#   pivot_longer(
+#     cols = c(from, to),
+#     names_to = "connector_var",
+#     values_to = "node_var"
+#   ) |> 
+#   relocate(node_var, connector_var, value) |>
+#   mutate(
+#     node_var = fct(node_var, levels = level_geo_regions),
+#     x_var = case_when(
+#       connector_var == "from" ~ 1,
+#       connector_var == "to" ~ 2,
+#       .default = NA
+#     )
+#   )
+
+
+```
+
+Visualization
+
+```{r}
+#| label: viz-static
 
 sankey_pos <- function(...){
   position_sankey(
@@ -374,6 +405,20 @@ g <- income1 |>
     )
   )
 
+ggsave(
+  filename = here::here("data_vizs", "owid_income_migrants.png"),
+  plot = g,
+  width = 500,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Save the graphic and a thumbnail
+
+```{r}
+#| label: save-graphic
 
 ggsave(
   filename = here::here("data_vizs", "owid_income_migrants.png"),
@@ -383,4 +428,12 @@ ggsave(
   units = "mm",
   bg = bg_col
 )
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_income_migrants.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_income_migrants.png"))
 ```
