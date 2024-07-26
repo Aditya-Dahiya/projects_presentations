@@ -456,7 +456,53 @@ Other attempts
 #| label: visualize2
 #| eval: false
 
-chordDiagram(
+# Load necessary libraries
+library(circlize)
+
+
+# Create the Chord Diagram with labels, title, and subtitle
+circlize::chordDiagram(
+  x = df1, 
+  transparency = 0.25,
+  directional = TRUE,
+  direction.type = c("arrows", "diffHeight"), 
+  diffHeight  = -0.04,
+  annotationTrack = "grid", 
+  annotationTrackHeight = c(0.05, 0.1),
+  link.arr.type = "big.arrow", 
+  link.sort = TRUE, 
+  link.largest.ontop = TRUE,
+  
+  # Add labels along the circumference
+  preAllocateTracks = list(
+    list(track.height = 0.1)
+  ),
+  track.margin = c(0, 0.1),
+  sector.order = df1$from,
+  # Add title and subtitle
+  title = "Chord Diagram for Migration",
+  subtitle = "Width represents number of migrants"
+)
+
+# Add labels along the circumference
+circos.trackPlotRegion(
+  track.index = 1,
+  panel.fun = function(x, y) {
+    circos.text(
+      x = x,
+      y = y,
+      labels = df1$from,
+      facing = "inside",
+      cex = 0.7,
+      adj = c(0.5, 0.5)
+    )
+  },
+  bg.border = NA
+)
+
+
+library(circlize)
+circlize::chordDiagram(
   x = df1, 
   # grid.col = mycolor,
   transparency = 0.25,
@@ -499,4 +545,252 @@ circos.trackPlotRegion(
   }
 )
 
+```
+
+Temp
+
+```{r}
+#| label: temp-2
+
+income_levels <- c(
+  "Low Income Countries",
+  "Lower Middle Income Countries",
+  "Middle Income Countries",
+  "Upper Middle Income Countries",
+  "High Income Countries"
+)
+mypal <- paletteer::paletteer_d("MoMAColors::Alkalay1")
+text_hil <- mypal[2]
+text_col <- mypal[1]
+bg_col <- lighten(mypal[5], 0.8)
+seecolor::print_color(bg_col)
+
+
+plot_title <- "Migration Towards Wealth: 2020"
+
+plot_subtitle <- str_wrap(
+  glue::glue("Nearly half of global migration in 2020 was directed towards high-income countries. Interestingly, middle-income countries, rather than low-income ones, were the primary contributors to this migration towards wealthier nations."
+      ),
+  90
+  )
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** United Nations & Our World in Data  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+income1 <- rawdf2 |> 
+  # Remove minor duplication of "Australia.And.New.Zealand"
+  select(-12) |> 
+  janitor::clean_names() |> 
+  as_tibble() |>
+  rename(origin = region_development_group_of_destination) |> 
+  mutate(origin = str_squish(origin)) |> 
+  select(-c(x1, x3, x4)) |> 
+  filter(str_detect(origin, "income")) |> 
+  select(-world) |> 
+  pivot_longer(
+    cols = -origin,
+    names_to = "destination",
+    values_to = "value"
+  ) |> 
+  filter(str_detect(destination, "income")) |> 
+  mutate(
+    origin = snakecase::to_title_case(origin),
+    destination = snakecase::to_title_case(destination)
+  ) |> 
+  rename(from = destination, to = origin) |> 
+  # filter(from != to) |> 
+  pivot_longer(
+    cols = c(from, to),
+    names_to = "connector_var",
+    values_to = "node_var"
+  ) |> 
+  relocate(node_var, connector_var, value) |> 
+  mutate(
+    node_var = fct(node_var, levels = income_levels),
+    x_var = case_when(
+      connector_var == "from" ~ 1,
+      connector_var == "to" ~ 2,
+      .default = NA
+    )
+  )
+
+income2 <- income1 |> 
+  group_by(connector_var, node_var, x_var) |> 
+  summarise(total = sum(value)) |> 
+  mutate(total = paste0(round(total/1e6, 1), " million")) |> 
+  ungroup() |> 
+  right_join(income1)
+  
+
+
+sankey_pos <- function(...){
+  position_sankey(
+    width = 0.05,
+    v_space = "auto", 
+    order = "as_is", 
+    align = "justify",
+    ...
+    )
+}
+
+bts = 80
+
+g <- income1 |> 
+  ggplot(
+    mapping = aes(
+      x = x_var,
+      y = value,
+      connector = connector_var,
+      group = node_var,
+      edge_id = value
+    )
+  ) +
+  
+  # Sankey Flows
+  geom_sankeyedge(
+    mapping = aes(
+      fill = node_var
+    ),
+    position = sankey_pos(),
+    alpha = 0.6
+  ) +
+  
+  # Bars at the ends to reflect totals
+  geom_sankeynode(
+    mapping = aes(fill = node_var),
+    position = sankey_pos()
+  ) +  
+  
+  # Left hand side labels
+  geom_text(
+    data = income2 |> filter(connector_var == "from"),
+    mapping = aes(
+      label = paste0(
+        str_wrap(node_var, 20),
+        "\n(",
+        total, 
+        ")"
+      )
+    ),
+    colour = text_col,
+    hjust = 1,
+    position = sankey_pos(nudge_x = -0.04),
+    stat = "sankeynode",
+    lineheight = 0.3,
+    size = bts / 3,
+    family = "caption_font",
+    fontface = "bold"
+    ) +
+  # Right hand side labels
+  geom_text(
+    data = income2 |> filter(connector_var == "to"),
+    mapping = aes(
+      label = paste0(
+        str_wrap(node_var, 20),
+        "\n(",
+        total, 
+        ")"
+      )
+    ),
+    colour = text_col,
+    hjust = 0,
+    position = sankey_pos(nudge_x = 0.04),
+    stat = "sankeynode",
+    lineheight = 0.3,
+    size = bts / 3,
+    family = "caption_font",
+    fontface = "bold"
+    ) +
+  
+  # Plots Labels
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  
+  # Scales and Coordinates
+  scale_x_continuous(
+    expand = expansion(0.2),
+    breaks = 1:2,
+    labels = c(
+    "Origin\n(Where do migrants come from?)",
+    "Destination\n(Where do migrants go to?)"
+    ),
+    position = "top"
+  ) +
+  scale_y_continuous(
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(values = mypal) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  # Themes and beautification
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.title = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(10,0,5,0, "mm"),
+      size = 3.5 * bts,
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(0,0,5,0, "mm"),
+      lineheight = 0.30,
+      size = 1.2 * bts
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5
+    ),
+    legend.position = "none",
+    plot.margin = margin(10,10,10,10, "mm"),
+    axis.text.x.top = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 1.5 * bts,
+      hjust = 0.5,
+      margin = margin(7,0,10,0, "mm"),
+      lineheight = 0.3
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "owid_income_migrants.png"),
+  plot = g,
+  width = 500,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
 ```
