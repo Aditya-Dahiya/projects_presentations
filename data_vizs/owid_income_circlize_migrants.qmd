@@ -33,7 +33,7 @@ bibliography: references.bib
 
 The data for this Sankey diagram, depicting migration flows in 2020, is sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It includes comprehensive international migrant statistics, standardized and refined through several processing steps to ensure accuracy and clarity. The graphic highlights key findings, showing the near universal migration to High_income countries, especially from Middle-Income countries. For more details, visit the [UN DESA International Migrant Stock](https://www.un.org/development/desa/pd/content/international-migrant-stock) page.
 
-![This graphic visualizes global migration flows for the year 2020 using data sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It highlights migration patterns in countries of different income groups through a Sankey Diagram.](owid_income_migrants.png)
+![This graphic visualizes global migration flows for the year 2020 using data sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It highlights migration patterns in countries of different income groups through a Sankey Diagram.](owid_income_circlize_migrants.png)
 
 ### How I made this graphic?
 
@@ -182,7 +182,7 @@ income1 <- rawdf2 |>
     from = fct(from, levels = income_levels),
     to = fct(to, levels = income_levels)
   ) |> 
-  mutate(value = value / 1e6)
+  mutate(value = value / 1e6) 
 
 income1
 ```
@@ -193,8 +193,7 @@ Visualization
 #| label: viz-static
 
 library(circlize)
-library(ggplot2)
-library(cowplot)
+# library(cowplot)
 library(grid)
 library(ggplotify)
 
@@ -203,11 +202,21 @@ income1_arrows <- income1 |>
   mutate(
     colour = if_else(
       to == "High Income Countries",
-      "black",
+      as.character(mypal[1]),
       "transparent"
     )
   )
 
+income1_border <- income1 |> 
+  select(-value) |> 
+  mutate(
+    border = if_else(
+      to == "High Income Countries",
+      as.character(mypal[1]),
+      "transparent"
+    )
+  ) 
+  
 # Credits: https://github.com/tashapiro/TidyTuesday/blob/master/2022/W10/erasmus-mobility.R
 # Credits: tutorial from https://jokergoo.github.io/circlize_book/book/the-chorddiagram-function.html
 
@@ -216,7 +225,7 @@ mypal <- paletteer::paletteer_d("yarrr::google")
 circos.clear()
 circos.par(
   gap.after = c(15, 5, 5, 15),
-  start.degree = 0,
+  start.degree = 22,
   clock.wise = FALSE
     )
 
@@ -228,10 +237,11 @@ circlize::chordDiagram(
     direction.type = c("diffHeight", "arrows"),
   # link.arr.type = "big.arrow",
     link.target.prop = T,
-    # link.arr.col = ,
-    link.arr.length = 0.2,
+  # link.arr.col = ,
+  # link.arr.length = 0.2,
     link.arr.col = income1_arrows,
-    diffHeight = mm_h(5)
+    diffHeight = mm_h(2),
+    link.border = income1_border
   ) 
 
 p <- recordPlot()
