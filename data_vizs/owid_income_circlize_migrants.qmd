@@ -1,0 +1,278 @@
+---
+title: "Is migration mainly driven by wealth?"
+author: "Aditya Dahiya"
+date: "2024-07-27"
+subtitle: "The Sankey diagram visualizes the migration flows in 2020, highlighting the near universal migration to wealthier countries, and almost none in the reverse direction."
+categories:
+  - "Our World in Data"
+  - "Public Health"
+  - "{ggsankeyfier}"
+image: "thumbnails/owid_income_migrants.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+## Migration: Internal and Inter-Continental Flows (2020)
+
+The data for this Sankey diagram, depicting migration flows in 2020, is sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It includes comprehensive international migrant statistics, standardized and refined through several processing steps to ensure accuracy and clarity. The graphic highlights key findings, showing the near universal migration to High_income countries, especially from Middle-Income countries. For more details, visit the [UN DESA International Migrant Stock](https://www.un.org/development/desa/pd/content/international-migrant-stock) page.
+
+![This graphic visualizes global migration flows for the year 2020 using data sourced from the United Nations Department of Economic and Social Affairs (UN DESA) and processed by Our World in Data. It highlights migration patterns in countries of different income groups through a Sankey Diagram.](owid_income_migrants.png)
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+
+library(ggsankeyfier)         # Sankey Diagrams with ggplot2
+
+# Getting the data
+# search1 <- owid_search("migrant")
+# rawdf <- owid("migrant-stock-total")
+
+url1 <- "https://www.un.org/development/desa/pd/sites/www.un.org.development.desa.pd/files/undesa_pd_2020_ims_stock_by_sex_destination_and_origin.xlsx"
+
+rawdf2 <- openxlsx::read.xlsx(
+  xlsxFile = url1,
+  sheet = "Table 2",
+  startRow = 10,
+  colNames = TRUE
+)
+
+rm(url1)
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Acme",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Changa",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Base Text Size
+bts <- 80
+
+# Colour Palette
+mypal <- paletteer::paletteer_d("MoMAColors::Alkalay1")
+text_hil <- mypal[2]
+text_col <- mypal[1]
+bg_col <- lighten(mypal[5], 0.8)
+seecolor::print_color(bg_col)
+
+plot_title <- "Migration Towards Wealth: 2020"
+
+plot_subtitle <- str_wrap(
+  glue::glue("Nearly half of global migration in 2020 was directed towards high-income countries. Interestingly, middle-income countries, rather than low-income ones, were the primary contributors to this migration towards wealthier nations."
+      ),
+  90
+  )
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** United Nations & Our World in Data  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: temp-2
+
+income_levels <- c(
+  "Low Income Countries",
+  "Lower Middle Income Countries",
+# "Middle Income Countries",
+  "Upper Middle Income Countries",
+  "High Income Countries"
+)
+
+income1 <- rawdf2 |> 
+  
+  # Remove minor duplication of "Australia.And.New.Zealand"
+  select(-12) |> 
+  janitor::clean_names() |> 
+  as_tibble() |>
+  rename(origin = region_development_group_of_destination) |> 
+  mutate(origin = str_squish(origin)) |> 
+  select(-c(x1, x3, x4)) |> 
+  filter(str_detect(origin, "income")) |> 
+  select(-world) |> 
+  pivot_longer(
+    cols = -origin,
+    names_to = "destination",
+    values_to = "value"
+  ) |> 
+  filter(str_detect(destination, "income")) |> 
+  mutate(
+    origin = snakecase::to_title_case(origin),
+    destination = snakecase::to_title_case(destination)
+  ) |> 
+  rename(from = destination, to = origin) |> 
+  filter(
+    (to != "Middle Income Countries")
+    &
+    (from != "Middle Income Countries")
+  ) |> 
+  mutate(
+    from = fct(from, levels = income_levels),
+    to = fct(to, levels = income_levels)
+  ) |> 
+  mutate(value = value / 1e6)
+
+income1
+```
+
+Visualization
+
+```{r}
+#| label: viz-static
+
+library(circlize)
+library(ggplot2)
+library(cowplot)
+library(grid)
+library(ggplotify)
+
+income1_arrows <- income1 |> 
+  select(-value) |> 
+  mutate(
+    colour = if_else(
+      to == "High Income Countries",
+      "black",
+      "transparent"
+    )
+  )
+
+# Credits: https://github.com/tashapiro/TidyTuesday/blob/master/2022/W10/erasmus-mobility.R
+# Credits: tutorial from https://jokergoo.github.io/circlize_book/book/the-chorddiagram-function.html
+
+mypal <- paletteer::paletteer_d("yarrr::google")
+
+circos.clear()
+circos.par(
+  gap.after = c(15, 5, 5, 15),
+  start.degree = 0,
+  clock.wise = FALSE
+    )
+
+circlize::chordDiagram(
+    x = income1,
+    grid.col = mypal,
+    directional = -1,
+    transparency = 0.5,
+    direction.type = c("diffHeight", "arrows"),
+  # link.arr.type = "big.arrow",
+    link.target.prop = T,
+    # link.arr.col = ,
+    link.arr.length = 0.2,
+    link.arr.col = income1_arrows,
+    diffHeight = mm_h(5)
+  ) 
+
+p <- recordPlot()
+
+ggplotify::as.ggplot(cowplot::ggdraw(p)) +
+  labs(
+    title = "My title",
+    caption = "By me"
+  )
+
+
+
+ggsave(
+  filename = here::here("data_vizs", "owid_income_migrants.png"),
+  plot = g,
+  width = 500,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Save the graphic and a thumbnail
+
+```{r}
+#| label: save-graphic
+
+ggsave(
+  filename = here::here("data_vizs", "owid_income_migrants.png"),
+  plot = g,
+  width = 500,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_income_migrants.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_income_migrants.png"))
+```
