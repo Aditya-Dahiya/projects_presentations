@@ -1,0 +1,411 @@
+---
+title: "Summer Movies"
+author: "Aditya Dahiya"
+date: "2024-07-30"
+subtitle: "Using #TidyTuesday data on Summer Movies"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_summer_movies.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+........................................... ....................
+
+![.......................](tidy_summer_movies.png)
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+
+
+# Getting the data
+summer_movie_genres <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-30/summer_movie_genres.csv')
+summer_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-30/summer_movies.csv')
+
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: eda
+
+# Select 50 most popular movies
+df <- summer_movies |> 
+  filter(!is.na(year)) |> 
+  mutate(decade = cut(year,
+                      breaks = seq(1920, 2030, by = 10),
+                      labels = paste0(seq(1920, 2020, by = 10), "s"),
+                      right = FALSE)) %>%
+  mutate(decade = fct_relevel(decade, sort)) |> 
+  select(-title_type, -original_title, -simple_title) |> 
+  mutate(genres = str_replace_all(genres, ",", ", "))
+
+# Some Exploratory Data Analysis
+# df |> 
+#   ggplot(aes(decade, runtime_minutes)) + 
+#   geom_boxplot()
+# 
+# df |> 
+#   ggplot(aes(decade, runtime_minutes)) +
+#   geom_jitter()
+#   
+# df |> 
+#   ggplot(aes(runtime_minutes, average_rating, size = num_votes)) +
+#   geom_jitter()
+# 
+# df |> 
+#   count(decade) |> 
+#   ggplot(aes(decade, n)) +
+#   geom_col()
+# 
+# df |> 
+#   ggplot(aes(average_rating, num_votes)) +
+#   geom_point() +
+#   scale_y_log10()
+# 
+
+
+plotdf <- df |>
+  slice_max(order_by = num_votes, n = 100) |> 
+  select(-tconst) |> 
+  mutate(id = row_number()) |> 
+  relocate(id) |> 
+  mutate(image_var = here::here("data_vizs", "temp_summer", paste0("image", id, ".png"))) |> 
+  mutate(image_var = str_replace_all(image_var, "/", " \\"))
+  # mutate(image_var = paste0("/data_vizs/temp_summer/image", id, ".png"))
+```
+
+Create a custom function & download movie posters
+
+```{r}
+#| label: movie-posters
+
+# Colours to use as background and borders
+mypal <- paletteer::paletteer_d("ggthemes::Summer")
+seecolor::print_color(mypal)
+
+bg_col <- mypal[6] |> lighten(0.5)
+seecolor::print_color(bg_col)
+
+text_col <-  mypal[5] |> darken(0.7)
+seecolor::print_color(text_col)
+
+text_hil <- mypal[5] |> darken(0.4)
+seecolor::print_color(text_hil)
+
+##### Getting movie posters for the top movies #########
+
+# Get a custom google search engine and API key
+# Tutorial: https://developers.google.com/custom-search/v1/overview
+# google_api_key <- "LOAD YOUR GOOGLE API KEY HERE"
+# my_cx <- "GET YOUR CUSTOM SEARCH ENGINE ID HERE"
+
+
+# Load necessary packages
+library(httr)
+library(magick)
+
+# Define function to download and save movie poster
+download_movie_poster <- function(movie_name, num_row) {
+  
+  api_key <- google_api_key
+  cx <- my_cx
+  
+  # Build the API request URL
+  url <- paste0("https://www.googleapis.com/customsearch/v1?q=", 
+                URLencode(paste0(movie_name, " movie poster")), 
+                "&cx=", cx, 
+                "&searchType=image&key=", api_key)
+  
+  # Make the request
+  response <- GET(url)
+  result <- content(response, "parsed")
+  
+  # Get the URL of the first image result
+  image_url <- result$items[[1]]$link
+  
+  im <- magick::image_read(image_url)
+  
+  # Technique Credits: https://stackoverflow.com/questions/64597525/r-magick-square-crop-and-circular-mask
+  # get height, width and crop longer side to match shorter side
+  ii <- image_info(im)
+  ii_min <- min(ii$width, ii$height)
+  im1 <- image_crop(
+    im, 
+    geometry = paste0(ii_min, "x", ii_min, "+0+0"), 
+    repage = TRUE
+    )
+  
+  # create a new image with white background and black circle
+  fig <- image_draw(image_blank(ii_min, ii_min))
+  symbols(ii_min / 2, ii_min / 2, circles = (ii_min / 2) - 3, 
+          bg = text_col, 
+          inches = FALSE, add = TRUE)
+  dev.off()
+  
+  # create an image composite using both images
+  im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
+  
+  # set background as white
+  image_write(
+    image = magick::image_background(im2, bg_col),
+    path = here::here("data_vizs", "temp_summer", 
+                      paste0("image_", num_row,".png")),
+    format = "png"
+    )
+}
+
+for (i in 51:nrow(plotdf)) {
+  
+  num_row_i <- plotdf$id[i]
+  movie_name_i <- plotdf$primary_title[i]
+  
+  download_movie_poster(movie_name_i, num_row_i)
+}
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Corinthia",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Semi Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Homenaje",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Summer Movies: Top 100"
+
+plot_subtitle <- str_wrap("Year of release, Average Ratings and Popularity (number of votes) for top 100 Summer Movies (by vote count) on the Internet Movie Database (IMDb)", 35)
+str_view(plot_subtitle)
+
+plot_caption <- paste0(
+  "**Data:** _#TidyTuesday_ & IMDb", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot:
+
+```{r}
+#| label: static-plot
+
+g <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = average_rating,
+      size = num_votes
+    )
+  ) +
+  # geom_point() +
+  ggimage::geom_image(
+    mapping = aes(
+      image = image_var
+    )
+  ) +
+  geom_text(
+    mapping = aes(
+      label = primary_title
+    ),
+    vjust = 1,
+    lineheight = 0.3,
+    size = bts / 10,
+    nudge_y = -0.1,
+    family = "body_font",
+    check_overlap = TRUE,
+    colour = text_col
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_subtitle,
+    x = 1950, y = 5,
+    hjust = 0, vjust = 1,
+    colour = text_col,
+    family = "body_font",
+    lineheight = 0.4,
+    size = bts / 2
+  ) +
+  scale_y_continuous(expand = expansion(0)) +
+  scale_x_continuous(
+    expand = expansion(c(0.05, 0.1)),
+    breaks = seq(1950, 2020, 10),
+    limits = c(1950, 2024)
+  ) +
+  scale_size_continuous(
+    range = c(4, 20),
+    labels = scales::label_number(scale_cut = cut_short_scale())
+  ) +
+  coord_cartesian(clip = "off") +
+  # Labels for the plot
+  labs(
+    title = plot_title,
+    # subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = "Year of Summer Moview Release", 
+    y = "Average Rating on IMDb",
+    size = "Votes on IMDb"
+  ) +
+
+  # Theme Elements
+  theme_classic(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  
+  theme(
+    legend.position = "bottom",
+    panel.grid = element_blank(),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      size = 1.2 * bts
+    ),
+    axis.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      face = "bold"
+    ),
+    axis.line = element_line(
+      arrow = arrow(length = unit(4, "mm")),
+      colour = text_col,
+      linewidth = 0.75
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 5.5 * bts,
+      colour = text_hil,
+      margin = margin(10,0,0,0, "mm"),
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      size = 1.2 * bts,
+      hjust = 0.5, 
+      lineheight = 0.3,
+      margin = margin(5,0,3,0, "mm"),
+      family = "title_font"
+    ),
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.title.position = "plot",
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.margin = margin(-10,0,10,0, "mm")
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_summer_movies.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_american_idol.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_american_idol.png"))
+
+```
