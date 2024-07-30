@@ -1,11 +1,11 @@
 ---
-title: "American Idol Episodes' Viewership"
+title: "Summer Movies"
 author: "Aditya Dahiya"
-date: "2024-07-26"
-subtitle: "Using #TidyTuesday data on American Idol Episodes' viewership to draw trends over its 18 seasons"
+date: "2024-07-30"
+subtitle: "Using #TidyTuesday data on Summer Movies"
 categories:
   - "#TidyTuesday"
-image: "thumbnails/tidy_american_idol.png"
+image: "thumbnails/tidy_summer_movies.png"
 format:
   html:
     code-fold: true
@@ -27,9 +27,9 @@ share:
 bibliography: references.bib
 ---
 
-The American Idol dataset, compiled by [kkakey](https://github.com/kkakey), is a comprehensive collection of information spanning seasons 1-18 of the popular TV show "American Idol." This dataset, available on [GitHub](https://github.com/kkakey/American_Idol/tree/main), aggregates data from Wikipedia, offering insights into various aspects of the show. The primary dataset, ratings.csv, contains detailed episode ratings and viewership statistics.
+...........................................
 
-![A line chart on viewership (on y-axis) of the episodes (on x-axis) of American Idol's 18 seasons. The most popular episodes are labelled.](tidy_american_idol.png)
+![.......................](tidy_summer_movies.png)
 
 ### **How I made this graphic?**
 
@@ -48,15 +48,10 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
-library(ggshadow)             # Shadows and Glowing lines / points
 
 # Getting the data
-# auditions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/auditions.csv')
-# eliminations <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/eliminations.csv')
-# finalists <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/finalists.csv')
-ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/ratings.csv')
-# seasons <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/seasons.csv')
-# songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-23/songs.csv')
+summer_movie_genres <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-30/summer_movie_genres.csv')
+summer_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-07-30/summer_movies.csv')
 ```
 
 Data Wrangling
@@ -64,33 +59,10 @@ Data Wrangling
 ```{r}
 #| label: eda
 
-plotdf <- ratings |> 
-  arrange(season, show_number) |> 
-  mutate(id = row_number()) |> 
-  select(id, season, show_number, viewers_in_millions,
-         weekrank, airdate, episode) |> 
-  mutate(
-    weekrank = as.numeric(weekrank)
-  )
+summer_movies
 
-xaxis_df <- plotdf |> 
-  group_by(season) |> 
-  summarise(
-    x_min = min(id),
-    x_max = max(id),
-    x_mean = (min(id) + max(id)) / 2
-  )
-
-labels_df <- plotdf |> 
-  group_by(season) |> 
-  slice_max(viewers_in_millions, n = 1) |> 
-  filter(season %in% c(2, 5, 6, 10, 15)) |> 
-  ungroup() |> 
-  mutate(label_var = paste0(
-    episode, 
-    "\n", 
-    airdate, 
-    "  (", round(viewers_in_millions, 1), " million)"))
+summer_movie_genres |> 
+  count(genres, sort = T)
 ```
 
 Visualization Parameters
