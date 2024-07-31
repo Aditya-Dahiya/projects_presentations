@@ -106,6 +106,16 @@ plotdf <- df |>
   relocate(id) |> 
   mutate(image_var = paste0("data_vizs/temp_summer/temp_image_", id, ".png"))
 
+library(magick)
+image_url <- "https://www.userlogos.org/files/logos/jumpordie/imdb-iphone.png"
+imlogo <- image_read(image_url) |> 
+  image_background("transparent") |> 
+  image_crop("220x260+90+40")
+
+image_write(
+  imlogo, 
+  here::here("data_vizs", "temp_summer", "clogo.png")
+  )
 ```
 
 Create a custom function & download movie posters
@@ -118,7 +128,7 @@ Create a custom function & download movie posters
 mypal <- paletteer::paletteer_d("ggthemes::Summer")
 seecolor::print_color(mypal)
 
-bg_col <- mypal[6] |> lighten(0.5)
+bg_col <- mypal[6] |> lighten(0.9)
 seecolor::print_color(bg_col)
 
 text_col <-  mypal[5] |> darken(0.7)
@@ -160,50 +170,32 @@ download_movie_poster <- function(movie_name, num_row) {
   
   im <- magick::image_read(image_url)
   
-  # Technique Credits: https://stackoverflow.com/questions/64597525/r-magick-square-crop-and-circular-mask
-  # get height, width and crop longer side to match shorter side
-  ii <- image_info(im)
-  ii_min <- min(ii$width, ii$height)
-  im1 <- image_crop(
+  # Crop the image into a circle 
+  # (Credits: https://github.com/doehm/cropcircles)
+  ic <- cropcircles::crop_circle(
     im, 
-    geometry = paste0(ii_min, "x", ii_min, "+0+0"), 
-    repage = TRUE
+    border_colour = text_col,
+    border_size = 0.2
     )
   
-  # create a new image with white background and black circle
-  fig <- image_draw(image_blank(ii_min, ii_min))
-  symbols(ii_min / 2, ii_min / 2, circles = (ii_min / 2) - 3, 
-          bg = text_col, 
-          inches = FALSE, add = TRUE)
-  dev.off()
-  
-  # create an image composite using both images
-  im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
-  im3 <- magick::image_resize(im2, "x400")
+  ic2 <- image_read(ic) |> 
+    image_resize("x200")
   
   # set background as white
   image_write(
-    image = magick::image_background(im3, "transparent"),
+    image = ic2,
     path = here::here("data_vizs", "temp_summer", 
                       paste0("temp_image_", num_row,".png")),
     format = "png"
     )
 }
 
-for (i in 1:nrow(plotdf)) {
+for (i in 44:nrow(plotdf)) {
   
   num_row_i <- plotdf$id[i]
   movie_name_i <- plotdf$primary_title[i]
   
   download_movie_poster(movie_name_i, num_row_i)
-}
-
-library(magick)
-
-for (i in 1:100) {
-  image_read(here::here("data_vizs", "temp_summer", paste0("image_", i, ".png"))) |>
-    image_resize("x400") |> 
-    image_write(here::here("data_vizs", "temp_summer", paste0("temp_image_", i, ".png")))
 }
 ```
 
@@ -218,16 +210,30 @@ font_add_google("Corinthia",
 ) 
 
 # Font for the caption
-font_add_google("Barlow Semi Condensed",
+font_add_google("Satisfy",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Homenaje",
+font_add_google("Saira Extra Condensed",
   family = "body_font"
 ) 
 
 showtext_auto()
+
+
+# Colours to use as background and borders
+mypal <- paletteer::paletteer_d("ggthemes::Summer")
+seecolor::print_color(mypal)
+
+bg_col <- mypal[6] |> lighten(0.9)
+seecolor::print_color(bg_col)
+
+text_col <-  mypal[5] |> darken(0.7)
+seecolor::print_color(text_col)
+
+text_hil <- mypal[5] |> darken(0.4)
+seecolor::print_color(text_hil)
 
 bts <- 80
 
@@ -243,7 +249,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Summer Movies: Top 100"
+plot_title <- "Summer Movies: \nTop 50"
 
 plot_subtitle <- str_wrap("Year of release, Average Ratings and Popularity (number of votes) for top 100 Summer Movies (by vote count) on the Internet Movie Database (IMDb)", 35)
 str_view(plot_subtitle)
@@ -265,6 +271,173 @@ The static plot:
 
 ```{r}
 #| label: static-plot
+
+# mypal2 <- paletteer::paletteer_d("palettesForR::Cranes")
+# mypal2 <- paletteer::paletteer_d("palettesForR::Caramel")
+# mypal2 <- paletteer::paletteer_d("palettesForR::Bears")
+mypal2 <- paletteer::paletteer_d("palettesForR::Named")
+length(mypal2)
+mypal2 <- mypal2[seq(from = 440, to = 40, by = -8)]
+
+g <- plotdf |>
+  arrange(desc(average_rating)) |> 
+  mutate(id = row_number()) |> 
+  slice_head(n = 50) |> 
+  ggplot(
+    mapping = aes(
+      x = id, 
+      y = average_rating - 3
+    )
+  ) +
+  geom_col(
+    mapping = aes(
+      fill = as_factor(id)
+    ),
+    width = 0.4,
+    colour = "transparent"
+  ) +
+  ggimage::geom_image(
+    mapping = aes(
+      y = average_rating - 3,
+      image = image_var
+    ),
+    size = 0.02,
+    fill = "transparent"
+  ) +
+  geom_text(
+    mapping = aes(
+      y = average_rating - 2.8,
+      label = paste0(primary_title, " (", average_rating, ")"),
+      colour = as_factor(id)
+    ),
+    vjust = 0.5,
+    hjust = 0,
+    angle = 0,
+    lineheight = 0.3,
+    size = bts / 5,
+    nudge_y = 0.1,
+    family = "body_font",
+    check_overlap = TRUE
+  ) +
+  scale_y_continuous(
+    sec.axis = sec_axis(
+      transform = ~.,
+      breaks = 0:5,
+      labels = 3:8
+    ),
+    breaks = 0:5,
+    labels = 3:8
+  ) +
+  scale_colour_manual(values = darken(mypal2, 0.5)) +
+  scale_fill_manual(values = mypal2) +
+  coord_radial(
+    theta = "x",
+    direction = 1,
+    start = 0,
+    end = pi,
+    inner.radius = 0.3,
+    expand = FALSE,
+    # rotate.angle = TRUE,
+    clip = "off"
+    ) +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    y = "Average Rating on IMDb"
+    ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    axis.text.theta = element_blank(),
+    axis.title.y = element_text(
+      hjust = 0.8, 
+      vjust = 0,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      colour = text_col
+    ),
+    axis.text.y = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.position = "none",
+    axis.ticks.y = element_line(
+      colour = text_col,
+      linewidth = 0.25
+    ),
+    axis.ticks.length = unit(2, "mm"),
+    axis.title.x = element_blank(),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      linetype = 1,
+      linewidth = 0.5,
+      colour = darken(bg_col, 0.2)
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "body_font",
+      hjust = 0.5,
+      margin = margin(-60,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      hjust = 1,
+      size = 6 * bts,
+      colour = text_hil,
+      margin = margin(10,-20,-100,0, "mm"),
+      family = "title_font",
+      lineheight = 0.25,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      size = 1.2 * bts,
+      hjust = 0.5, 
+      lineheight = 0.3,
+      margin = margin(5,0,3,0, "mm"),
+      family = "title_font"
+    ),
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.title.position = "plot"
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_summer_movies.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_american_idol.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_american_idol.png"))
+
+```
+
+Other attempts:
+
+```{r}
+#| label: dump-1
 
 g <- plotdf |>
   ggplot(
@@ -402,25 +575,5 @@ g <- plotdf |>
     legend.margin = margin(-10,0,10,0, "mm")
   )
 
-ggsave(
-  filename = here::here("data_vizs", "tidy_summer_movies.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 5:4
-  height = 500,   
-  units = "mm",
-  bg = bg_col
-)
-```
-
-Savings the graphics
-
-```{r}
-#| label: save-image
-
-library(magick)
-# Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "tidy_american_idol.png")) |> 
-  image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_american_idol.png"))
 
 ```
