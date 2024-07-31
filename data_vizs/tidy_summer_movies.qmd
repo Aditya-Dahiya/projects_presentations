@@ -1,10 +1,11 @@
 ---
-title: "Summer Movies"
+title: "Summer Movies @ IMDb"
 author: "Aditya Dahiya"
-date: "2024-07-30"
-subtitle: "Using #TidyTuesday data on Summer Movies"
+date: "2024-07-31"
+subtitle: "Using IMDb's data on top 100 Summer Movies to display their average viewer's ratings"
 categories:
   - "#TidyTuesday"
+  - "{ggimage}"
 image: "thumbnails/tidy_summer_movies.png"
 format:
   html:
@@ -27,9 +28,9 @@ share:
 bibliography: references.bib
 ---
 
-........................................... ....................
+The dataset for this analysis is derived from the Internet Movie Database (IMDb) and focuses on movies with "summer" in their titles. The data includes a comprehensive list of these films, along with details such as their unique identifiers, titles, release years, runtimes, genres, and IMDb ratings. The information has been made available through the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/data/2024/2024-07-30/readme.md) project, a weekly data project in the R community, encouraging data exploration and visualization. The specific datasets used in this analysis are `summer_movies` and `summer_movie_genres`, containing records of various movies and their associated genres.
 
-![.......................](tidy_summer_movies.png)
+![Spiraling through the stars: A visual journey of the top 50 summer-titled movies, showcasing their IMDb average ratings. The bar chart, arranged in a polar coordinate spiral, highlights each film's rating, inviting viewers to explore the cinematic warmth of summer-themed stories.](tidy_summer_movies.png){width="900"}
 
 ### **How I made this graphic?**
 
@@ -106,16 +107,16 @@ plotdf <- df |>
   relocate(id) |> 
   mutate(image_var = paste0("data_vizs/temp_summer/temp_image_", id, ".png"))
 
-library(magick)
-image_url <- "https://www.userlogos.org/files/logos/jumpordie/imdb-iphone.png"
-imlogo <- image_read(image_url) |> 
-  image_background("transparent") |> 
-  image_crop("220x260+90+40")
-
-image_write(
-  imlogo, 
-  here::here("data_vizs", "temp_summer", "clogo.png")
-  )
+# library(magick)
+# image_url <- "https://www.userlogos.org/files/logos/jumpordie/imdb-iphone.png"
+# imlogo <- image_read(image_url) |> 
+#   image_background("transparent") |> 
+#   image_crop("220x260+90+40")
+# 
+# image_write(
+#   imlogo, 
+#   here::here("data_vizs", "temp_summer", "clogo.png")
+#   )
 ```
 
 Create a custom function & download movie posters
@@ -190,7 +191,7 @@ download_movie_poster <- function(movie_name, num_row) {
     )
 }
 
-for (i in 44:nrow(plotdf)) {
+for (i in 1:43) {
   
   num_row_i <- plotdf$id[i]
   movie_name_i <- plotdf$primary_title[i]
@@ -251,7 +252,7 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 plot_title <- "Summer Movies: \nTop 50"
 
-plot_subtitle <- str_wrap("Year of release, Average Ratings and Popularity (number of votes) for top 100 Summer Movies (by vote count) on the Internet Movie Database (IMDb)", 35)
+plot_subtitle <- "Names of Movies with\nYear of release &\nAverage IMDb\nRating in\nbrackets"
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
@@ -278,6 +279,7 @@ The static plot:
 mypal2 <- paletteer::paletteer_d("palettesForR::Named")
 length(mypal2)
 mypal2 <- mypal2[seq(from = 440, to = 40, by = -8)]
+length(mypal2)
 
 g <- plotdf |>
   arrange(desc(average_rating)) |> 
@@ -301,13 +303,13 @@ g <- plotdf |>
       y = average_rating - 3,
       image = image_var
     ),
-    size = 0.02,
-    fill = "transparent"
+    size = 0.02
   ) +
   geom_text(
     mapping = aes(
       y = average_rating - 2.8,
-      label = paste0(primary_title, " (", average_rating, ")"),
+      label = paste0(primary_title, " (", year, 
+                     " | ", average_rating, ")"),
       colour = as_factor(id)
     ),
     vjust = 0.5,
@@ -322,11 +324,11 @@ g <- plotdf |>
   scale_y_continuous(
     sec.axis = sec_axis(
       transform = ~.,
-      breaks = 0:5,
-      labels = 3:8
+      breaks = 0:4,
+      labels = 3:7
     ),
-    breaks = 0:5,
-    labels = 3:8
+    breaks = 0:4,
+    labels = 3:7
   ) +
   scale_colour_manual(values = darken(mypal2, 0.5)) +
   scale_fill_manual(values = mypal2) +
@@ -342,6 +344,7 @@ g <- plotdf |>
     ) +
   labs(
     title = plot_title,
+    subtitle = plot_subtitle,
     caption = plot_caption,
     y = "Average Rating on IMDb"
     ) +
@@ -356,7 +359,7 @@ g <- plotdf |>
       vjust = 0,
       margin = margin(0,0,0,0, "mm"),
       family = "caption_font",
-      colour = text_col
+      colour = text_hil
     ),
     axis.text.y = element_text(
       colour = text_col,
@@ -387,38 +390,97 @@ g <- plotdf |>
       colour = text_hil,
       family = "body_font",
       hjust = 0.5,
-      margin = margin(-60,0,0,0, "mm")
+      margin = margin(-100,0,0,0, "mm")
     ),
     plot.title = element_text(
       hjust = 1,
       size = 6 * bts,
       colour = text_hil,
-      margin = margin(10,-20,-100,0, "mm"),
+      margin = margin(10,-10,-120,0, "mm"),
       family = "title_font",
       lineheight = 0.25,
       face = "bold"
     ),
     plot.subtitle = element_text(
+      hjust = 1,
+      size = 1.5 * bts,
       colour = text_hil,
-      size = 1.2 * bts,
-      hjust = 0.5, 
-      lineheight = 0.3,
-      margin = margin(5,0,3,0, "mm"),
-      family = "title_font"
+      margin = margin(120,-10,-180,0, "mm"),
+      family = "body_font",
+      lineheight = 0.25,
+      face = "bold"
     ),
     plot.margin = margin(10,10,10,10, "mm"),
     plot.title.position = "plot"
   )
 
+```
 
-ggsave(
-  filename = here::here("data_vizs", "tidy_summer_movies.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 5:4
-  height = 500,   
-  units = "mm",
-  bg = bg_col
-)
+Insets and annotations - ignored while compiling
+
+```{r}
+#| label: insets
+
+library(patchwork)
+
+g2 <- ggplot() +
+  annotation_custom(
+    xmin = 0,
+    xmax = 1,
+    ymin = 0,
+    ymax = 1,
+    grob = grid::rasterGrob(imlogo)
+  ) +
+  annotate(
+    geom = "text",
+    label = "Ratings",
+    x = 0.5, 
+    y = 0.1,
+    hjust = 0.5,
+    vjust = 1,
+    colour = text_hil,
+    family = "body_font",
+    size = bts / 3,
+    fontface = "bold"
+  ) +
+  scale_x_continuous(
+    limits = c(-2, 2),
+    expand = expansion(0)
+  ) +
+  scale_y_continuous(
+    limits = c(-2, 2),
+    expand = expansion(0)
+  ) +
+  theme_void() +
+  theme(
+    plot.margin = margin(0,0,0,0, "mm"),
+    plot.caption = element_text(
+      margin = margin(-100,0,0,0, "mm")
+    )
+  )
+
+gfull <- g +
+  inset_element(
+    p = g2,
+    left = 0.2,
+    right = 0.7,
+    top = 0.7, bottom = 0.3,
+    clip = FALSE,
+    on_top = TRUE,
+    align_to = "full") +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
 ```
 
 Savings the graphics
@@ -426,12 +488,27 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
+ggsave(
+  filename = here::here("data_vizs", "tidy_summer_movies.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = lighten(bg_col, 0.5)
+)
+
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "tidy_american_idol.png")) |> 
+image_read(here::here("data_vizs", "tidy_summer_movies.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_american_idol.png"))
+  image_write(here::here("data_vizs", "thumbnails", "tidy_summer_movies.png"))
 
+
+unlink("data_vizs/temp_summer/clogo.png")
+
+remove_files <- paste0("data_vizs/temp_summer/temp_image_", 1:100, ".png")
+
+unlink(remove_files)
 ```
 
 Other attempts:
