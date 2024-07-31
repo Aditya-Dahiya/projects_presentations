@@ -104,15 +104,15 @@ plotdf <- df |>
   select(-tconst) |> 
   mutate(id = row_number()) |> 
   relocate(id) |> 
-  mutate(image_var = here::here("data_vizs", "temp_summer", paste0("image", id, ".png"))) |> 
-  mutate(image_var = str_replace_all(image_var, "/", " \\"))
-  # mutate(image_var = paste0("/data_vizs/temp_summer/image", id, ".png"))
+  mutate(image_var = paste0("data_vizs/temp_summer/temp_image_", id, ".png"))
+
 ```
 
 Create a custom function & download movie posters
 
 ```{r}
 #| label: movie-posters
+#| eval: false
 
 # Colours to use as background and borders
 mypal <- paletteer::paletteer_d("ggthemes::Summer")
@@ -179,17 +179,18 @@ download_movie_poster <- function(movie_name, num_row) {
   
   # create an image composite using both images
   im2 <- magick::image_composite(im1, fig, operator = "copyopacity")
+  im3 <- magick::image_resize(im2, "x400")
   
   # set background as white
   image_write(
-    image = magick::image_background(im2, bg_col),
+    image = magick::image_background(im3, "transparent"),
     path = here::here("data_vizs", "temp_summer", 
-                      paste0("image_", num_row,".png")),
+                      paste0("temp_image_", num_row,".png")),
     format = "png"
     )
 }
 
-for (i in 51:nrow(plotdf)) {
+for (i in 1:nrow(plotdf)) {
   
   num_row_i <- plotdf$id[i]
   movie_name_i <- plotdf$primary_title[i]
@@ -197,6 +198,13 @@ for (i in 51:nrow(plotdf)) {
   download_movie_poster(movie_name_i, num_row_i)
 }
 
+library(magick)
+
+for (i in 1:100) {
+  image_read(here::here("data_vizs", "temp_summer", paste0("image_", i, ".png"))) |>
+    image_resize("x400") |> 
+    image_write(here::here("data_vizs", "temp_summer", paste0("temp_image_", i, ".png")))
+}
 ```
 
 Visualization Parameters
@@ -258,7 +266,7 @@ The static plot:
 ```{r}
 #| label: static-plot
 
-g <- plotdf |> 
+g <- plotdf |>
   ggplot(
     mapping = aes(
       x = year, 
@@ -270,8 +278,13 @@ g <- plotdf |>
   ggimage::geom_image(
     mapping = aes(
       image = image_var
-    )
+    ),
+    alpha = 0.7,
+    size = 0.05
   ) +
+  # scale_size(
+  #   range = c(0.02, 0.08)
+  # ) +
   geom_text(
     mapping = aes(
       label = primary_title
@@ -287,28 +300,30 @@ g <- plotdf |>
   annotate(
     geom = "text",
     label = plot_subtitle,
-    x = 1950, y = 5,
+    x = 1946, y = 5,
     hjust = 0, vjust = 1,
     colour = text_col,
     family = "body_font",
     lineheight = 0.4,
     size = bts / 2
   ) +
-  scale_y_continuous(expand = expansion(0)) +
+  scale_y_continuous(
+    expand = expansion(0),
+    limits = c(3.5, 8.5)
+  ) +
   scale_x_continuous(
-    expand = expansion(c(0.05, 0.1)),
+    expand = expansion(c(0, 0.1)),
     breaks = seq(1950, 2020, 10),
-    limits = c(1950, 2024)
+    limits = c(1945, 2024)
   ) +
-  scale_size_continuous(
-    range = c(4, 20),
-    labels = scales::label_number(scale_cut = cut_short_scale())
-  ) +
+  # scale_size_continuous(
+  #    range = c(0.02, 0.05),
+  #   labels = scales::label_number(scale_cut = cut_short_scale())
+  # ) +
   coord_cartesian(clip = "off") +
   # Labels for the plot
   labs(
     title = plot_title,
-    # subtitle = plot_subtitle,
     caption = plot_caption,
     x = "Year of Summer Moview Release", 
     y = "Average Rating on IMDb",
@@ -357,7 +372,7 @@ g <- plotdf |>
     ),
     plot.title = element_text(
       hjust = 0.5,
-      size = 5.5 * bts,
+      size = 5.1 * bts,
       colour = text_hil,
       margin = margin(10,0,0,0, "mm"),
       family = "title_font"
@@ -382,7 +397,7 @@ g <- plotdf |>
     ),
     legend.title = element_text(
       colour = text_col,
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,10,0,0, "mm")
     ),
     legend.margin = margin(-10,0,10,0, "mm")
   )
