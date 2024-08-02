@@ -1,12 +1,12 @@
 ---
-title: "Visualizing the Top Causes of illness, death and disability globally"
+title: "Donut Chart on Top Causes of DALYs globally"
 author: "Aditya Dahiya"
 date: "2024-08-01"
-subtitle: "........................................"
+subtitle: "A donut chart, with an inset pie chart on the main causes of DALYs, coloured by different categories, and different causes within each category distinguished by opacity. Labels show percentage contribution and the names of causes."
 categories:
-  - "A4 Size Viz"
   - "Our World in Data"
   - "Public Health"
+  - "{donutsk}"
 image: "thumbnails/owid_daly_causes_donut.png"
 format:
   html:
@@ -31,7 +31,7 @@ bibliography: references.bib
 
 The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions, including communicable, maternal, neonatal, nutritional diseases, injuries, and non-communicable diseases (NCDs). The data is sourced from the IHME's Global Burden of Disease (GBD) study, which offers a detailed assessment of global health trends, encompassing death and DALY counts and rates for 371 diseases and injuries. The dataset, which spans from 1990 to 2021, was last updated on May 20, 2024, with the next update expected in May 2028. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
 
-![.......................](owid_daly_causes_donut.png){#fig-1}
+![A donut chart, with an inset pie chart on the main causes of DALYs, coloured by different categories, and different causes within each category distinguished by opacity. Labels show percentage contribution and the names of causes.](owid_daly_causes_donut.png){#fig-1 width="900"}
 
 ### How I made these graphics?
 
@@ -52,11 +52,83 @@ library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # To lighten and darken colours
 library(patchwork)            # Combining plots
 
+library(donutsk)              # Pie & Donut Charts with labels
+
 # search1 <- owidR::owid_search("burden of disease")
 
 df1 <- owid("burden-of-disease-by-cause")
 
 # popdf <- owid("population-with-un-projections")
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Fondamento",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("PT Sans Narrow",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Colour Palette
+set.seed(41)
+mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
+mypal <- sample(mypal, 25, replace = F)
+# Background Colour
+bg_col <- "white"
+text_col <- "grey20"
+text_hil <- "grey30"
+
+# Base Text Size
+bts <- 80
+
+plot_title <- "Causes of DALYs Worldwide"
+
+plot_subtitle <- str_wrap("A Donut Chart on the causes of death, disease and disability globally in 2021 (measured by DALYs).", 60)
+str_view(plot_subtitle)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling-1
+
 
 df2 <- df1 |> 
   as_tibble() |> 
@@ -90,121 +162,65 @@ df2 <- df1 |>
       "and"
     )
   )
-```
-
-Visualization Parameters
-
-```{r}
-#| label: parameters2
-
-# Font for titles
-font_add_google("Sail",
-  family = "title_font"
-) 
-
-# Font for the caption
-font_add_google("Barlow Condensed",
-  family = "caption_font"
-) 
-
-# Font for plot text
-font_add_google("Poiret One",
-  family = "body_font"
-) 
-
-# Font for the Strip Text 
-font_add_google("Yanone Kaffeesatz",
-  family = "strip_font"
-)
-
-showtext_auto()
-
-# Colour Palette
-set.seed(41)
-mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
-mypal <- sample(mypal, 25, replace = F)
-# Background Colour
-bg_col <- "#F1F9F3FF"
-text_col <- "grey20"
-text_hil <- "#004616FF"
-
-# Base Text Size
-bts <- 11
-
-plot_title <- ""
-
-plot_subtitle <- ""
-
-data_annotation <- "About the Data: "
-
-# Caption stuff for the plot
-sysfonts::font_add(
-  family = "Font Awesome 6 Brands",
-  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
-)
-github <- "&#xf09b"
-github_username <- "aditya-dahiya"
-xtwitter <- "&#xe61b"
-xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-
-plot_caption <- paste0(
-  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
-  "**Code:** ", 
-  social_caption_1, 
-  " |  **Graphics:** ", 
-  social_caption_2
-  )
-rm(github, github_username, xtwitter, 
-   xtwitter_username, social_caption_1, social_caption_2)
-
-```
-
-Data Wrangling
-
-```{r}
-#| label: data-wrangling-1
-
-library(donutsk)
 
 plotdf <- df2 |> 
-  filter(year == 2021) |> 
-  filter(entity == "World") |> 
-  select(-c(entity, code, year)) |> 
-  donutsk::packing(value = value)
+  filter(year == 2021 & entity == "World") |> 
+  mutate(
+    indicator = fct(indicator),
+    indicator_group = fct_collapse(
+      indicator,
+    "Lifestyle Disorders" = c("Cardiovascular Diseases", 
+                              "Diabetes and Kidney Diseases", 
+                              "Digestive Diseases", "Neoplasms", 
+                              "Chronic Respiratory Diseases"),
+    "Infectious Diseases" = c("Other Infectious Diseases", 
+                              "Neglected Tropical Diseases and Malaria", 
+                              "Enteric Infections", 
+                              "HIV / AIDS and Sexually Transmitted Infections", 
+                              "Respiratory Infections and Tuberculosis"),
+    "Violence and Injuries" = c("Transport Injuries", 
+                                "Self-Harm", 
+                                "Interpersonal Violence",
+                                "Unintentional Injuries", 
+                                "Conflict and Terrorism", 
+                                "Exposure To Forces Of Nature"),
+    "Mental Health Disorders" = c("Neurological Disorders",
+                                  "Mental Disorders", 
+                                  "Substance Use Disorders"),
+    "Others" = c("Musculoskeletal Disorders", 
+                 "Maternal Disorders", 
+                 "Nutritional Deficiencies", 
+                 "Neonatal Disorders", 
+                 "Skin and Subcutaneous Diseases", 
+                 "Other Non-Communicable Diseases")
+  )) |> 
+  select(entity, year, indicator_group, indicator, value) |> 
+  donutsk::packing(value = value, level = indicator_group) |> 
+  mutate(perc_outer = 100 * value / sum(value)) |> 
+  group_by(indicator_group) |> 
+  mutate(perc_inner = sum(perc_outer)) |> 
+  ungroup()
 
-
-# install.packages("donutsk")
-
-plotdf |> 
-  ggplot(
-    mapping = aes(
-      value = value,
-      fill = indicator
+labelsdf <- plotdf |> 
+  distinct(indicator_group, perc_inner) |> 
+  mutate(
+    ymax = cumsum(perc_inner),
+    ymin = ymax - perc_inner,
+    x_var = case_when(
+      indicator_group == "Violence and Injuries" ~ 1.4,
+      indicator_group == "Mental Health Disorders" ~ 1.4,
+      .default = 1.3
     )
-  ) +
-  geom_donut_int(
-    r_int=.5, 
-    alpha=.6, 
-    linewidth=.2, 
-    col = "gray20"
-  ) +
-  geom_label_ext(
-    mapping = aes(label = indicator),
-    colour = "black"
-  ) +
-  scale_x_continuous(
-    limits = c(0, 1)
-  ) +
-  coord_polar(
-    theta = "y"
-  ) +
-  theme_void() +
-  theme(
-    legend.position = "none"
+  ) |> 
+  select(-perc_inner) |> 
+  pivot_longer(
+    cols = c(ymax, ymin),
+    values_to = "y_var",
+    names_to = NULL
+  ) |> 
+  mutate(
+    y_var = y_var / 100
   )
-  
 ```
 
 Visualization
@@ -212,6 +228,166 @@ Visualization
 ```{r}
 #| label: visualize-1
 
+g <- plotdf |>
+  ggplot(
+    mapping = aes(
+      value = value,
+      fill = indicator_group
+    )
+  ) +
+
+  # Internal donut represents major categories of causes of DALYs
+  geom_donut_int(
+    r_int = 0, 
+    col = bg_col, 
+    linewidth = 0.75
+  ) +
+  
+  # External donut represents detailed individual causes
+  geom_donut_ext(
+    mapping = aes(
+      opacity = indicator
+    ), 
+    col = bg_col, 
+    linewidth = 0.5, 
+    show.legend = F
+  ) +
+  
+  # Text annotations for internal donut
+  geom_text_int(
+    mapping = aes(
+      label = paste0(
+        round(perc_inner, 1),
+        " %"
+        )
+      ),
+    size = bts / 4,
+    colour = bg_col,
+    hjust = 0.5,
+    r = 0.55,
+    show.legend = F,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  
+  geom_text_int(
+    mapping = aes(
+      label = str_wrap(as.character(indicator_group), 10)
+      ),
+    size = bts / 2,
+    colour = text_hil,
+    hjust = 0.5,
+    lineheight = 0.25,
+    r = 1.2,
+    show.legend = F,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+
+  # Label annotations for internal donut
+  geom_text_ext(
+    mapping = aes(
+      colour = indicator_group, 
+      label = paste0(
+        str_wrap(indicator, 10), " (",
+        round(perc_outer, 1), 
+        " %)"
+        )
+      ),
+    
+    hjust = "outward",
+    vjust = "outward",
+    size = bts / 5,
+    layout = circle(thinner = T), 
+    show.legend = F,
+    lineheight = 0.25,
+    family = "caption_font"
+  ) +
+  
+  # Link label annotations to outer donut chart
+  geom_pin(
+    mapping = aes(colour = indicator_group),
+    size = 1, 
+    linewidth = .25, 
+    show.legend = F, 
+    cut = 0, 
+    layout = circle(thinner = T), 
+    r = 1.75
+  ) +
+  # geomtextpath::geom_textpath(
+  #   data = labelsdf,
+  #   mapping = aes(
+  #     x = x_var, 
+  #     y = y_var,
+  #     colour = indicator_group,
+  #     label = str_wrap(indicator_group, 1),
+  #     value = NULL,
+  #     fill = NULL
+  #   ),
+  #   spacing = -200,
+  #   text_only = TRUE,
+  #   text_smoothing = 0,
+  #   lineheight = 0.25,
+  #   family = "caption_font",
+  #   size = bts/6
+  # ) + 
+  # Scales and Coordinates
+  paletteer::scale_colour_paletteer_d("wesanderson::Darjeeling1") +
+  paletteer::scale_fill_paletteer_d("wesanderson::Darjeeling1") +
+  coord_radial(
+    theta = "y", 
+    expand = F, 
+    clip = "off"
+    ) +
+  xlim(0, 3.5) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle
+  ) +
+  
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none", 
+    plot.title.position = "plot",
+    plot.title = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 3 * bts,
+      hjust = 0.5,
+      margin = margin(10,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 1.5 * bts,
+      hjust = 0.5,
+      margin = margin(5,0,-70,0, "mm"),
+      lineheight = 0.25
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(-70,0,0,0, "mm")
+    ),
+    plot.margin = margin(10,-70,10,-70, "mm"),
+    panel.border = element_blank()
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "owid_daly_causes_donut.png"),
+  plot = g,
+  height = 500,
+  width = 400,
+  units = "mm",
+  bg = bg_col
+)
 
 ```
 
@@ -221,14 +397,7 @@ Save a thumbnail
 #| label: save-plot
 
 
-ggsave(
-  filename = here::here("data_vizs", "owid_daly_causes.png"),
-  plot = g,
-  height = 500,
-  width = 400,
-  units = "mm",
-  bg = bg_col
-)
+
 
 
 library(magick)
@@ -238,4 +407,54 @@ image_read(here::here("data_vizs",
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", "thumbnails", 
                          "owid_daly_causes.png"))
+```
+
+Other Trial and Error Code
+
+```{r}
+#| label: other-attempts
+
+
+# Trying a sample with geom_textpath
+# ggplot() +
+#   geom_point(
+#     data = labelsdf,
+#     mapping = aes(
+#       x = x_var,
+#       y = y_var,
+#       colour = indicator_group,
+#       value = NULL,
+#       fill = NULL
+#     )
+#   ) +
+#   geom_line(
+#     data = labelsdf,
+#     mapping = aes(
+#       x = x_var,
+#       y = y_var,
+#       colour = indicator_group,
+#       value = NULL,
+#       fill = NULL
+#     )
+#   ) +
+#   
+#   # Adding a line on inside of outer donut
+#   geomtextpath::geom_textpath(
+#     data = labelsdf,
+#     mapping = aes(
+#       x = x_var, 
+#       y = y_var,
+#       colour = indicator_group,
+#       label = indicator_group,
+#       value = NULL,
+#       fill = NULL
+#     ),
+#     text_only = TRUE,
+#     text_smoothing = 0,
+#     family = "caption_font",
+#     size = bts/3
+#   ) +
+#   coord_radial(theta = "y", expand = F, clip = "off")
+
+
 ```
