@@ -1,0 +1,241 @@
+---
+title: "Visualizing the Top Causes of illness, death and disability globally"
+author: "Aditya Dahiya"
+date: "2024-08-01"
+subtitle: "........................................"
+categories:
+  - "A4 Size Viz"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_daly_causes_donut.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions, including communicable, maternal, neonatal, nutritional diseases, injuries, and non-communicable diseases (NCDs). The data is sourced from the IHME's Global Burden of Disease (GBD) study, which offers a detailed assessment of global health trends, encompassing death and DALY counts and rates for 371 diseases and injuries. The dataset, which spans from 1990 to 2021, was last updated on May 20, 2024, with the next update expected in May 2028. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
+
+![.......................](owid_daly_causes_donut.png){#fig-1}
+
+### How I made these graphics?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(patchwork)            # Combining plots
+
+# search1 <- owidR::owid_search("burden of disease")
+
+df1 <- owid("burden-of-disease-by-cause")
+
+# popdf <- owid("population-with-un-projections")
+
+df2 <- df1 |> 
+  as_tibble() |> 
+  pivot_longer(
+    cols = -c(year, entity, code),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  mutate(
+    indicator = str_remove(
+      indicator,
+      "Total number of DALYs from "
+    ),
+    indicator = str_remove(
+      indicator,
+      "\n"
+    )
+  ) |>
+  mutate(
+    indicator = str_to_title(
+      indicator
+    ),
+    indicator = str_replace(
+      indicator,
+      "Hiv/Aids",
+      "HIV / AIDS"
+    ),
+    indicator = str_replace_all(
+      indicator,
+      "And",
+      "and"
+    )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles
+font_add_google("Sail",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Poiret One",
+  family = "body_font"
+) 
+
+# Font for the Strip Text 
+font_add_google("Yanone Kaffeesatz",
+  family = "strip_font"
+)
+
+showtext_auto()
+
+# Colour Palette
+set.seed(41)
+mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
+mypal <- sample(mypal, 25, replace = F)
+# Background Colour
+bg_col <- "#F1F9F3FF"
+text_col <- "grey20"
+text_hil <- "#004616FF"
+
+# Base Text Size
+bts <- 11
+
+plot_title <- ""
+
+plot_subtitle <- ""
+
+data_annotation <- "About the Data: "
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** IHME - Global Burden of Disease (GBD) Study  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, social_caption_2)
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: data-wrangling-1
+
+library(donutsk)
+
+plotdf <- df2 |> 
+  filter(year == 2021) |> 
+  filter(entity == "World") |> 
+  select(-c(entity, code, year)) |> 
+  donutsk::packing(value = value)
+
+
+# install.packages("donutsk")
+
+plotdf |> 
+  ggplot(
+    mapping = aes(
+      value = value,
+      fill = indicator
+    )
+  ) +
+  geom_donut_int(
+    r_int=.5, 
+    alpha=.6, 
+    linewidth=.2, 
+    col = "gray20"
+  ) +
+  geom_label_ext(
+    mapping = aes(label = indicator),
+    colour = "black"
+  ) +
+  scale_x_continuous(
+    limits = c(0, 1)
+  ) +
+  coord_polar(
+    theta = "y"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
+  
+```
+
+Visualization
+
+```{r}
+#| label: visualize-1
+
+
+```
+
+Save a thumbnail
+
+```{r}
+#| label: save-plot
+
+
+ggsave(
+  filename = here::here("data_vizs", "owid_daly_causes.png"),
+  plot = g,
+  height = 500,
+  width = 400,
+  units = "mm",
+  bg = bg_col
+)
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "owid_daly_causes.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", 
+                         "owid_daly_causes.png"))
+```
