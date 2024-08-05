@@ -1,13 +1,14 @@
 ---
 title: "Donut Chart on Top Causes of DALYs globally"
 author: "Aditya Dahiya"
-date: "2024-08-01"
+date: "2024-08-05"
 subtitle: "A donut chart, with an inset pie chart on the main causes of DALYs, coloured by different categories, and different causes within each category distinguished by opacity. Labels show percentage contribution and the names of causes."
 categories:
   - "Our World in Data"
   - "Public Health"
+  - "A4 Size Viz"
   - "{donutsk}"
-image: "thumbnails/owid_daly_causes_donut.png"
+image: "thumbnails/owid_daly_causes_donut_highlight.png"
 format:
   html:
     code-fold: true
@@ -31,7 +32,7 @@ bibliography: references.bib
 
 The dataset from [Our World in Data](https://ourworldindata.org/) provides comprehensive information on Disability Adjusted Life Years (DALYs) for various health conditions, including communicable, maternal, neonatal, nutritional diseases, injuries, and non-communicable diseases (NCDs). The data is sourced from the IHME's Global Burden of Disease (GBD) study, which offers a detailed assessment of global health trends, encompassing death and DALY counts and rates for 371 diseases and injuries. The dataset, which spans from 1990 to 2021, was last updated on May 20, 2024, with the next update expected in May 2028. Detailed data can be retrieved from the Global Burden of Disease's results tool [here](https://vizhub.healthdata.org/gbd-results/).
 
-![A donut chart, with an inset pie chart on the main causes of DALYs, coloured by different categories, and different causes within each category distinguished by opacity. Labels show percentage contribution and the names of causes.](owid_daly_causes_donut_highlight.png){#fig-1 width="900"}
+![This graphic features four donut charts displaying the proportion of total global Disability Adjusted Life Years (DALYs) attributed to five major cause categories in the years 1990, 2000, 2010, and 2020. Each chart illustrates the evolving distribution of health burdens over time, with different sections representing distinct categories of diseases and conditions.](a4_owid_daly_causes_donut_highlight.png){#fig-1}
 
 ### How I made these graphics?
 
@@ -84,9 +85,7 @@ font_add_google("PT Sans Narrow",
 showtext_auto()
 
 # Colour Palette
-set.seed(41)
-mypal <- paletteer::paletteer_d("khroma::smoothrainbow")
-mypal <- sample(mypal, 25, replace = F)
+mypal <- c("grey40", "#FC1414FF", "grey60", "grey50", "grey30")
 # Background Colour
 bg_col <- "white"
 text_col <- "grey20"
@@ -95,9 +94,9 @@ text_hil <- "grey30"
 # Base Text Size
 bts <- 80
 
-plot_title <- "Causes of DALYs Worldwide"
+plot_title <- "Global Health Progress :\nDrop in Infectious Disease DALYs"
 
-plot_subtitle <- str_wrap("A Donut Chart on the causes of death, disease and disability globally in 2021 (measured by DALYs).", 60)
+plot_subtitle <- str_wrap("There is a significant global decrease in the share of infectious diseases in total DALYs, dropping from 30.6% in 1990 to 19.3% in 2020. Notably, enteric infections have seen the largest decline, falling from 8.4% to 2.8% over the same period, reflecting improvements in global health and sanitation.", 65)
 str_view(plot_subtitle)
 
 # Caption stuff for the plot
@@ -198,6 +197,7 @@ plotdf <- df2 |>
   select(entity, year, indicator_group, indicator, value) |> 
   group_by(year) |> 
   donutsk::packing(value = value, level = indicator_group) |> 
+  group_by(year) |> 
   mutate(perc_outer = 100 * value / sum(value)) |> 
   group_by(year, indicator_group) |> 
   mutate(perc_inner = sum(perc_outer)) |> 
@@ -238,6 +238,7 @@ Visualization
 bts = 40
 
 g <- plotdf |>
+  filter(year %in% c(1990, 2000, 2010, 2020)) |> 
   ggplot(
     mapping = aes(
       value = value,
@@ -254,7 +255,7 @@ g <- plotdf |>
     col = bg_col, 
     linewidth = 0.5,
     hl_shift = 0.4,
-    hl_col = "darkgreen"
+    hl_col = "#980000FF"
   ) +
   
   # External donut represents detailed individual causes
@@ -267,7 +268,7 @@ g <- plotdf |>
     linewidth = 0.3, 
     show.legend = F,
     hl_shift = 0.2,
-    hl_col = "darkgreen"
+    hl_col = "#980000FF"
   ) +
   
   # Text annotations for internal donut
@@ -282,7 +283,7 @@ g <- plotdf |>
       ),
     size = bts / 4,
     lineheight = 0.25,
-    colour = text_hil,
+    colour = "white",
     hjust = 0.5,
     r = 0.65,
     show.legend = F,
@@ -304,13 +305,13 @@ g <- plotdf |>
     
     hjust = "outward",
     vjust = "outward",
-    layout = tv(), 
+    layout = circle(thinner = TRUE), 
     show.legend = F,
     lineheight = 0.25,
     family = "caption_font"
   ) +
   scale_size_manual(
-    values = c(bts/3, bts/2)
+    values = c(bts/6, bts/4)
   ) +
   # Link label annotations to outer donut chart
   geom_pin(
@@ -319,21 +320,22 @@ g <- plotdf |>
     linewidth = .25, 
     show.legend = F, 
     cut = 0, 
-    layout = tv(), 
+    layout = circle(thinner = TRUE), 
     r = 1.75
   ) +
   
   facet_wrap(~ year, ncol = 2, nrow = 2, dir = "h") +
   
   # Scales and Coordinates
-  paletteer::scale_colour_paletteer_d("wesanderson::Darjeeling1") +
-  paletteer::scale_fill_paletteer_d("wesanderson::Darjeeling1") +
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  
   coord_radial(
     theta = "y", 
     expand = F, 
     clip = "off"
     ) +
-  xlim(0, 3.5) +
+  xlim(0, 3) +
   
   # Labels and Themes
   labs(
@@ -354,41 +356,114 @@ g <- plotdf |>
       family = "title_font",
       size = 6 * bts,
       hjust = 0.5,
-      margin = margin(10,0,5,0, "mm")
+      margin = margin(10,0,5,0, "mm"),
+      lineheight = 0.3
     ),
     plot.subtitle = element_text(
       colour = text_hil,
       family = "title_font",
-      size = 1.5 * bts,
-      hjust = 0.5,
-      margin = margin(5,0,10,0, "mm"),
-      lineheight = 0.25
+      size = 2.5 * bts,
+      hjust = 0,
+      margin = margin(0,0,0,10, "mm"),
+      lineheight = 0.3
     ),
     plot.caption = element_textbox(
       colour = text_hil,
       family = "caption_font",
       hjust = 0.5,
-      margin = margin(0,0,10,0, "mm")
+      margin = margin(-10,0,0,0, "mm")
     ),
     strip.text = element_text(
-      size = 3 * bts,
+      size = 5 * bts,
       colour = text_hil, 
       family = "title_font",
-      margin = margin(0,0,-30,0, "mm")
+      margin = margin(10,0,-30,0, "mm"),
+      face = "bold"
     ),
-    plot.margin = margin(10,-20,10,-20, "mm"),
-    panel.spacing = unit(-10, "mm"),
-    panel.border = element_blank()
+    plot.margin = margin(10,-15,5,-15, "mm"),
+    panel.spacing.x = unit(-70, "mm"),
+    panel.spacing.y = unit(-20, "mm"),
+    panel.border = element_blank(),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+```
+
+Add insets and QR Code
+
+```{r}
+#| label: insets
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "owid_daly_causes_donut_highlight",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.5
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
   )
 
-ggsave(
-  filename = here::here("data_vizs", "owid_daly_causes_donut_highlight.png"),
-  plot = g,
-  height = 500,
-  width = 400,
-  units = "mm",
-  bg = bg_col
-)
+plot_data <- ggplot() +
+  annotate(
+    geom = "text",
+    x = 0, y = 0,
+    label = str_wrap("About the Data: The dataset, derived from the Global Burden of Disease study and processed by Our World in Data, encompasses global health data from 1990 to 2020. It provides detailed information on the share of different disease categories in total Disability Adjusted Life Years (DALYs), allowing for analysis of trends and changes in global health burdens.", 50),
+    family = "caption_font",
+    colour = text_hil,
+    lineheight = 0.3, 
+    size = bts / 4,
+    hjust = 1,
+    vjust = 1
+  ) +
+  theme_void()
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.88, right = 0.98,
+    top = 1.18, bottom = 1,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  inset_element(
+    p = plot_data,
+    left = 0.75, right = 1.2,
+    top = 1.1, bottom = 0.95,
+    align_to = "panel",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+
+
 ```
 
 Save a thumbnail
@@ -396,13 +471,20 @@ Save a thumbnail
 ```{r}
 #| label: save-plot
 
-
+ggsave(
+  filename = here::here("data_vizs", "a4_owid_daly_causes_donut_highlight.png"),
+  plot = g_full,
+  height = 297 * 2,
+  width = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
 
 library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "owid_daly_causes_donut.png")) |> 
+                      "a4_owid_daly_causes_donut_highlight.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", "thumbnails", 
-                         "owid_daly_causes_donut.png"))
+                         "owid_daly_causes_donut_highlight.png"))
 ```
