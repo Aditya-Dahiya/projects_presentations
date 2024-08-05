@@ -202,8 +202,8 @@ plotdf <- df2 |>
   mutate(perc_inner = sum(perc_outer)) |> 
   ungroup() |> 
   mutate(
-    highlight_int = (indicator_group == "Lifestyle Disorders"),
-    highlight_ext = (indicator == "Cardiovascular Diseases")
+    highlight_int = (indicator_group == "Infectious Diseases"),
+    highlight_ext = (indicator_group == "Infectious Diseases")
   )
 
 labelsdf <- plotdf |> 
@@ -234,6 +234,8 @@ Visualization
 ```{r}
 #| label: visualize-1
 
+bts = 40
+
 g <- plotdf |>
   ggplot(
     mapping = aes(
@@ -244,9 +246,14 @@ g <- plotdf |>
 
   # Internal donut represents major categories of causes of DALYs
   geom_donut_int(
+    mapping = aes(
+     highlight = highlight_ext
+    ),
     r_int = 0, 
     col = bg_col, 
-    linewidth = 0.75
+    linewidth = 0.5,
+    hl_shift = 0.4,
+    hl_col = "darkgreen"
   ) +
   
   # External donut represents detailed individual causes
@@ -256,8 +263,10 @@ g <- plotdf |>
       highlight = highlight_ext
     ), 
     col = bg_col, 
-    linewidth = 0.5, 
-    show.legend = F
+    linewidth = 0.3, 
+    show.legend = F,
+    hl_shift = 0.2,
+    hl_col = "darkgreen"
   ) +
   
   # Text annotations for internal donut
@@ -272,9 +281,9 @@ g <- plotdf |>
       ),
     size = bts / 4,
     lineheight = 0.25,
-    colour = bg_col,
+    colour = text_hil,
     hjust = 0.5,
-    r = 0.55,
+    r = 0.65,
     show.legend = F,
     family = "body_font",
     fontface = "bold"
@@ -285,21 +294,23 @@ g <- plotdf |>
     mapping = aes(
       colour = indicator_group, 
       label = paste0(
-        str_wrap(indicator, 10), " (",
+        str_wrap(indicator, 15), " (",
         round(perc_outer, 1), 
         " %)"
-        )
+        ),
+      size = highlight_ext
       ),
     
     hjust = "outward",
     vjust = "outward",
-    size = bts / 5,
-    layout = circle(thinner = T), 
+    layout = tv(), 
     show.legend = F,
     lineheight = 0.25,
     family = "caption_font"
   ) +
-  
+  scale_size_manual(
+    values = c(bts/3, bts/2)
+  ) +
   # Link label annotations to outer donut chart
   geom_pin(
     mapping = aes(colour = indicator_group),
@@ -307,7 +318,7 @@ g <- plotdf |>
     linewidth = .25, 
     show.legend = F, 
     cut = 0, 
-    layout = circle(thinner = T), 
+    layout = tv(), 
     r = 1.75
   ) +
   
@@ -340,33 +351,40 @@ g <- plotdf |>
     plot.title = element_text(
       colour = text_hil,
       family = "title_font",
-      size = 3 * bts,
+      size = 6 * bts,
       hjust = 0.5,
-      margin = margin(10,0,0,0, "mm")
+      margin = margin(10,0,5,0, "mm")
     ),
     plot.subtitle = element_text(
       colour = text_hil,
       family = "title_font",
       size = 1.5 * bts,
       hjust = 0.5,
-      margin = margin(5,0,-70,0, "mm"),
+      margin = margin(5,0,10,0, "mm"),
       lineheight = 0.25
     ),
     plot.caption = element_textbox(
       colour = text_hil,
       family = "caption_font",
       hjust = 0.5,
-      margin = margin(-70,0,0,0, "mm")
+      margin = margin(0,0,10,0, "mm")
     ),
-    plot.margin = margin(10,-70,10,-70, "mm"),
+    strip.text = element_text(
+      size = 3 * bts,
+      colour = text_hil, 
+      family = "title_font",
+      margin = margin(0,0,-30,0, "mm")
+    ),
+    plot.margin = margin(10,-20,10,-20, "mm"),
+    panel.spacing = unit(-10, "mm"),
     panel.border = element_blank()
   )
 
 ggsave(
   filename = here::here("data_vizs", "owid_daly_causes_donut_highlight.png"),
   plot = g,
-  height = 1000,
-  width = 800,
+  height = 500,
+  width = 400,
   units = "mm",
   bg = bg_col
 )
