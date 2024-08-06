@@ -1,0 +1,250 @@
+---
+title: "Olympics Medals"
+author: "Aditya Dahiya"
+date: "2024-08-06"
+subtitle: ".........................."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_olympics.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+..........................
+
+![....................](tidy_olympics.png)
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+
+# Option 2: Read directly from GitHub
+
+olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-08-06/olympics.csv')
+```
+
+Data Wrangling
+
+```{r}
+#| label: eda
+
+years_select <- seq(2000, 2016, 4)
+
+continents <- rnaturalearth::ne_countries() |> 
+  as_tibble() |> 
+  select(iso_a3, continent, name)
+
+df <- olympics |> 
+  filter(year %in% years_select) |> 
+  filter(season == "Summer") |> 
+  group_by(year) |> 
+  count(team, noc, sort = TRUE)
+
+df1 <- df |> 
+  left_join(continents, by = join_by(team == name)) |> 
+  select(-iso_a3)
+  
+df2 <- df |> 
+  left_join(continents, by = join_by(noc == iso_a3)) |> 
+  select(-name)
+
+df3 <- df1 |> 
+  bind_rows(df2) |> 
+  ungroup() |> 
+  drop_na() |> 
+  distinct() |> 
+  arrange(desc(n))
+
+df4 <- df3 |> 
+  group_by(year, continent) |> 
+  summarise(n = sum(n))
+
+df5 <- df4 |> 
+  group_by(year) |> 
+  mutate(perc = round(100 * n / sum(n), 1))
+  
+yr = years_select[1]
+bts = 11
+
+plot_donut <- function(yr){
+  df5 |> 
+  filter(year == yr) |> 
+  ggplot(aes(1, n, fill = continent)) +
+  geom_col(
+    colour = "black",
+    width = 0.15
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(perc, " %")
+    ),
+    position = position_stack(vjust = 0.5),
+    family = "body_font"
+  ) +
+  annotate(
+    geom = "text",
+    x = 0 , y = 0,
+    label = yr,
+    size = bts * 1.5,
+    family = "body_font"
+  ) +
+  # facet_wrap(~ year, scales = "free") +
+  scale_x_continuous(limits = c(0, 1.5)) +
+  coord_polar(theta = "y") +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none"
+  )
+}
+
+plot1 <- plot_donut(years_select[1])
+plot2 <- plot_donut(years_select[2])
+plot3 <- plot_donut(years_select[3])
+plot4 <- plot_donut(years_select[4])
+plot5 <- plot_donut(years_select[5])
+
+plot6 <- plot1 + plot2 + plot3 + plot4 + plot5
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Corinthia",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Satisfy",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+
+# Colours to use as background and borders
+mypal <- paletteer::paletteer_d("ggthemes::Summer")
+seecolor::print_color(mypal)
+
+bg_col <- mypal[6] |> lighten(0.9)
+seecolor::print_color(bg_col)
+
+text_col <-  mypal[5] |> darken(0.7)
+seecolor::print_color(text_col)
+
+text_hil <- mypal[5] |> darken(0.4)
+seecolor::print_color(text_hil)
+
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Summer Movies: \nTop 50"
+
+plot_subtitle <- "Names of Movies with\nYear of release &\nAverage IMDb\nRating in\nbrackets"
+str_view(plot_subtitle)
+
+plot_caption <- paste0(
+  "**Data:** _#TidyTuesday_ & IMDb", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot:
+
+```{r}
+#| label: static-plot
+
+
+
+
+```
+
+Insets and annotations - ignored while compiling
+
+```{r}
+#| label: insets
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_olympics.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = lighten(bg_col, 0.5)
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_olympics.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", "thumbnails", "tidy_olympics.png"))
+```
