@@ -1,10 +1,12 @@
 ---
-title: "Olympics Medals"
+title: "Average Age of Olympians over the years"
 author: "Aditya Dahiya"
 date: "2024-08-06"
-subtitle: ".........................."
+subtitle: "A ridgeline density plot of the ages of Olympics participants and medal winners, faceted by the medal outcome. Plotted from 1896 to 2016 Olympics (120 years). The central dot shows the mean age for that year."
 categories:
   - "#TidyTuesday"
+  - "Sports"
+  - "{ggridges}"
 image: "thumbnails/tidy_olympics.png"
 format:
   html:
@@ -27,9 +29,11 @@ share:
 bibliography: references.bib
 ---
 
-..........................
+This week, we're diving into the rich history of the modern Olympic Games with a dataset from Kaggle's [RGriffin](https://www.kaggle.com/rgriffin). The dataset, titled ***"120 years of Olympic history: athletes and results,"*** offers an extensive collection of data on athletes and their medal results from the Athens 1896 Olympics up to the Rio 2016 Games. This dataset, which we previously explored during [TidyTuesday on July 27, 2021](https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-07-27/readme.md), includes detailed biographical data on athletes.
 
-![....................](tidy_olympics.png)
+The data was sourced from [sports-reference.com](https://www.sports-reference.com/) in May 2018. This site provides comprehensive data from both the Summer and Winter Games, which were held in the same year until 1992. The subsequent staggering of these events, with the Winter Games starting in 1994 and the Summer Games in 1996, is an important historical detail often overlooked in analyses. For a deeper exploration, check out the [Olympics results page](https://www.olympic.org/olympic-results) and the blog on [sports-reference.com](https://www.sports-reference.com/).
+
+![A ridgeline density plot of the ages of Olympics participants and medal winners, faceted by the medal outcome. Plotted from 1896 to 2016 Olympics (120 years). The central dot shows the mean age for that year.](tidy_olympics.png){#fig-1 width="900"}
 
 ### **How I made this graphic?**
 
@@ -55,7 +59,7 @@ library(patchwork)            # Combining plots
 olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-08-06/olympics.csv')
 ```
 
-Data Wrangling
+Data Wrangling (1)
 
 ```{r}
 #| label: eda
@@ -67,7 +71,7 @@ continents <- rnaturalearth::ne_countries() |>
   select(iso_a3, continent, name)
 
 df <- olympics |> 
-  filter(year %in% years_select) |> 
+  # filter(year %in% years_select) |> 
   filter(season == "Summer") |> 
   group_by(year) |> 
   count(team, noc, sort = TRUE)
@@ -95,15 +99,12 @@ df5 <- df4 |>
   group_by(year) |> 
   mutate(perc = round(100 * n / sum(n), 1))
   
-yr = years_select[1]
-bts = 11
-
 plot_donut <- function(yr){
   df5 |> 
   filter(year == yr) |> 
   ggplot(aes(1, n, fill = continent)) +
   geom_col(
-    colour = "black",
+    colour = bg_col,
     width = 0.15
   ) +
   geom_text(
@@ -128,19 +129,174 @@ plot_donut <- function(yr){
     base_size = bts
   ) +
   theme(
-    legend.position = "none"
+    legend.position = "none",
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
   )
 }
 
-plot1 <- plot_donut(years_select[1])
-plot2 <- plot_donut(years_select[2])
-plot3 <- plot_donut(years_select[3])
-plot4 <- plot_donut(years_select[4])
-plot5 <- plot_donut(years_select[5])
+bmi_df <- olympics |> 
+  filter(season == "Summer") |> 
+  mutate(
+    medal = replace_na(medal, "Others"),
+    medal = fct(
+      medal, 
+      levels = c("Gold", "Silver", "Bronze", "Others")
+    )
+  ) |>
+  mutate(bmi = (weight / ((height/100)^2)))
 
-plot6 <- plot1 + plot2 + plot3 + plot4 + plot5
+# What percentages are NA for each medal type
+bmi_df |> 
+  group_by(medal) |> 
+  summarise(na_percentage = mean(is.na(bmi)) * 100) %>%
+  pull(na_percentage)
 
 
+library(ggridges)
+
+bmi_df |> 
+  ggplot(
+    mapping = aes(
+      x = weight,
+      y = as_factor(year)
+    )
+  ) +
+  geom_density_ridges(
+    alpha = 0.5
+  ) +
+  scale_x_continuous(limits = c(40, 120)) +
+  # scale_x_continuous(limits = c(150, 210)) +
+  # scale_x_continuous(limits = c(18, 30)) +
+  facet_wrap(~ medal, nrow = 1)
+
+
+olympics |> 
+  filter(!is.na(medal)) |> 
+  group_by(name) |> 
+  count(sort = T)
+
+olympics |>
+  filter(season == "Summer") |> 
+  filter(!is.na(medal)) |> 
+  group_by(year, team, noc, medal) |> 
+  count() |> 
+  pivot_wider(
+    id_cols = c(year, noc, team),
+    names_from = medal,
+    values_from = n,
+    values_fill = 0
+  ) |> 
+  janitor::clean_names() |> 
+  mutate(total = bronze + silver + gold) |> 
+  group_by(year) |> 
+  slice_max(order_by = total, n = 10) |> 
+  mutate(rank = row_number())
+```
+
+Data Wrangling (2)
+
+```{r}
+#| label: eda-2
+
+continents <- rnaturalearth::ne_countries() |> 
+  as_tibble() |> 
+  select(iso_a3, continent, name)
+
+df <- olympics |> 
+  filter(!is.na(medal)) |> 
+  filter(season == "Summer") |> 
+  group_by(year) |> 
+  count(team, noc, medal)
+
+df1 <- df |> 
+  left_join(continents, by = join_by(team == name)) |> 
+  select(-iso_a3)
+  
+df2 <- df |> 
+  left_join(continents, by = join_by(noc == iso_a3)) |> 
+  select(-name)
+
+df3 <- df1 |> 
+  bind_rows(df2) |> 
+  ungroup() |> 
+  drop_na() |> 
+  distinct() |> 
+  arrange(desc(n))
+
+df4 <- df3 |> 
+  group_by(year, continent, medal) |> 
+  summarise(n = sum(n)) |> 
+  group_by(year) |> 
+  mutate(perc = round(100 * n / sum(n), 1)) |> 
+  ungroup() |>
+  mutate(
+    medal = fct(
+      medal, 
+      levels = c("Gold", "Silver", "Bronze")
+    )
+  )
+  
+df4 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = n,
+      fill = continent,
+      alpha = medal
+    )
+  ) +
+  # geom_area(
+  #   position = "fill",
+  #   colour = "white"
+  # ) +
+  ggstream::geom_stream(
+    type = "proportional",
+    bw = 0.5
+  ) +
+  scale_alpha_manual(
+    values = c(0.9, 0.7, 0.5)
+  )
+  
+```
+
+Data Wrangling (3) - Age Distribution amongst medal winners
+
+```{r}
+#| label: eda-3
+
+mypal <- c("#FFD700", "#C0C0C0", "#ad8a56", "grey20")
+
+age_df <- olympics |> 
+  filter(season == "Summer") |> 
+  mutate(
+    medal = replace_na(medal, "Other Participants"),
+    medal = if_else(
+      medal == "Other Participants",
+      medal,
+      paste0(medal, " Medalists")
+    ),
+    medal = fct(
+      medal, 
+      levels = c("Gold Medalists", 
+                 "Silver Medalists", 
+                 "Bronze Medalists", 
+                 "Other Participants")
+    )
+  )
+
+age_med <- age_df |> 
+  group_by(year, medal) |> 
+  summarise(
+    median_age = median(age, na.rm = TRUE),
+    mean_age = mean(age, na.rm = TRUE)
+  )
 ```
 
 Visualization Parameters
@@ -149,35 +305,26 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Corinthia",
+font_add_google("Bilbo",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Satisfy",
-  family = "caption_font"
+font_add_google("Barlow Semi Condensed",
+  family = "caption_font",
+  regular.wt = 400,
+  bold.wt = 700
 ) 
 
 # Font for plot text
-font_add_google("Saira Extra Condensed",
+font_add_google("Ubuntu Condensed",
   family = "body_font"
 ) 
 
 showtext_auto()
 
-
-# Colours to use as background and borders
-mypal <- paletteer::paletteer_d("ggthemes::Summer")
-seecolor::print_color(mypal)
-
-bg_col <- mypal[6] |> lighten(0.9)
-seecolor::print_color(bg_col)
-
-text_col <-  mypal[5] |> darken(0.7)
-seecolor::print_color(text_col)
-
-text_hil <- mypal[5] |> darken(0.4)
-seecolor::print_color(text_hil)
+text_col <- "grey20"
+text_hil <- "grey30"
 
 bts <- 80
 
@@ -193,13 +340,13 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Summer Movies: \nTop 50"
+plot_title <- "Average Age of Olympians"
 
-plot_subtitle <- "Names of Movies with\nYear of release &\nAverage IMDb\nRating in\nbrackets"
+plot_subtitle <- "Since the start of Modern Summer Olympics in 1896, the average age **(represented by**<br>**the dots)** of Olympics' medallists and participants has stayed around 25 years<br>**(represented by the vertical line)**. Of late, average age has been increasing slightly."
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
-  "**Data:** _#TidyTuesday_ & IMDb", 
+  "**Data:** _#TidyTuesday_ & RGriffin's Kaggle Dataset: ", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -211,27 +358,176 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 ```
 
-The static plot:
+The static plot: Attempt 1
 
 ```{r}
 #| label: static-plot
 
 
+df5 |> 
+  ggplot(
+    mapping = aes(
+      x = 1, 
+      y = n, 
+      fill = continent
+    )
+  ) +
+  geom_col(
+    colour = bg_col,
+    width = 0.15
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(perc, " %")
+    ),
+    position = position_stack(vjust = 0.5),
+    family = "body_font"
+  ) +
+  facet_wrap(~ year, scales = "free") +
+  scale_x_continuous(
+    limits = c(0, 1.5), 
+    expand = expansion(c(0, -0.3))
+  ) +
+  coord_polar(theta = "y") +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+```
+
+The static plot: Attempt 2
+
+```{r}
+#| label: static-plot2
+
+df5 |> 
+  ggplot(aes(year, n, fill = continent)) +
+  ggstream::geom_stream(
+    type = "proportional",
+    colour = "white"
+  )
 
 
 ```
 
-Insets and annotations - ignored while compiling
+The static plot: Attempt 3 produced the @fig-1
 
 ```{r}
-#| label: insets
+#| label: static-plot-3
 
-```
+bts = 80
 
-Savings the graphics
-
-```{r}
-#| label: save-image
+g <- age_df |> 
+  ggplot(
+    mapping = aes(
+      x = age,
+      y = as_factor(year),
+      fill = medal
+    )
+  ) +
+  ggridges::geom_density_ridges(
+    alpha = 0.5,
+    panel_scaling = TRUE
+  ) +
+  scale_fill_manual(
+    values = mypal
+  ) +
+  scale_colour_manual(
+    values = darken(mypal, 0.3)
+  ) +
+  geom_point(
+    data = age_med,
+    mapping = aes(
+      x = mean_age,
+      y = as_factor(year),
+      colour = medal
+    ),
+    position = position_nudge(y = 0.5),
+    size = 3
+  ) +
+  geom_vline(
+    mapping = aes(colour = medal),
+    xintercept = 25,
+    linetype = 1,
+    linewidth = 0.75,
+    alpha = 0.1
+  ) +
+  scale_x_continuous(
+    limits = c(15, 35),
+    expand = expansion(0)
+  ) +
+  scale_y_discrete(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ medal, nrow = 1) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    y = "Year of the Summer Olympics",
+    x = "Age (in years)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot",
+    plot.margin = margin(10,15,10,15, "mm"),
+    plot.title = element_text(
+      colour = text_hil,
+      size = 5 * bts,
+      margin = margin(5,0,5,0, "mm"), 
+      hjust = 0.5,
+      family = "title_font",
+      face = "bold"
+    ),
+    plot.subtitle = element_markdown(
+      colour = text_hil,
+      size = 1.2 * bts,
+      lineheight = 0.35,
+      margin = margin(0,0,5,0, "mm"),
+      family = "caption_font",
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      colour = text_hil
+    ),
+    strip.text = element_text(
+      margin = margin(10,0,5,0, "mm"),
+      colour = text_hil,
+      size = 1.2 * bts
+    ),
+    panel.grid = element_blank(),
+    axis.text.y = element_text(
+      vjust = -0.2,
+      colour = text_hil
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    panel.spacing = unit(15, "mm"),
+    axis.text.x = element_text(
+      colour = text_hil,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    axis.title = element_text(
+      colour = text_hil
+    )
+  )
 
 ggsave(
   filename = here::here("data_vizs", "tidy_olympics.png"),
@@ -239,8 +535,16 @@ ggsave(
   width = 400,    # Best Twitter Aspect Ratio = 5:4
   height = 500,   
   units = "mm",
-  bg = lighten(bg_col, 0.5)
+  bg = "white"
 )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+
 
 library(magick)
 # Saving a thumbnail for the webpage
