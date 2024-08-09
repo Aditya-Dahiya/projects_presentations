@@ -79,9 +79,17 @@ df <- rawdf |>
   filter(!is.na(ghe)) |> 
   filter(!is.na(trpc))
 
+sel_cons <- df |> 
+  filter(year == 2018) |> 
+  filter(!is.na(code)) |>
+  filter(entity != "World") |> 
+  slice_max(order_by = pop, n = 10) |> 
+  pull(entity)
+
+font_add_google("Barlow Condensed", family = "body_font")
+showtext_auto()
 df |> 
-  # filter(year == 2020) |>
-  filter(entity %in% sel_cons) |> 
+  filter(year == 2020) |>
   ggplot(
     mapping = aes(
       x = ghe,
@@ -96,26 +104,28 @@ df |>
     alpha = 0.7
   ) +
   scale_size(range = c(1, 10)) +
-  # geom_text(
-  #   mapping = aes(
-  #     label = entity
-  #   ),
-  #   check_overlap = T
-  # ) +
-  # scale_x_log10() +
-  # scale_y_log10() +
+  scale_x_continuous(
+    labels = scales::label_currency()
+  ) +
+  scale_y_continuous(
+    labels = scales::label_currency()
+  ) +
   labs(
     x = names(rawdf)[4],
     y = names(rawdf)[5]
   ) +
-  theme(legend.position = "none")
+  theme_classic(
+    base_size = 11,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.line = element_line(
+      arrow = arrow(length = unit(3, "mm")),
+      linewidth = 0.3
+    )
+  )
 
-sel_cons <- df |> 
-  filter(year == 2018) |> 
-  filter(!is.na(code)) |>
-  filter(entity != "World") |> 
-  slice_max(order_by = pop, n = 10) |> 
-  pull(entity)
 
 df |> 
   filter(year < 2021) |> 
