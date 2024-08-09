@@ -1,0 +1,154 @@
+---
+title: "Analysis of India's NFHS-5 Data"
+author: "Aditya Dahiya"
+date: "2024-08-09"
+subtitle: "NFHS-5 Data, Insights and Analysis"
+categories:
+  - "NFHS-5"
+  - "Data Table"
+  - "{gt}"
+image: "nfhs_thumnail.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+```{r}
+#| label: setup
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+rawdf <- readxl::read_xls(
+  here::here("data/NFHS_5_Factsheets_Data.xls"),
+  na = "*"
+  )
+```
+
+The Raw Data from the National Family Health Survey (NFHS-5), 2019-21 is shown in @tbl-1
+
+```{r}
+#| label: tbl-1
+#| eval: true
+#| tbl-cap: "The Raw Data from the NFHS-5"
+
+library(gt)                   # Beautiful HTML tables
+library(gtExtras)             # Customizing GT tables
+
+sel_cols <- rawdf |> 
+  names()
+
+
+rawdf |> 
+  group_by(`States/UTs`) |> 
+  mutate(across(-c(1:2), as.numeric)) |>
+  mutate(across(where(is.numeric), ~ round(., 1))) |> 
+  gt(
+    rowname_col = "`States/UTs`"
+  ) |> 
+  tab_stubhead(label = "States/UTs") |> 
+  tab_header(
+    title = md("**Raw Data from the NFHS-5**")
+  ) |> 
+   tab_source_note(
+    source_note = "Source: Open Government Data (OGD) Platform"
+  ) |>
+  tab_source_note(
+    source_note = md("Released: May 2022. Ministry of Health and Family Welfare, Government of India. International Institute for Population Sciences, Mumbai")
+  ) |> 
+  sub_missing(missing_text = "") |> 
+  gt_theme_espn() |> 
+  opt_interactive(
+    use_search = TRUE,
+    use_resizers = TRUE,
+    use_compact_mode = TRUE,
+    use_pagination = TRUE,
+    page_size_default = 2
+  ) |> 
+  opt_table_font(
+    font = google_font("Saira Condensed")
+  ) |> 
+  fmt_number(
+    columns = sel_cols[3:5],
+    decimals = 0,
+    system = "ind"
+  ) |> 
+  opt_align_table_header(align = "center") |> 
+  gt_highlight_cols(
+    columns = "States/UTs",
+    fill = "grey90",
+    font_weight = "bold"
+  )
+
+```
+
+An analysis of Institutional Deliveries in Public Facility - Rural vs. Urban India
+
+```{r}
+#| label: fig-institutional-deliveries-public
+#| eval: true
+
+
+library(sf)                   # Map of India
+
+df_indicators <- tibble(
+  indicator = names(rawdf)
+) |> 
+  slice(3:n()) |> 
+  mutate(
+    ind_id = row_number()
+  ) |> 
+  relocate(ind_id)
+
+df <- rawdf |> 
+  mutate(across(-c(1:2), as.numeric)) |>
+  pivot_longer(
+    cols = -c(`States/UTs`, Area),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  rename(state  = `States/UTs`, area = Area) |> 
+  left_join(df_indicators) |> 
+  
+  # Remove obvious data entry errors (less than zero values)
+  filter(value > 0)
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 5000) |> 
+  st_transform(crs = 4326) |> 
+  mutate(state = case_when(
+    State_Name == "Andaman & Nicobar" ~ "Andaman & Nicobar Islands",
+    State_Name == "Daman and Diu and Dadra and Nagar Haveli" ~ "Dadra and Nagar Haveli & Daman and Diu",
+    State_Name == "Jammu and Kashmir" ~ "Jammu & Kashmir",
+    State_Name == "Maharashtra" ~ "Maharastra",
+    State_Name == "Delhi" ~ "NCT of Delhi",
+    State_Name == "Telengana" ~ "Telangana",
+    State_Name == "Tamilnadu" ~ "Tamil Nadu",
+    State_Name == "Chhattishgarh" ~ "Chhattisgarh",
+    .default = State_Name
+    ),
+    .keep = "unused"
+  ) |>
+  
+  # Remove empty geometries
+  filter(!st_is_empty(geometry))
+```
