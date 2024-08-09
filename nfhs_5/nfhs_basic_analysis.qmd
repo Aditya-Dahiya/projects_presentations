@@ -31,21 +31,74 @@ bibliography: references.bib
 
 ### **How I made this graphic?**
 
-Loading libraries & data
+Loading libraries & cleaning the data to make it in a tidy format
 
 ```{r}
 #| label: setup
 
 # Data Import and Wrangling Tools
 library(tidyverse)            # All things tidy
+library(sf)                   # Map of India
 
 rawdf <- readxl::read_xls("nfhs_5/NFHS_5_Factsheets_Data.xls")
 
 df_indicators <- tibble(
   indicator = names(rawdf)
-)
+) |> 
+  slice(3:n()) |> 
+  mutate(
+    ind_id = row_number()
+  ) |> 
+  relocate(ind_id)
 
-df_indicators
+df <- rawdf |> 
+  mutate(across(-c(1:2), as.numeric)) |>
+  pivot_longer(
+    cols = -c(`States/UTs`, Area),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  rename(state  = `States/UTs`, area = Area) |> 
+  left_join(df_indicators)
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 5000) |> 
+  st_transform(crs = 4326) |> 
+  mutate(state = case_when(
+    State_Name == "Andaman & Nicobar" ~ "Andaman & Nicobar Islands",
+    State_Name == "Daman and Diu and Dadra and Nagar Haveli" ~ "Dadra and Nagar Haveli & Daman and Diu",
+    State_Name == "Jammu and Kashmir" ~ "Jammu & Kashmir",
+    State_Name == "Maharashtra" ~ "Maharastra",
+    State_Name == "Delhi" ~ "NCT of Delhi",
+    State_Name == "Telengana" ~ "Telangana",
+    State_Name == "Tamilnadu" ~ "Tamil Nadu",
+    State_Name == "Chhattishgarh" ~ "Chhattisgarh",
+    .default = State_Name
+    ),
+    .keep = "unused"
+  )
+```
+
+Data Wrangling
+
+```{r}
+#| label: india-map
+
+df_indicators |> 
+  print(n = Inf)
+df |> 
+  filter(ind_id %in% c(28)) |> 
+  filter(area == "Total") |> 
+  left_join(india_state_map) |> 
+  ggplot(aes(fill = value, geometry = geometry)) +
+  geom_sf(colour = "white") +
+  paletteer::scale_fill_paletteer_c("grDevices::Red-Purple", direction = -1) +
+  facet_wrap(~ind_id) +
+  ggthemes::theme_map()
 ```
 
 Data Wrangling
