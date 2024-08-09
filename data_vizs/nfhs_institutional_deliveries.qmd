@@ -1,0 +1,343 @@
+---
+title: "The Rural vs. Urban divide in India - Births in Government facilities!"
+author: "Aditya Dahiya"
+date: "2024-08-09"
+subtitle: "The percentage of births that take place in Institutional public (government) facilities, and not at private facilities. Rural areas depend far more on Government facilities, while urban Indians rely on the private sector."
+categories:
+  - "A4 Size Viz"
+  - "India"
+  - "Maps"
+  - "Public Health"
+image: "thumbnails/nfhs_thumbnail.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+  cache: true
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+Full analysis is shown [here](https://aditya-dahiya.github.io/projects_presentations/projects/nfhs_basic_analysis.html).
+
+![Figure showing the Institutional births in public facility (in the 5 years before the survey) (%) - NFHS-5, Government of India (2019-20)](/docs/nfhs_5_institutional_delievries.png)
+
+Code to generate the Graphic: —
+
+```{r}
+#| label: fig-institutional-deliveries-public
+#| eval: false
+
+
+library(sf)                   # Map of India
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+df_indicators <- tibble(
+  indicator = names(rawdf)
+) |> 
+  slice(3:n()) |> 
+  mutate(
+    ind_id = row_number()
+  ) |> 
+  relocate(ind_id)
+
+df <- rawdf |> 
+  mutate(across(-c(1:2), as.numeric)) |>
+  pivot_longer(
+    cols = -c(`States/UTs`, Area),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  rename(state  = `States/UTs`, area = Area) |> 
+  left_join(df_indicators) |> 
+  
+  # Remove obvious data entry errors (less than zero values)
+  filter(value > 0)
+
+# Get State Map of India
+india_state_map <- read_sf(here::here(
+  "data", "india_map", "India_State_Boundary.shp"
+)) |> 
+  # During interations, using lower resolution for quick plotting
+  st_simplify(dTolerance = 100) |> 
+  st_transform(crs = 4326) |> 
+  mutate(state = case_when(
+    State_Name == "Andaman & Nicobar" ~ "Andaman & Nicobar Islands",
+    State_Name == "Daman and Diu and Dadra and Nagar Haveli" ~ "Dadra and Nagar Haveli & Daman and Diu",
+    State_Name == "Jammu and Kashmir" ~ "Jammu & Kashmir",
+    State_Name == "Maharashtra" ~ "Maharastra",
+    State_Name == "Delhi" ~ "NCT of Delhi",
+    State_Name == "Telengana" ~ "Telangana",
+    State_Name == "Tamilnadu" ~ "Tamil Nadu",
+    State_Name == "Chhattishgarh" ~ "Chhattisgarh",
+    .default = State_Name
+    ),
+    .keep = "unused"
+  ) |>
+  
+  # Remove empty geometries
+  filter(!st_is_empty(geometry)) |> 
+  mutate(
+    area_state = as.numeric(st_area(geometry))
+  )
+
+plot_title <- "The Rural vs. Urban divide in India - Births in Government facilities!"
+
+plot_subtitle <- str_wrap("The percentage of births that take place in Institutional public (government) facilities, and not at private facilities. Rural areas depend far more on Government facilities, while urban Indians rely on the private sector.", 115)
+
+str_view(plot_subtitle)
+
+# Font for titles
+font_add_google("Maiden Orange",
+  family = "body_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+text_col <- "grey20"
+text_hil <- "grey30"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_caption <- paste0(
+  "**Data:** NFHS-5, OGD Open Government Database, Government of India", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+bts <-  80
+
+df_indicators |> 
+  filter(ind_id == 54) |> 
+  pull(indicator)
+
+g <- df |> 
+  filter(ind_id == 54) |> 
+  filter(area %in% c("Rural", "Urban")) |> 
+  left_join(india_state_map) |> 
+  ggplot(aes(fill = value, geometry = geometry)) +
+  geom_sf(
+    colour = "white"
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = round(value, 1),
+      size = area_state
+    ),
+    family = "body_font",
+    colour = text_col
+  ) +
+  facet_wrap(~ area) +
+  coord_sf(
+    clip = "off"
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    palette = "grDevices::Green-Orange", 
+    direction = -1,
+    limits = c(50, 80),
+    oob = scales::squish
+  ) +
+  guides(size = "none") +
+  scale_size_continuous(range = c(bts/5, bts/3)) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = NULL, 
+    y = NULL,
+    fill = "Institutional births in public facility (in the 5 years before the survey) (%)"
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    panel.spacing.x = unit(-10, "mm"),
+    panel.background = element_rect(
+      fill = "transparent", colour = "transparent"
+    ),
+    legend.position.inside = c(0, -0.08),
+    legend.direction = "horizontal",
+    legend.key.height = unit(8, "mm"),
+    legend.key.width = unit(50, "mm"),
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      colour = text_hil
+    ),
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    legend.text = element_text(
+      colour = text_hil,
+      margin = margin(2,0,0,0, "mm")
+    ),
+    plot.title = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      face = "bold",
+      size = 2.5 * bts,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      lineheight = 0.35,
+      hjust = 0.5,
+      margin = margin(5,0,10,0, "mm"),
+      size = 1.2 * bts
+    ),
+    plot.caption = element_textbox(
+      hjust = 1,
+      family = "caption_font",
+      margin = margin(5,20,0,0, "mm")
+    ),
+    strip.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    strip.text = element_text(
+      size = bts * 3,
+      margin = margin(0,0,-40,0, "mm"),
+      hjust = 0.6,
+      colour = text_hil
+    ),
+    plot.margin = margin(10,-10,10,-10, "mm")
+  )
+
+bg_col = "white"
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  "nfhs_basic_analysis",
+  ".html"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 2
+    ) +
+  # labs(caption = "Scan for the Interactive Version") +
+  coord_fixed() +
+  theme_void() +
+  theme(plot.background = element_rect(
+    fill = NA, 
+    colour = NA
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      family = "caption_font",
+      size = bts/1.8
+    )
+  )
+
+data_viz <- ggplot() +
+  annotate(
+    geom = "text",
+    label = str_wrap("The National Family Health Survey (NFHS-5) 2019-21 provides comprehensive data on health, population, and nutrition across India. Conducted under the Ministry of Health and Family Welfare, the survey covers 707 districts.", 30),
+    x = 0, y = 0,
+    family = "caption_font",
+    colour = text_hil,
+    lineheight = 0.25,
+    size = bts / 4,
+    hjust = 1
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "transparent", colour = "transparent"),
+    panel.background = element_rect(fill = "transparent", colour = "transparent")
+  )
+
+library(patchwork)
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.85, right = 1,
+    top = 0.92, bottom = 0.78,
+    align_to = "full"
+  ) +
+  inset_element(
+    p = data_viz,
+    left = 0.8, right = 1.13,
+    top = 0.78, bottom = 0.63,
+    align_to = "full"
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  plot = g_full,
+  filename = here::here("docs", "nfhs_5_institutional_delievries.png"),
+  device = "png",
+  height = 210 * 2,
+  width = 297 * 2,
+  units = "mm",
+  bg = "white"
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("docs", 
+                      "nfhs_5_institutional_delievries.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("docs", 
+                         "nfhs_thumbnail.png"))
+
+```
