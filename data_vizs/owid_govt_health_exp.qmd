@@ -1,12 +1,14 @@
 ---
-title: "Government Health-Care Expenditure and Taxation"
+title: "Government Health-Care Expenditure over last 20 years"
 author: "Aditya Dahiya"
 date: "2024-08-08"
-subtitle: "............"
+subtitle: "Animated line plot comparing Public Health Spending per Capita (2000–2021) across countries. Data sourced from World Bank and processed by Our World in Data."
 categories:
   - "Our World in Data"
   - "Public Health"
-image: "thumbnails/owid_govt_health_exp.png"
+  - "Animation"
+  - "{gganimate}"
+image: "thumbnails/owid_govt_health_exp.gif"
 format:
   html:
     code-fold: true
@@ -28,11 +30,13 @@ share:
 bibliography: references.bib
 ---
 
-## Government Health Care Expenditure
+## Government Health Care Expenditure vs. its Tax Revenue (in different Countries)
 
-..................................................
+This animated line plot compares Public Health Spending per Capita from 2000 to 2021 across various countries. The Y-axis illustrates Public Health Spending per Capita, which includes all recurrent and capital spending from government sources, external borrowing, grants, and social health insurance funds. It is measured in current international dollars, adjusting for price differences between countries. Each line represents a country.
 
-![.........................](owid_govt_health_exp.png)
+The data for public health spending is sourced from multiple providers, compiled by the World Bank and processed by Our World in Data. The data pipeline includes standardizing country names, converting units, and calculating derived indicators such as per capita measures. For a detailed description of the data processing and links to the original sources, please refer to [Our World in Data's data pipeline documentation](https://ourworldindata.org/our-data-pipeline) and [World Bank's World Development Indicators](https://datacatalog.worldbank.org/search/dataset/0037712/World-Development-Indicators).
+
+![An animated line plot that compares Public Health Spending per Capita from 2000 to 2021 across various countries.](owid_govt_health_exp.gif)
 
 ### How I made this graphic?
 
@@ -51,7 +55,7 @@ library(fontawesome)          # Icons display in ggplot2
 library(ggtext)               # Markdown text support
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # To lighten and darken colours
-library(patchwork)            # Combining plots
+library(gganimate)            # Animations
 
 # Getting the data
 search1 <- owidR::owid_search("health spending")
@@ -64,8 +68,11 @@ Data Wrangling
 ```{r}
 #| label: data-wrangling
 
-object.size(rawdf)
-names(rawdf)[4:5]
+df_continents <- rnaturalearth::ne_countries() |> 
+  as_tibble() |> 
+  select(continent, iso_a3, iso_a2) |> 
+  rename(code = iso_a3) |> 
+  mutate(iso_a2 = str_to_lower(iso_a2))
 
 df <- rawdf |> 
   janitor::clean_names() |> 
@@ -76,105 +83,123 @@ df <- rawdf |>
     pop = population_historical
   ) |> 
   select(-countries_continents) |> 
+  
+  # Minor house-keeping corrections
   filter(!is.na(ghe)) |> 
-  filter(!is.na(trpc))
+  filter(!is.na(trpc)) |> 
+  left_join(df_continents) |> 
+  filter(!str_detect(entity, "(WB)")) |> 
+  filter(!str_detect(entity, "income")) |> 
+  filter(!is.na(code) & code != "OWID_WRL") |> 
+  mutate(
+    continent = case_when(
+      code %in% c("FRA", "NOR") ~ "Europe",
+      code %in% c("SGP", "MUS") ~ "Asia",
+      .default = continent
+    )
+  ) |> 
+  filter(!is.na(continent))
 
-sel_cons <- df |> 
-  filter(year == 2018) |> 
-  filter(!is.na(code)) |>
-  filter(entity != "World") |> 
-  slice_max(order_by = pop, n = 10) |> 
-  pull(entity)
+# selcon0 <- df |> 
+#   mutate(rtio = ghe/trpc) |> 
+#   group_by(code) |> 
+#   slice_max(order_by = rtio, n = 1) |> 
+#   ungroup() |> 
+#   slice_max(order_by = rtio, n = 3) |> 
+#   pull(entity)
+# 
+# selcon1 <- df |> 
+#   filter(year == 2018) |> 
+#   slice_max(order_by = pop, n = 10) |> 
+#   pull(entity)
+# 
+# selcon2 <- df |> 
+#   filter(year == 2020) |> 
+#   slice_max(order_by = trpc, n = 2) |> 
+#   pull(entity)
+# 
+# selcon3 <- df |> 
+#   filter(year == 2020) |> 
+#   slice_max(order_by = ghe, n = 2) |> 
+#   pull(entity)
 
-font_add_google("Barlow Condensed", family = "body_font")
-showtext_auto()
-df |> 
-  filter(year == 2020) |>
-  ggplot(
-    mapping = aes(
-      x = ghe,
-      y = trpc
-    ) 
-  ) +
-  geom_point(
-    mapping = aes(
-      colour = entity,
-      size = pop
-    ),
-    alpha = 0.7
-  ) +
-  scale_size(range = c(1, 10)) +
-  scale_x_continuous(
-    labels = scales::label_currency()
-  ) +
-  scale_y_continuous(
-    labels = scales::label_currency()
-  ) +
-  labs(
-    x = names(rawdf)[4],
-    y = names(rawdf)[5]
-  ) +
-  theme_classic(
-    base_size = 11,
-    base_family = "body_font"
-  ) +
-  theme(
-    legend.position = "none",
-    axis.line = element_line(
-      arrow = arrow(length = unit(3, "mm")),
-      linewidth = 0.3
+select_countries <-  c("United States", "China", "India", "Russia", "Germany", "United Kingdom")
+
+df <- df |> 
+  # Add dummy values for missing years of India
+  bind_rows(
+    df |> filter(entity == "India" & year > 2017) |> 
+      mutate(year = 2019),
+
+    df |> filter(entity == "India" & year > 2017) |> 
+      mutate(year = 2020)
+
+  ) |> 
+  mutate(
+    select_var = if_else(
+      entity %in% select_countries,
+      entity,
+      "ZZZ"
     )
   )
 
 
-df |> 
-  filter(year < 2021) |> 
-  filter(entity %in% sel_cons) |> 
-  ggplot(
-    mapping = aes(
-      x = year,
-      y = ghe / trpc,
-      colour = entity
-    )
-  ) +
-  geom_line() +
-  geom_text(
-    data = df |> filter(year == 2020 & entity %in% sel_cons),
-    mapping = aes(
-      x = 2020.2,
-      y = ghe / trpc,
-      colour = entity,
-      label = entity
-    ),
-    check_overlap = T
-  ) +
-  scale_y_continuous(limits = c(0,0.5)) +
-  theme(legend.position = "none")
+# sel_cons <- df |> 
+#   filter(year == 2018) |> 
+#   filter(!is.na(code)) |>
+#   filter(entity != "World") |> 
+#   slice_max(order_by = pop, n = 10) |> 
+#   pull(entity)
+# 
 
-
-df |> 
-  ggplot(
-    mapping = aes(
-      x = ghe/trpc,
-      y = as_factor(year)
-    )
-  ) +
-  geom_violin() +
-  # ggridges::geom_density_ridges(
-  #   alpha = 0.2
-  # ) +
-  geom_boxplot(
-    width = 0.4
-  ) +
-  scale_x_continuous(limits = c(0,0.5)) +
-  theme_minimal()
-
-df |> 
-  filter(entity %in% sel_cons) |> 
-  ggplot(aes(year, ghe, colour = entity)) +
-  geom_point() +
-  geom_line()
-
+# df |> 
+#   filter(year < 2021) |> 
+#   filter(entity %in% sel_cons) |> 
+#   ggplot(
+#     mapping = aes(
+#       x = year,
+#       y = ghe / trpc,
+#       colour = entity
+#     )
+#   ) +
+#   geom_line() +
+#   geom_text(
+#     data = df |> filter(year == 2020 & entity %in% sel_cons),
+#     mapping = aes(
+#       x = 2020.2,
+#       y = ghe / trpc,
+#       colour = entity,
+#       label = entity
+#     ),
+#     check_overlap = T
+#   ) +
+#   scale_y_continuous(limits = c(0,0.5)) +
+#   theme(legend.position = "none")
+# 
+# 
+# df |> 
+#   ggplot(
+#     mapping = aes(
+#       x = ghe/trpc,
+#       y = as_factor(year)
+#     )
+#   ) +
+#   geom_violin() +
+#   # ggridges::geom_density_ridges(
+#   #   alpha = 0.2
+#   # ) +
+#   geom_boxplot(
+#     width = 0.4
+#   ) +
+#   scale_x_continuous(limits = c(0,0.5)) +
+#   theme_minimal()
+# 
+# df |> 
+#   filter(entity %in% sel_cons) |> 
+#   ggplot(aes(year, ghe, colour = entity)) +
+#   geom_point() +
+#   geom_line()
+# 
 
 ```
 
@@ -194,9 +219,10 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Changa",
+font_add_google(
+  "Barlow Condensed", 
   family = "body_font"
-) 
+)
 
 showtext_auto()
 
@@ -210,45 +236,305 @@ text_hil <- "#18304a"
 # Base Text Size
 bts <- 80
 
-plot_title <- "Global Migration Trends in 2020"
+plot_title <- "Tax and Health: Tracking Global Trends"
 
-plot_subtitle <- str_wrap(
-  glue::glue("There is dominance of internal migration within Asia and Europe. Major inter-continental migration routes include Asia to Europe, Asia to North America, and Latin America to North America."
-      ),
-  100
-  )
-str_view(plot_subtitle)
+plot_caption <- "Data: Our World in Data  |  Code & Graphics on GitHub @aditya-dahiya"
 
-data_annotation <- "About the Data: The data comes from the United Nations (UN) and the United Nations Department of Economic and Social Affairs (UN DESA) for the year 2020."
-
-# Caption stuff for the plot
-sysfonts::font_add(
-  family = "Font Awesome 6 Brands",
-  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
-)
-github <- "&#xf09b"
-github_username <- "aditya-dahiya"
-xtwitter <- "&#xe61b"
-xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-
-plot_caption <- paste0(
-  "**Data:** United Nations & Our World in Data  |  ",
-  "**Code:** ", 
-  social_caption_1, 
-  " |  **Graphics:** ", 
-  social_caption_2
-  )
-rm(github, github_username, xtwitter, 
-   xtwitter_username, social_caption_1, social_caption_2)
 ```
 
-Visualization
+Visualization-1
 
 ```{r}
 #| label: visualize
 
+text_hil <- "grey30"
+text_col <- "grey20"
+mypal <- paletteer::paletteer_d("awtools::spalette")
+
+df |> 
+  group_by(year, entity) |> 
+  count(sort = T)
+
+g1 <- df |> 
+  filter(year <= 2020) |> 
+  # filter(code == "USA") |> 
+  ggplot(
+    mapping = aes(
+      x = ghe,
+      y = trpc
+    ) 
+  ) +
+  geom_point(
+    mapping = aes(
+      colour = continent,
+      size = pop
+    ),
+    alpha = 0.7, 
+    pch = 19
+  ) +
+  geom_abline(
+    slope = 3,
+    intercept = 0,
+    colour = text_col
+  ) +
+  annotate(
+    geom = "text",
+    x = 3000, y = 9800,
+    label = "Slope: line at which 33% tax collected is spent on health-care",
+    family = "body_font",
+    size = 4,
+    hjust = 0,
+    colour = text_hil,
+    angle = 36.67
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0("Year: ", as_factor(year)),
+      x = 10,
+      y = 18000
+    ),
+    family = "body_font",
+    size = 15,
+    hjust = 0,
+    colour = text_hil
+  ) +
+  # geom_text(
+  #   mapping = aes(
+  #     label = label_var
+  #   ),
+  #   colour = text_hil,
+  #   family = "body_font",
+  #   nudge_y = -500,
+  #   size = 4
+  # ) +
+  scale_size(range = c(2, 15)) +
+  coord_fixed(
+    ratio = 1/4
+  ) +
+  scale_colour_manual(
+    values = mypal
+  ) +
+  scale_x_continuous(
+    labels = scales::label_currency(),
+    limits = c(10, 6000),
+    oob = scales::squish
+  ) +
+  scale_y_continuous(
+    labels = scales::label_currency(),
+    limits = c(100, 20000),
+    oob = scales::squish
+  ) +
+  guides(
+    size = "none",
+    colour = guide_legend(
+      title = NULL,
+      nrow = 1
+    )
+  ) +
+  labs(
+    x = names(rawdf)[4],
+    y = names(rawdf)[5],
+    title = plot_title,
+    caption = plot_caption
+  ) +
+  theme_classic(
+    base_size = 11,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "bottom",
+    axis.line = element_line(
+      arrow = arrow(length = unit(3, "mm")),
+      linewidth = 0.3,
+      colour = text_col
+    ),
+    axis.title = element_text(
+      colour = text_col
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold",
+      size = 25,
+      colour = text_hil
+    ),
+    plot.caption = element_text(
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      colour = text_hil,
+      size = 15
+    )
+  )
+
+g2 <- g1 +
+  transition_time(year) +
+  ease_aes("linear")
+
+anim_save(
+  filename = here::here("data_vizs", "owid_govt_health_exp.gif"),
+  animation = g2,
+  fps = 15,
+  duration = 30,
+  width = 600,
+  height = 600,
+  rewind = FALSE,
+  end_pause = 20
+)
+
+```
+
+Visualization 2 (the ratio over time)
+
+```{r}
+#| label: viz-2
+
+mypal <- c(paletteer::paletteer_d("khroma::okabeitoblack")[1:6], "grey80")
+  
+mypal |> seecolor::print_color()
+
+bts = 14
+
+g <- df |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = ghe
+    )
+  ) +
+ 
+  annotate(
+    geom = "text",
+    x = 2000.2,
+    y = 6400,
+    hjust = 0, vjust = 1,
+    family = "body_font",
+    colour = text_hil,
+    label = "Domestic general government\nhealth expenditure\nper capita, PPP\n(current international $)",
+    lineheight = 1.2
+  ) +
+  
+  annotate(
+    geom = "text",
+    x = 2006.5,
+    y = 1950,
+    hjust = 0, 
+    vjust = 1,
+    family = "body_font",
+    colour = text_hil,
+    label = str_wrap("Each line represents a country. Richer countries are spending increasingly more on health-care. The gap is widening.", 45)
+  ) +
+  
+  
+  geom_line(
+    mapping = aes(
+      group = entity,
+      colour = select_var,
+      alpha = entity %in% select_countries,
+      linewidth = entity %in% select_countries
+    )
+  ) +
+ 
+  geom_text(
+    data = df |> filter(entity %in% select_countries),
+    mapping = aes(
+      label = entity,
+      colour = select_var
+    ),
+    hjust = 0.5,
+    family = "body_font",
+    nudge_y = -200
+  ) +
+  
+  ggflags::geom_flag(
+    data = df |> filter(entity %in% select_countries),
+    mapping = aes(
+      country = iso_a2
+    ),
+    size = 8
+  ) +
+  
+  # Scales & Coordinates
+  coord_cartesian(
+    clip = "off"
+  ) +
+  scale_linewidth_manual(
+    values = c(0.25, 0.75)
+  ) +
+  scale_alpha_manual(
+    values = c(0.1, 0.9)
+  ) +
+  scale_y_continuous(
+    oob = scales::squish,
+    expand = expansion(0),
+    labels = scales::label_dollar()
+  ) +
+  scale_x_continuous(
+    limits = c(2000, 2020),
+    expand = expansion(c(0, 0.05)),
+    breaks = seq(2000, 2020, 2)
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = "Governments' Rising Health Expenditure in 21st Century",
+    caption = plot_caption,
+    x = "Year", y = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(4,10,4,4, "mm"),
+    plot.title = element_text(
+      size = bts * 1.2, 
+      hjust = 0.5,
+      margin = margin(0,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      size = bts * 0.9,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    text = element_text(
+      colour = text_hil
+    ),
+    axis.line = element_line(
+      colour = text_hil,
+      arrow = arrow(length = unit(3, "mm"))
+    ),
+    plot.caption = element_text(
+      hjust = 0
+    ),
+    legend.position = "none",
+    panel.grid.major = element_line(
+      colour = "grey80",
+      linetype = 3,
+      linewidth = 0.5
+    ),
+    panel.grid.minor = element_blank(),
+    axis.title.x = element_text(hjust = 1)
+  )
+
+library(gganimate)
+
+g_anim <- g +
+  transition_reveal(year) +
+  shadow_mark(
+    exclude_layer = c(2,3)
+  )
+
+anim_save(
+  filename = here::here("data_vizs", "owid_govt_health_exp.gif"),
+  animation = g_anim,
+  fps = 15,
+  duration = 20,
+  width = 500,
+  height = 650,
+  rewind = FALSE,
+  end_pause = 50
+)
 ```
 
 Save the graphic and a thumbnail
