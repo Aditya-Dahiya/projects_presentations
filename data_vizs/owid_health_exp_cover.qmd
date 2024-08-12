@@ -131,7 +131,7 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 
 plot_caption <- paste0(
-  "**Data:** Our World in Data | World Health Organization  ",
+  "**Data:** Our World in Data | World Health Organization  |  ",
   "**Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -142,8 +142,8 @@ about_the_data <- "About the Data: The data for the Universal Health Coverage (U
 
 inset_title <- "Trends in Health Expenditure and Coverage: Spending More, Covering Less Equitably?"
 
-inset_subtitle <- str_wrap("The evolution of healthcare spending vs. service coverage from 2000 to 2020. While countries are increasingly allocating a higher percentage of their GDP to healthcare, the Universal Health Coverage Service Index has not risen proportionately. This trend suggests a growing inequity in how healthcare funds are being utilized, indicating that higher spending does not necessarily translate to more comprehensive coverage. (Each dot is a country)", 170)
-
+inset_subtitle <- str_wrap("The evolution of healthcare spending vs. service coverage from 2000 to 2020. While countries are increasingly allocating a higher percentage of their GDP to healthcare, the Universal Health Coverage Service Index has not risen proportionately. This trend suggests a growing inequity in how healthcare funds are being utilized, indicating that higher spending does not necessarily translate to more comprehensive coverage. (Each dot is a country)", 225)
+str_view(inset_subtitle)
 ```
 
 Exploratory Data Analysis and Data Wrangling
@@ -540,16 +540,16 @@ g_base <- plotdf1 |>
       label = country
     )
   ) + 
-  # ggflags::geom_flag(
-  #   mapping = aes(country = iso2c),
-  #   size = 7
-  # ) +
+  ggflags::geom_flag(
+    mapping = aes(country = iso2c),
+    size = 10
+  ) +
   
   # During iterations, I use geom_point() instead of geom_flag() to save rendering time
-  geom_point(
-    alpha = 0.4,
-    size = 7
-  ) +
+  # geom_point(
+  #   alpha = 0.4,
+  #   size = 9
+  # ) +
   geom_text(
     mapping = aes(
       size = size_var, 
@@ -557,7 +557,7 @@ g_base <- plotdf1 |>
     ),
     check_overlap = TRUE,
     family = "body_font",
-    nudge_y = -0.5
+    nudge_y = -0.8
   ) +
   scale_size_manual(
     values = c(12, 24)
@@ -574,11 +574,11 @@ g_base <- plotdf1 |>
     geom = "text",
     x = 0.005, y = 80,
     family = "caption_font",
-    size = 15,
+    size = 16,
     label = str_wrap(about_the_data, 80),
     hjust = 0,
     vjust = 1,
-    lineheight = 0.4,
+    lineheight = 0.3,
     colour = text_col
   ) +
   scale_x_continuous(
@@ -612,27 +612,26 @@ g_base <- plotdf1 |>
     legend.position = "none",
     plot.title.position = "plot",
     plot.title = element_text(
-      family = "title_font",
-      size = 2 * bts,
+      size = 2.5 * bts,
       hjust = 0,
       lineheight = 0.35,
       colour = text_hil,
-      margin = margin(100,0,0,0, "mm")
+      margin = margin(10,0,0,0, "mm")
     ),
     plot.subtitle = element_text(
       lineheight = 0.35,
       hjust = 0,
       size = bts,
       colour = text_hil,
-      margin = margin(100,0,5,0, "mm")
+      margin = margin(5,0,5,0, "mm")
     ),
     plot.caption = element_textbox(
       family = "caption_font",
       colour = text_hil,
       hjust = 0.5,
-      margin = margin(200,0,0,0, "mm")
+      margin = margin(250,0,0,0, "mm")
     ),
-    plot.margin = margin(10,10,10,10, "mm"),
+    plot.margin = margin(10,10,5,10, "mm"),
     axis.line = element_line(
       colour = text_col,
       linewidth = 0.5,
@@ -669,10 +668,14 @@ g2 <- plotdf1 |>
       group = year
     )
   ) + 
-  geom_point(
-    pch = 20,
-    size = 3.5
+  ggflags::geom_flag(
+    mapping = aes(country = iso2c),
+    size = 5
   ) +
+  # geom_point(
+  #   pch = 20,
+  #   size = 3.5
+  # ) +
   geom_abline(
     colour = mypal[5],
     linewidth = 20,
@@ -720,6 +723,7 @@ g2 <- plotdf1 |>
     legend.position = "none",
     plot.subtitle = element_text(
       colour = text_col,
+      size = btsi * 0.9,
       lineheight = 0.3,
       hjust = 0.5,
       margin = margin(2,0,2,0, "mm")
@@ -751,7 +755,12 @@ g2 <- plotdf1 |>
       size = btsi * 2
     ),
     axis.ticks.length = unit(0, "mm"),
-    plot.title.position = "plot"
+    plot.title.position = "plot",
+    panel.grid = element_line(
+      linetype = 3,
+      colour = darken(bg_col, 0.4),
+      linewidth = 0.4
+    )
   )
 
 
@@ -770,21 +779,15 @@ plot_qr <- ggplot(
   ) + 
   ggqr::geom_qr(
     colour = text_hil, 
-    fill = bg_col,
+    fill = "transparent",
     size = 1.5
     ) +
   # labs(caption = "Scan for the Interactive Version") +
   coord_fixed() +
   theme_void() +
   theme(plot.background = element_rect(
-    fill = NA, 
-    colour = NA
-    ),
-    plot.caption = element_text(
-      hjust = 0.5,
-      margin = margin(0,0,0,0, "mm"),
-      family = "caption_font",
-      size = bts/1.8
+    fill = "transparent", 
+    colour = "transparent"
     )
   )
 
@@ -792,15 +795,15 @@ library(patchwork)
 g <- g_base +
   inset_element(
     p = plot_qr,
-    left = 0.81, right = 0.91,
-    top = 0.92, bottom = 0.82,
-    align_to = "full",
+    left = 0.02, right = 0.1,
+    top = 0.83, bottom = 0.75,
+    align_to = "panel",
     on_top = TRUE
   ) +
   inset_element(
     p = g2,
     left = 0, right = 1,
-    top = 0.33, bottom = 0.04,
+    top = 0.28, bottom = 0.01,
     align_to = "full"
   ) +
   plot_annotation(
@@ -818,7 +821,7 @@ g <- g_base +
 
 ggsave(
   filename = here::here("data_vizs", "poster_owid_health_exp_cover.png"),
-  plot = g_base,
+  plot = g,
   height = 36,
   width = 24,
   units = "in",
