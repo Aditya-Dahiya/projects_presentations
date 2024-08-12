@@ -1,0 +1,94 @@
+---
+title: "WHO's Global Health Expenditure Database"
+author: "Aditya Dahiya"
+date: "2024-08-12"
+subtitle: "WHO's Global Health Expenditure Database Data, Insights and Analysis"
+categories:
+  - "Public Health"
+  - "{gt}"
+image: "nfhs_thumbnail.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+rawdf1 <- readxl::read_xlsx(
+  path = here::here("data", "GHED_data.xlsx"),
+  sheet = "Data"
+  )
+
+codes_df <- readxl::read_xlsx(
+  path = here::here("data", "GHED_data.xlsx"),
+  sheet = "Codebook"
+  )
+
+```
+
+Data Wrangling to Analyse the Data
+
+```{r}
+#| label: data-wrangling
+
+# Fidning variables that are not missing a lot of values
+# temp <- rawdf1 |> 
+#   summarise(
+#     across(
+#       .cols = everything(), 
+#       .fns = ~ mean(is.na(.)) * 100
+#     )
+#   ) |> 
+#   pivot_longer(
+#     cols = everything(),
+#     names_to = "variable code",
+#     values_to = "missing_vals"
+#   ) |> 
+#   arrange(missing_vals) |> 
+#   filter(missing_vals < 50) |>  
+#   left_join(
+#     codes_df |> select(`variable code`, `variable name`)
+#   )
+
+# Finding variables with common denominator (i.e., as a percentage
+# of current health expenditure CHE)
+# temp |> 
+#   filter(missing_vals < 10) |> 
+#   filter(str_detect(`variable code`, "_che")) |> 
+#   print(n = Inf)
+
+selected_indicators <- c("oops_che", "shi_che", "chi_che", "hf13_che")
+
+rawdf1 |> 
+  select(
+    country, code, income, 
+    year, 
+    che_gdp, oops_che
+  ) |> 
+  filter(year == 2020) |> 
+  ggplot(aes(che_gdp, oops_che, colour = income)) +
+  geom_point() +
+  geom_text(
+    aes(label = country),
+    check_overlap = T
+  )
+```
