@@ -78,17 +78,35 @@ Data Wrangling to Analyse the Data
 
 selected_indicators <- c("oops_che", "shi_che", "chi_che", "hf13_che")
 
-rawdf1 |> 
+library(gganimate)
+
+g <- rawdf1 |> 
   select(
     country, code, income, 
     year, 
     che_gdp, oops_che
   ) |> 
-  filter(year == 2020) |> 
+  # filter(year %in% seq(2000, 2021, 3)) |> 
   ggplot(aes(che_gdp, oops_che, colour = income)) +
   geom_point() +
-  geom_text(
-    aes(label = country),
-    check_overlap = T
-  )
+  # geom_text(
+  #   aes(label = country),
+  #   check_overlap = T,
+  #   size = 2
+  # ) +
+  scale_x_continuous(
+    limits = c(0, 20),
+    oob = scales::squish
+  ) +
+  coord_fixed(
+    ratio = 1/4
+  ) +
+  transition_time(~year) +
+  ease_aes("linear")
+
+animate(
+  plot = g,
+  fps = 5, 
+  duration = 10
+)
 ```
