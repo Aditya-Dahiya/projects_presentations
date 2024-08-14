@@ -2,7 +2,7 @@
 title: "World's Fairs data @ #TidyTuesday"
 author: "Aditya Dahiya"
 date: "2024-08-14"
-subtitle: ".................."
+subtitle: "Which months of the years were the World Expos and Specialized Expos held in the last 150 years"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_world_fairs.png"
@@ -27,7 +27,7 @@ share:
 bibliography: references.bib
 ---
 
-![...................](tidy_world_fairs.png){#fig-1}
+![A line-segment chart showing the months in which the World Expos and Specialized Expos were held, and the length of each. On X-axis are the months, and on Y-axis are the Years.](tidy_world_fairs.png){#fig-1 width="900"}
 
 ### **How I made this graphic?**
 
@@ -77,7 +77,8 @@ df <- worlds_fairs |>
       start_year,
       end_year
     )
-  )
+  ) |> 
+  filter(!((start_month == end_month) & (start_year == end_year)))
 
 df_year <- df |> distinct(start_year)
 ```
@@ -106,8 +107,8 @@ showtext_auto()
 
 mypal <- paletteer::paletteer_d("nbapalettes::clippers_original")
 mypal
-text_col <- mypal[2]
-text_hil <- mypal[4]
+text_col <- "grey30"
+text_hil <- "grey30"
 
 bts <- 80
 
@@ -125,7 +126,7 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 plot_title <- "World Expositions"
 
-plot_subtitle <- str_wrap("BIE-sanctioned World Expositions, known for their extensive scope, typically occur from April to November, aligning with favorable weather conditions.", 80)
+plot_subtitle <- glue::glue("BIE-sanctioned World Expositions, known<br>for their extensive scope, typically<br>occur from *April to November*, aligning<br>with favorable weather conditions. From<br>1970s to 1990s, there were far more<br><b style='color:{mypal[1]}'>Specialized Expo</b>, than <b style='color:{mypal[3]}'>World Expos</b>.")
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
@@ -161,11 +162,26 @@ g <- df |>
       yend = start_year,
       x = start_month,
       xend = end_month,
-      colour = category,
-      linewidth = visitors
+      colour = category
     ),
-    alpha = 0.5
+    alpha = 0.95,
+    linewidth = 2.5
   ) +
+  # Text labels within the segments
+  geom_text(
+    mapping = aes(
+      x = start_month,
+      label = paste0(city, ", ", country, ": ", name_of_exposition)
+    ),
+    family = "caption_font",
+    size = bts / 20,
+    colour = "grey10",
+    hjust = 0,
+    nudge_x = 0.05,
+    vjust = 0.5
+  ) +
+  
+  # Bottom X-axis
   geom_text(
     data = df_year,
     mapping = aes(
@@ -223,6 +239,20 @@ g <- df |>
     size = bts / 2
   ) +
   
+  # Plot Subtitle as an annotation on the plot
+  annotate(
+    geom = "richtext",
+    y = 2015, x = 21.5,
+    label = plot_subtitle,
+    hjust = 1,
+    vjust = 1,
+    colour = text_hil,
+    family = "body_font",
+    size = bts / 2.5,
+    lineheight = 0.35,
+    label.size = NA
+  ) +
+  
   # Scales and Coordinates
   scale_x_continuous(
     expand = expansion(0),
@@ -235,6 +265,12 @@ g <- df |>
   scale_colour_manual(
     values = c(mypal[1], mypal[3])
   ) +
+  scale_linewidth_continuous(
+    range = c(2, 12)
+  ) +
+  guides(
+    colour = "none"
+  ) +
   coord_cartesian(
     clip = "off"
   ) +
@@ -242,11 +278,12 @@ g <- df |>
   # Labels and Themes
   labs(
     title = plot_title,
-    subtitle = plot_subtitle,
+    # subtitle = plot_subtitle,
     caption = plot_caption,
     colour = "Expo Category",
     y = "Year of the Exposition",
-    x = NULL
+    x = NULL,
+    linewidth = "Number of Visitors\nat Expo (millions)"
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -254,7 +291,7 @@ g <- df |>
   ) +
   theme(
     plot.title.position = "plot",
-    plot.margin = margin(10,5,10,5, "mm"),
+    plot.margin = margin(10,10,10,10, "mm"),
     legend.position = c(0.8, 0.2),
     text = element_text(
       colour = text_col,
@@ -264,17 +301,14 @@ g <- df |>
     ),
     plot.title = element_text(
       hjust = 0.5,
-      size = 4 * bts,
-      margin = margin(0,0,0,0, "mm"),
+      size = 5 * bts,
+      margin = margin(10,0,0,0, "mm"),
       family = "title_font"
-    ),
-    plot.subtitle = element_text(
-      hjust = 0.5,
-      margin = margin(0,0,0,0, "mm")
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
-      family = "caption_font"
+      family = "caption_font",
+      margin = margin(0,0,10,0, "mm")
     ),
     panel.grid.major.y = element_blank(),
     panel.grid.minor.y = element_blank(),
@@ -282,9 +316,19 @@ g <- df |>
     panel.grid.major.x = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    axis.ticks.length = unit(0, "mm")
+    axis.ticks.length = unit(0, "mm"),
+    legend.title = element_text(
+      lineheight = 0.35,
+      colour = text_col
+    )
   )
 
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
 
 ggsave(
   filename = here::here("data_vizs", "tidy_world_fairs.png"),
@@ -294,13 +338,6 @@ ggsave(
   units = "mm",
   bg = "white"
 )
-
-```
-
-Savings the graphics
-
-```{r}
-#| label: save-image
 
 library(magick)
 # Saving a thumbnail for the webpage
