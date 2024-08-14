@@ -1,0 +1,269 @@
+---
+title: "WHO's Global Health Expenditure Database"
+author: "Aditya Dahiya"
+date: "2024-08-14"
+subtitle: "WHO's Global Health Expenditure Database Data, Insights and Analysis"
+categories:
+  - "Public Health"
+  - "{gt}"
+image: "nfhs_thumbnail.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+The data originates from the [Global Health Expenditure Database (GHED)](https://apps.who.int/nha/database) managed by the [World Health Organization (WHO)](https://www.who.int). GHED offers a comprehensive and internationally comparable collection of health expenditure data, covering over 190 countries. This database is pivotal for understanding global health financing trends and is instrumental in supporting evidence-based policy-making, particularly in the pursuit of [universal health coverage (UHC)](https://www.who.int/news-room/fact-sheets/detail/universal-health-coverage-(uhc)) and enhancing transparency within health systems. The data within GHED is meticulously structured following the [System of Health Accounts 2011 (SHA 2011)](https://www.who.int/health-topics/health-financing#tab=tab_1), ensuring uniformity in tracking health expenditures across different nations. This standardized system enables the systematic monitoring of resource flows through health systems, from funding sources to final consumption in various health care functions.
+
+For further details on the data and methodology, explore the [Global Health Expenditure Database](https://apps.who.int/nha/database) and additional resources available through the [WHO Global Health Observatory](https://www.who.int/data/gho).
+
+Basic Code to fetch data, and analyze it
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+# Plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+
+rawdf1 <- readxl::read_xlsx(
+  path = here::here("data", "GHED_data.xlsx"),
+  sheet = "Data"
+  )
+
+codes_df <- readxl::read_xlsx(
+  path = here::here("data", "GHED_data.xlsx"),
+  sheet = "Codebook"
+  )
+
+```
+
+```{r}
+#| label: data-wrangling
+
+# Fidning variables that are not missing a lot of values
+# temp <- rawdf1 |> 
+#   summarise(
+#     across(
+#       .cols = everything(), 
+#       .fns = ~ mean(is.na(.)) * 100
+#     )
+#   ) |> 
+#   pivot_longer(
+#     cols = everything(),
+#     names_to = "variable code",
+#     values_to = "missing_vals"
+#   ) |> 
+#   arrange(missing_vals) |> 
+#   filter(missing_vals < 50) |>  
+#   left_join(
+#     codes_df |> select(`variable code`, `variable name`)
+#   )
+
+# Finding variables with common denominator (i.e., as a percentage
+# of current health expenditure CHE)
+# temp |> 
+#   filter(missing_vals < 10) |> 
+#   filter(str_detect(`variable code`, "_che")) |> 
+#   print(n = Inf)
+
+
+
+library(gganimate)
+
+g <- rawdf1 |> 
+  select(
+    country, code, income, 
+    year, 
+    che_gdp, oops_che
+  ) |> 
+  # filter(year %in% seq(2000, 2021, 3)) |> 
+  ggplot(aes(che_gdp, oops_che, colour = income)) +
+  geom_point() +
+<<<<<<< HEAD
+  geom_text(
+    aes(label = country),
+    check_overlap = T
+  )
+
+rawdf1 |> 
+  distinct(country, code) |> 
+  arrange(country) |> 
+  print(n = Inf)
+=======
+  # geom_text(
+  #   aes(label = country),
+  #   check_overlap = T,
+  #   size = 2
+  # ) +
+  scale_x_continuous(
+    limits = c(0, 20),
+    oob = scales::squish
+  ) +
+  coord_fixed(
+    ratio = 1/4
+  ) +
+  transition_time(~year) +
+  ease_aes("linear")
+
+animate(
+  plot = g,
+  fps = 5, 
+  duration = 10
+)
+>>>>>>> 158283fedfba9fd94e057c19ed9db0a3d91cfe81
+```
+
+```{r}
+#| label: viz-che-gdp-1
+#| eval: false
+
+# Font for plot text
+font_add_google("News Cycle",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+
+plot_caption <- paste0(
+  "**Data:** Global Health Expenditure Database, WHO  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, xtwitter_username, 
+   social_caption_2, social_caption_1)
+
+selected_countries <- c(
+  "IND", "CHN", "THA", "BGD", "PAK", "IDN", "LKA"
+  )
+
+
+df1 <- rawdf1 |> 
+  filter(code %in% selected_countries) |> 
+  select(
+    country, code, year, income,
+    che_gdp
+  )
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = che_gdp,
+      colour = country,
+      group = country,
+      label = country,
+      linewidth = code == "IND",
+      alpha = code == "IND"
+    )
+  ) + 
+  geom_line() +
+  geom_point(
+    mapping = aes(size = code == "IND"),
+    pch = 21,
+    fill = "white",
+    alpha = 1
+  ) +
+  geom_text(
+    data = df1 |> filter(year == 2021),
+    mapping = aes(
+      x = 2021.3
+    ),
+    hjust = 0,
+    alpha = 0.95,
+    family = "body_font",
+    size = 18,
+    fontface = "bold"
+  ) +
+  scale_x_continuous(expand = expansion(0)) +
+  coord_fixed(
+    clip = "off",
+    ratio = 2.5
+  ) +
+  scale_linewidth_manual(values = c(0.5, 1.5)) +
+  scale_alpha_manual(values = c(0.6, 0.9)) +
+  paletteer::scale_colour_paletteer_d("MetBrewer::Austria") + 
+  # scale_colour_manual(
+  #   values = c("grey50", "darkorange")
+  # ) +
+  scale_size_manual(
+    values = c(2, 6)
+  ) +
+  labs( 
+    title = "Current Health Expenditure (CHE) as a % of Gross Domestic Product (GDP)",
+    x = "Year",
+    y = "Percentage"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = 40
+  ) +
+  theme(
+    line = element_line(
+      linetype = 1, 
+      colour = "grey30",
+      linewidth = 0.5
+    ),
+    text = element_text(
+      colour = "grey30",
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.line = element_line(
+      arrow = arrow(length = unit(5, "mm")),
+      colour = "grey30"
+    ),
+    legend.position = "none",
+    plot.margin = margin(5,30,5,5, "mm"),
+    plot.title = element_text(
+      size = 80,
+      hjust = 0.5
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("docs", "fig_who_ghed_1.png"),
+  height = unit(19.05 / 3, "cm"),
+  width = unit(33.867 / 3, "cm"),
+  bg = "transparent"
+)
+
+
+```
+
+![Current Health Expenditure (as a percentage of GDP) in various Asian Countries (with a focus on India)](/docs/fig_who_ghed_1.png){#fig-1}
