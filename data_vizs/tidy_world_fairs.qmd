@@ -57,13 +57,13 @@ Data Wrangling
 ```{r}
 #| label: eda
 
-worlds_fairs |> 
-  summarytools::dfSummary() |> 
-  summarytools::view()
-
-worlds_fairs |> 
-  group_by(category) |> 
-  summarise(mean(is.na(cost)))
+# worlds_fairs |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+# 
+# worlds_fairs |> 
+#   group_by(category) |> 
+#   summarise(mean(is.na(cost)))
 
 df <- worlds_fairs |> 
   mutate(
@@ -79,29 +79,7 @@ df <- worlds_fairs |>
     )
   )
 
-df |> 
-  ggplot(
-    mapping = aes(
-      y = start_year
-    )
-  ) +
-  geom_segment(
-    mapping = aes(
-      yend = start_year,
-      x = start_month,
-      xend = end_month,
-      linewidth = visitors
-    ),
-    alpha = 0.5
-  ) +
-  scale_x_continuous(
-    expand = expansion(0),
-    breaks = 1:22,
-    limits = c(1, 22),
-    labels = c(month.abb, month.abb[1:10])
-  ) +
-  scale_y_continuous()
-
+df_year <- df |> distinct(start_year)
 ```
 
 Visualization Parameters
@@ -110,15 +88,13 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Bilbo",
+font_add_google("Amita",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Barlow Semi Condensed",
-  family = "caption_font",
-  regular.wt = 400,
-  bold.wt = 700
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
 ) 
 
 # Font for plot text
@@ -128,8 +104,10 @@ font_add_google("Ubuntu Condensed",
 
 showtext_auto()
 
-text_col <- "grey20"
-text_hil <- "grey30"
+mypal <- paletteer::paletteer_d("nbapalettes::clippers_original")
+mypal
+text_col <- mypal[2]
+text_hil <- mypal[4]
 
 bts <- 80
 
@@ -145,13 +123,13 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Average Age of Olympians"
+plot_title <- "World Expositions"
 
-plot_subtitle <- "Since the start of Modern Summer Olympics in 1896, the average age **(represented by**<br>**the dots)** of Olympics' medallists and participants has stayed around 25 years<br>**(represented by the vertical line)**. Of late, average age has been increasing slightly."
+plot_subtitle <- str_wrap("BIE-sanctioned World Expositions, known for their extensive scope, typically occur from April to November, aligning with favorable weather conditions.", 80)
 str_view(plot_subtitle)
 
 plot_caption <- paste0(
-  "**Data:** _#TidyTuesday_ & RGriffin's Kaggle Dataset: ", 
+  "**Data:** Wikipedia & Bureau International des Expositions", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -168,56 +146,148 @@ The static plot
 ```{r}
 #| label: static-plot
 
-
-df5 |> 
+g <- df |> 
+  
+  # Start Plot
   ggplot(
     mapping = aes(
-      x = 1, 
-      y = n, 
-      fill = continent
+      y = start_year
     )
   ) +
-  geom_col(
-    colour = bg_col,
-    width = 0.15
+  
+  # Segment Lines to plot data
+  geom_segment(
+    mapping = aes(
+      yend = start_year,
+      x = start_month,
+      xend = end_month,
+      colour = category,
+      linewidth = visitors
+    ),
+    alpha = 0.5
   ) +
   geom_text(
+    data = df_year,
     mapping = aes(
-      label = paste0(perc, " %")
+      x = 1,
+      label = start_year
     ),
-    position = position_stack(vjust = 0.5),
-    family = "body_font"
+    hjust = 1,
+    colour = text_hil,
+    size = bts / 12
   ) +
-  facet_wrap(~ year, scales = "free") +
+  geom_text(
+    data = tibble(
+      x_var = 1:22, 
+      label_var = c(month.abb, month.abb[1:10])
+    ),
+    mapping = aes(
+      x = x_var,
+      y = 1845,
+      label = label_var
+    ),
+    family = "body_font",
+    colour = text_col,
+    size = bts / 3
+  ) +
+  annotate(
+    geom = "segment",
+    x = 1, xend = 12.4, y = 1840, yend = 1840,
+    arrow = arrow(length = unit(5, "mm"), angle = 90, ends = "both"),
+    colour = text_col
+  ) +
+  annotate(
+    geom = "segment",
+    x = 12.6, xend = 21.9, y = 1840, yend = 1840,
+    arrow = arrow(length = unit(5, "mm"), angle = 90, ends = "both"),
+    colour = text_col
+  ) +
+  annotate(
+    geom = "text",
+    y = 1839, x = 6.5,
+    label = "Months of the Expo Year",
+    hjust = 0.5,
+    vjust = 1,
+    colour = text_col,
+    family = "body_font",
+    size = bts / 2
+  ) +
+  annotate(
+    geom = "text",
+    y = 1839, x = 17,
+    label = "Next Year's months",
+    hjust = 0.5,
+    vjust = 1,
+    colour = text_col,
+    family = "body_font",
+    size = bts / 2
+  ) +
+  
+  # Scales and Coordinates
   scale_x_continuous(
-    limits = c(0, 1.5), 
-    expand = expansion(c(0, -0.3))
+    expand = expansion(0),
+    breaks = 1:22,
+    limits = c(0.9, 22)
   ) +
-  coord_polar(theta = "y") +
-  theme_void(
+  scale_y_continuous(
+    limits = c(1835, 2024)
+  ) +
+  scale_colour_manual(
+    values = c(mypal[1], mypal[3])
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    colour = "Expo Category",
+    y = "Year of the Exposition",
+    x = NULL
+  ) +
+  theme_minimal(
     base_family = "body_font",
-    base_size = bts
+    base_size = bts * 1.2
   ) +
   theme(
-    legend.position = "none",
-    plot.background = element_rect(
-      fill = "transparent",
-      colour = "transparent"
+    plot.title.position = "plot",
+    plot.margin = margin(10,5,10,5, "mm"),
+    legend.position = c(0.8, 0.2),
+    text = element_text(
+      colour = text_col,
+      family = "body_font",
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
     ),
-    panel.background = element_rect(
-      fill = "transparent",
-      colour = "transparent"
-    )
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 4 * bts,
+      margin = margin(0,0,0,0, "mm"),
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font"
+    ),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.length = unit(0, "mm")
   )
-```
 
-Savings the graphics
-
-```{r}
-#| label: save-image
 
 ggsave(
-  filename = here::here("data_vizs", "tidy_olympics.png"),
+  filename = here::here("data_vizs", "tidy_world_fairs.png"),
   plot = g,
   width = 400,    # Best Twitter Aspect Ratio = 5:4
   height = 500,   
@@ -225,9 +295,16 @@ ggsave(
   bg = "white"
 )
 
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "tidy_olympics.png")) |> 
+image_read(here::here("data_vizs", "tidy_world_fairs.png")) |> 
   image_resize(geometry = "400") |> 
-  image_write(here::here("data_vizs", "thumbnails", "tidy_olympics.png"))
+  image_write(here::here("data_vizs", "thumbnails", "tidy_world_fairs.png"))
 ```
