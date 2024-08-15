@@ -7,9 +7,6 @@ date: "2023-10-13"
 image: "haunted.jpg"
 categories:
   - "#TidyTuesday"
-format:
-  html:
-    theme: simplex
 editor_options: 
   chunk_output_type: console
 execute: 
@@ -17,11 +14,12 @@ execute:
   error: false
   message: false
   warning: false
+  eval: false
 bibliography: references.bib
 filters:
   - social-share
 share:
-  permalink: "https://aditya-dahiya.github.io/session_presentations/projects.html"
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects.html"
   description: "Ghostly Jargon in Haunted Spots: A Gendered Perspective"
   twitter: true
   linkedin: true
@@ -67,9 +65,7 @@ haunted_places |>
   print(n = 25)
 ```
 
-### In the eerie realm of American haunts, male spirits outnumber female in most locales. Yet, within the sinister confines of academia, the scales tip towards women. A spine-chilling revelation!
-
-<br/>
+In the eerie realm of American haunts, male spirits outnumber female in most locales. Yet, within the sinister confines of academia, the scales tip towards women. A spine-chilling revelation! See @fig-1
 
 ```{r}
 #| label: fig-gender-comparison-bar-chart
@@ -152,7 +148,8 @@ df_clean_names_long <- df_names |>
   filter(indicator != "total_haunted_places") |>
   mutate(indicator = snakecase::to_sentence_case(indicator)) 
 
-df_clean_names_long |>
+
+g <- df_clean_names_long |>
   ggplot(aes(x = value,
              y = indicator,
              fill = indicator)) +
@@ -164,9 +161,19 @@ df_clean_names_long |>
   scale_fill_manual(values = c("#d4d4d4", "#eba0e9", "#5dace8")) +
   theme_void() +
   theme(legend.position = "none",
-        strip.text = element_text(size = 14, face = "bold"))
+        strip.text = element_text(size = 14, face = "bold")) 
+
+ggsave(
+  filename = here::here("docs", "tidy_tuesday_2023_10_10_1.png"),
+  plot = g,
+  width = 20,
+  height = 10,
+  units = "cm"
+)
 
 ```
+
+![Percentage of haunted locations with gender-specific terms in descriptions](/docs/tidy_tuesday_2023_10_10_1.png){#fig-1}
 
 ```{r}
 #| label: failed-attempt-at-venn-diagram-eval-false
@@ -243,14 +250,14 @@ word_cloud_haunt <- function(data) {
 
 ## Ghostly Jargon in Haunted Spots: A Gendered Perspective
 
-@fig-word-clouds-by-gender illustrates the prevalence of gender-specific common words in haunted locations, comparing all American locations to haunted spots in universities and colleges.
+@fig-2 illustrates the prevalence of gender-specific common words in haunted locations, comparing all American locations to haunted spots in universities and colleges.
 
 ```{r}
 #| label: fig-word-clouds-by-gender
 #| fig-cap: "Gender-specific words' prevalence in haunted locations, comparing sites across USA with those in universities and colleges."
 #| fig-width: 10
 
-bind_rows(
+g1 <- bind_rows(
   only_male |>
   mutate(facet_type = "All Haunted places citing males"),
   
@@ -301,14 +308,22 @@ bind_rows(
   scale_size_area(max_size = 12) +
   theme_void()
 
-
+ggsave(
+  filename = here::here("docs", "tidy_tuesday_2023_10_10_2.png"),
+  plot = g1,
+  width = 20,
+  height = 12,
+  units = "cm"
+)
 ```
+
+![Gender-specific words' prevalence in haunted locations, comparing sites across USA with those in universities and colleges.](/docs/tidy_tuesday_2023_10_10_2.png){#fig-2}
 
 *Credits: Sentiment Analysis [@mohammad2012] and code inspiration from [Steven Ponce](https://github.com/poncest)'s [R script](https://github.com/poncest/tidytuesday/blob/main/2023/Week_41/2023_41.R) on GitHub.*
 
 ## Unique Verbiage in these haunted places
 
-In contrast to the previous slide's word clouds featuring overlapping terms, the @fig-unique-words-to-each-gender shows distinct vocabulary found exclusively in male and female haunted locations.
+In contrast to the previous slide's word clouds featuring overlapping terms, the @fig-3 shows distinct vocabulary found exclusively in male and female haunted locations.
 
 ```{r}
 # Finding words unique to each data frame
@@ -383,7 +398,7 @@ uniq_colleges_females <- colleges_female |>
 #| fig-cap: "Unique words in descriptions of gender-specific haunted locations, but absent in descriptions of the opposite gender's haunted places."
 #| fig-width: 10
 
-bind_rows(
+g2 <- bind_rows(
   uniq_all_males |>
   mutate(facet_type = "All Haunted places citing males"),
   
@@ -410,6 +425,16 @@ bind_rows(
                      drop = FALSE) + 
   scale_size_area(max_size = 12) +
   theme_void()
+
+ggsave(
+  filename = here::here("docs", "tidy_tuesday_2023_10_10_3.png"),
+  plot = g2,
+  width = 25,
+  height = 17,
+  units = "cm"
+)
 ```
+
+![Unique words in descriptions of gender-specific haunted locations, but absent in descriptions of the opposite gender's haunted places.](/docs/tidy_tuesday_2023_10_10_3.png){#fig-3}
 
 Carefully look at ***All Haunted Places citing males***: Who knew America's haunted places had such a penchant for **"wife"** -- even beyond the grave! Ghostly husbands, you've got some explaining to do! 😄👻

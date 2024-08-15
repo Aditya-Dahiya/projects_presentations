@@ -9,7 +9,6 @@ date: "2023-10-25"
 image: "patient_risk_profiles.png"
 format:
   html:
-    theme: simplex
     code-fold: true
 editor_options: 
   chunk_output_type: console
@@ -18,11 +17,12 @@ execute:
   message: false
   warning: false
   cache: true
+  eval: false
 bibliography: references.bib
 filters:
   - social-share
 share:
-  permalink: "https://aditya-dahiya.github.io/session_presentations/projects/patient_risk_profiles.html"
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects/patient_risk_profiles.html"
   description: "A detailed look at a simulated data set for patient risk factors for various outcomes"
   twitter: true
   linkedin: true
@@ -60,12 +60,23 @@ The data is completely numerical, and there are no missing values. So it seems g
 #| fig-width: 10
 #| fig-asp: 0.4
 
-patient_risk_profiles |> 
+g1 <- patient_risk_profiles |> 
   visdat::vis_dat() +
   theme(axis.text.x = element_text(angle = 90,
                                    size = 4),
         legend.position = "bottom")
+
+ggsave(
+    filename = here::here("docs", "patient_risk_profiles_1.png"),
+    plot = g1,
+    height = 10, 
+    width = 20,
+    device = "png",
+    units = "cm"
+  )
 ```
+
+![Entire dataframe with vis_dat()](/docs/patient_risk_profiles_1.png){#fig-1}
 
 Upon exploration, it seems that the data has mainly these columns:
 
@@ -151,14 +162,25 @@ prf <- prf |>
 #| fig-cap: "A bar chart showing distribution of age groups int he simulated data set on Patient Risk Profiles"
 
 
-prf |> 
+g2 <- prf |> 
   ggplot(aes(y = age_group)) +
   geom_bar() +
   theme_minimal() +
   labs(title = "Distribution of age-groups in the data set shows no particular pattern",
        y = NULL, x = "Number of persons in the data set") +
   theme(plot.title.position = "plot")
+
+ggsave(
+    filename = here::here("docs", "patient_risk_profiles_2.png"),
+    plot = g2,
+    height = 10, 
+    width = 20,
+    device = "png",
+    units = "cm"
+  )
 ```
+
+![A bar chart showing distribution of age groups int he simulated data set on Patient Risk Profiles.](/docs/patient_risk_profiles_2.png){#fig-2}
 
 ------------------------------------------------------------------------
 
@@ -167,6 +189,9 @@ prf |>
 Now, lets focus on outcomes to visually check correlations amongst them. We can see there are total 14 different outcomes which are "predicted" in this data-set. An interactive heat-map using `heatmaply` package with a *dendrogram* to classify groups of outcomes: --
 
 ```{r}
+#| label: fig-int-1
+#| fig-cap: "An interactive heat map"
+
 colnames_prf1 <- prf |> 
   select(starts_with("predicted")) |> 
   colnames() |>
@@ -196,6 +221,8 @@ pc1 <- prf1 |>
 
 biplot(pc1, scale = 0)
 ```
+
+![](/docs/patient_risk_profiles_3.png)
 
 As we can see in the bivariate plot, the predicted conditions (in red arrows) are clustered along two directions. This, sort of, reinforces out view formed earlier from the heatmap that there are, broadly, two groups of outcomes.
 
@@ -230,6 +257,9 @@ prf1 <- prf1 |>
 Listing the predictors present in the data set: there are **64** of them !
 
 ```{r}
+#| label: tbl-1
+#| tbl-cap: "A table of different risk factors"
+
 prf |> 
   select(!starts_with("predicted"), 
          -c(personId, age_group, gender)) |> 
