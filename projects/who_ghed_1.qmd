@@ -58,7 +58,8 @@ codes_df <- readxl::read_xlsx(
 ```
 
 ```{r}
-#| label: data-wrangling
+#| label: eda-random
+#| echo: false
 
 # Fidning variables that are not missing a lot of values
 # temp <- rawdf1 |> 
@@ -126,6 +127,8 @@ animate(
 )
 ```
 
+The @fig-1 shows the Current Health Expenditure as a percentage of country's GDP in some Asian Countries, with a focus on India.
+
 ```{r}
 #| label: viz-che-gdp-1
 #| eval: false
@@ -136,6 +139,8 @@ font_add_google("News Cycle",
 ) 
 
 showtext_auto()
+
+text_hil <- "grey30"
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -264,3 +269,121 @@ image_read(here::here("docs", "fig_who_ghed_1.png")) |>
 ```
 
 ![Current Health Expenditure (as a percentage of GDP) in various Asian Countries (with a focus on India)](/docs/fig_who_ghed_1.png){#fig-1}
+
+The @fig-2 shows the Domestic Government Health Expenditure as a percentage of GDP.
+
+```{r}
+#| label: analysis-2
+
+selected_countries <- c(
+  "IND", "CHN", "THA", "BGD", "PAK", "IDN", "LKA"
+  )
+
+df2 <- rawdf1 |> 
+  filter(code %in% selected_countries) |> 
+  select(
+    "country",
+    "code",
+    "region",
+    "income",
+    "year",
+    "gghed_gdp"
+  )
+  
+g <- df2 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = gghed_gdp,
+      colour = country,
+      group = country,
+      label = country,
+      linewidth = code == "IND",
+      alpha = code == "IND"
+    )
+  ) + 
+  geom_line() +
+  geom_point(
+    mapping = aes(size = code == "IND"),
+    pch = 21,
+    fill = "white",
+    alpha = 1
+  ) +
+  geom_text(
+    data = df2 |> filter(year == 2021),
+    mapping = aes(
+      x = 2021.3
+    ),
+    hjust = 0,
+    alpha = 0.95,
+    family = "body_font",
+    size = 18,
+    fontface = "bold"
+  ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_linewidth_manual(values = c(0.5, 1.5)) +
+  scale_alpha_manual(values = c(0.6, 0.9)) +
+  paletteer::scale_colour_paletteer_d("MetBrewer::Austria") + 
+  coord_cartesian(
+    clip = "off"
+  ) +
+  scale_size_manual(
+    values = c(2, 6)
+  ) +
+  labs( 
+    title = "Domestic General Government Health Expenditure (GGHE-D)\nas % Gross Domestic Product (GDP)",
+    x = "Year",
+    y = "Percentage",
+    caption = plot_caption
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = 40
+  ) +
+  theme(
+    line = element_line(
+      linetype = 1, 
+      colour = "grey30",
+      linewidth = 0.5
+    ),
+    text = element_text(
+      colour = "grey30",
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.4
+    ),
+    axis.line = element_line(
+      arrow = arrow(length = unit(5, "mm")),
+      colour = "grey30"
+    ),
+    legend.position = "none",
+    plot.margin = margin(5,30,5,5, "mm"),
+    plot.title = element_text(
+      size = 80,
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      hjust = 0,
+      margin = margin(0,0,0,0, "mm"),
+      size = 15
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("docs", "fig_who_ghed_2.png"),
+  height = unit(19.05 / 3, "cm"),
+  width = unit(33.867 / 3, "cm"),
+  bg = "transparent"
+)
+```
+
+![Domestic General Government Health Expenditure (GGHE-D) as % Gross Domestic Product (GDP) for selected countries in Asia, with focus on India.](/docs/fig_who_ghed_2.png){#fig-2}
+
+```{r}
+#| label: analysis-3
+
+rawdf1 |> 
+  select(country, contains("gghed_")) |> 
+  visdat::vis_miss()
+
+```
