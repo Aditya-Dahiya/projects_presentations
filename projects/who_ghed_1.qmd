@@ -382,8 +382,43 @@ ggsave(
 ```{r}
 #| label: analysis-3
 
-rawdf1 |> 
-  select(country, contains("gghed_")) |> 
-  visdat::vis_miss()
+selected_countries <- c(
+  "IND", "CHN", "THA", "BGD", "PAK", "IDN", "LKA", "USA"
+  )
 
+che_components <- names(rawdf1)[16:20]
+
+rawdf1 |> 
+  select(country, code, year, all_of(che_components)) |>
+  mutate(
+    pvtd_che = pvtd_che - oops_che
+  ) |> 
+  pivot_longer(
+    cols = all_of(che_components),
+    names_to = "indicator",
+    values_to = "value"
+  ) |> 
+  filter(
+    code %in% selected_countries
+  ) |> 
+  ggplot(
+    aes(x = year, y = value, fill = indicator)
+  ) +
+  geom_area(
+    position = position_fill()
+  ) +
+  facet_wrap(~ country)
+  
+  
+  # filter(code %in% selected_countries) |> 
+  ggplot(
+    mapping = aes(
+      x = gghed_che,
+      y = ext_che,
+      colour = country
+    )
+  ) +
+  geom_point() +
+  facet_wrap(~year) +
+  theme(legend.position = "none")
 ```
