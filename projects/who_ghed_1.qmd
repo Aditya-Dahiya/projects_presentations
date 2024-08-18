@@ -57,6 +57,47 @@ codes_df <- readxl::read_xlsx(
 
 ```
 
+Common Visualizations' Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for plot text
+font_add_google("News Cycle",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+text_hil <- "grey30"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+
+plot_caption <- paste0(
+  "**Data:** Global Health Expenditure Database, WHO  |  ",
+  "**Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, xtwitter_username, 
+   social_caption_2, social_caption_1)
+
+
+```
+
 ```{r}
 #| label: eda-random
 #| echo: false
@@ -379,46 +420,178 @@ ggsave(
 
 ![Domestic General Government Health Expenditure (GGHE-D) as % Gross Domestic Product (GDP) for selected countries in Asia, with focus on India.](/docs/fig_who_ghed_2.png){#fig-2}
 
+The @fig-3 compares the Components of Current Health Expenditure in 9 countries.
+
 ```{r}
 #| label: analysis-3
 
 selected_countries <- c(
-  "IND", "CHN", "THA", "BGD", "PAK", "IDN", "LKA", "USA"
+  "BGD", "PAK", "LKA",
+  "IND", "CHN", "IDN",  
+  "THA", "USA", "GBR"
   )
+
+strip_labels_df <- rawdf1 |> 
+  filter(code %in% selected_countries) |> 
+  distinct(country, code) |> 
+  mutate(code = fct(code, levels = selected_countries)) |> 
+  arrange(code) |> 
+  mutate(
+    country = if_else(
+      code == "GBR",
+      "United Kingdom (Britain)",
+      country
+    )
+  )
+
+strip_labels <- strip_labels_df$country
+names(strip_labels) <- strip_labels_df$code
 
 che_components <- names(rawdf1)[16:20]
 
-rawdf1 |> 
+ind_levels <- c(
+  "ext_che", 
+  "gghed_che", 
+  "pvtd_che", "vpp_che" , 
+  "oops_che"
+  )
+
+colour_labels <- codes_df |> 
+  filter(`variable code` %in% ind_levels) |> 
+  mutate(code = fct(`variable code`, levels = ind_levels)) |> 
+  arrange(code) |> 
+  pull(`variable name`)
+
+mypal <- c(
+  "#999999FF",
+  "#39B185FF",
+  "#F6EDBDFF", "#EDBB8AFF",
+  "#FF3200FF"
+)
+
+bts = 60
+
+g3 <- rawdf1 |> 
+  
+  # Data Wrangling
   select(country, code, year, all_of(che_components)) |>
+  filter(
+    code %in% selected_countries
+  ) |> 
   mutate(
-    pvtd_che = pvtd_che - oops_che
+    pvtd_che = pvtd_che - oops_che - vpp_che,
+    code = fct(code, levels = selected_countries)
   ) |> 
   pivot_longer(
     cols = all_of(che_components),
     names_to = "indicator",
     values_to = "value"
+  ) |>
+  mutate(
+    indicator = fct(indicator, levels = ind_levels)
   ) |> 
-  filter(
-    code %in% selected_countries
-  ) |> 
-  ggplot(
-    aes(x = year, y = value, fill = indicator)
-  ) +
-  geom_area(
-    position = position_fill()
-  ) +
-  facet_wrap(~ country)
   
-  
-  # filter(code %in% selected_countries) |> 
+  # Starting the Plot
   ggplot(
     mapping = aes(
-      x = gghed_che,
-      y = ext_che,
-      colour = country
+      x = year, 
+      y = value, 
+      fill = indicator
     )
   ) +
-  geom_point() +
-  facet_wrap(~year) +
-  theme(legend.position = "none")
+  geom_area(
+    position = "fill",
+    colour = "transparent",
+    linewidth = 0.3
+  ) +
+  
+  # Scales and Coordinates
+  scale_fill_manual(
+    values = mypal,
+    labels = str_wrap(colour_labels, 40)
+  ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_continuous(
+    expand = expansion(0),
+    labels = scales::label_percent()
+  ) +
+  coord_cartesian(clip = "off") +
+  facet_wrap(~ code, labeller = as_labeller(strip_labels)) +
+  
+  # Labels and Themes
+  labs(
+    title = "The Current Health Expenditure, and its components (2000-2021)",
+    subtitle = glue::glue(
+      "The <b style = 'color:{mypal[5]}'>Out-of-pocket Payments</b> cause impoverishment, and still constitute a large share of health expenditure in developing economies.<br><b style = 'color:{mypal[2]}'>Government Health Expenditure</b> is the most equitable, and can resolve the issues associated with Out-of-Pocket Payments."
+    ),
+    caption = plot_caption,
+    x = NULL,
+    y = NULL,
+    colour = NULL
+  ) +
+  theme_minimal(
+    base_size = 2 * bts,
+    base_family = "body_font" 
+  ) +
+  theme(
+    text = element_text(
+      colour = text_hil,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    panel.grid = element_blank(),
+    legend.position = "right",
+    plot.title.position = "plot",
+    plot.title = element_text(
+      size = 4 * bts,
+      face = "bold",
+      margin = margin(5,0,5,10, "mm")
+    ),
+    plot.subtitle = element_textbox(
+      lineheight = 0.4,
+      size = 2 * bts,
+      margin = margin(5,0,10,10, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0,
+      size = bts,
+      margin = margin(5,0,-10, -5, "mm")
+    ),
+    strip.text = element_text(
+      size = 2 * bts,
+      face = "bold",
+      colour = text_hil,
+      margin = margin(0,0,5,0, "mm")
+    ),
+    strip.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.spacing.x = unit(20, "mm"),
+    panel.spacing.y = unit(10, "mm"),
+    legend.title = element_blank(),
+    legend.key.spacing.y = unit(20, "mm"),
+    legend.key.height = unit(40, "mm"),
+    legend.key.width = unit(40, "mm"),
+    legend.text = element_text(
+      size = 1.5 * bts,
+      margin = margin(0,0,0,5, "mm")
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.2
+    ),
+    legend.margin = margin(0,0,0,0, "mm")
+  )
+
+ggsave(
+  plot = g3,
+  filename = here::here("docs", "fig_who_ghed_3.png"),
+  height = unit(19.05, "cm"),
+  width = unit(33.867, "cm"),
+  bg = "transparent"
+)
 ```
+
+![The Components in Current Health expenditure, in selected 9 countries, to show importance of Govt. Health Expenditure in reducing Out-of-Pocket Payments](/docs/fig_who_ghed_3.png){#fig-3}
