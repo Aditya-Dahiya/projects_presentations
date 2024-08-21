@@ -2,9 +2,10 @@
 title: "Marriage Ages of English Monarchs"
 author: "Aditya Dahiya"
 date: "2024-08-21"
-subtitle: "Visualoizing the ages of English Monarchs at the time of marriages"
+subtitle: "Visualizing the ages of English Monarchs at the time of marriages"
 categories:
   - "#TidyTuesday"
+  - "{ggimage}"
 image: "thumbnails/tidy_english_monarchs.png"
 format:
   html:
@@ -27,7 +28,7 @@ share:
 bibliography: references.bib
 ---
 
-![.........................](tidy_english_monarchs.png){#fig-1}
+![A horizontal lollipop bar chart, showing the ages of English monarchs and their consorts. The ages are in brackets along with names, below their potrait. The age difference is written in the intervening segment. The Y-axis represents the marriage age, and the X-axis shows the ages.](tidy_english_monarchs.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -50,7 +51,7 @@ library(patchwork)            # Combining plots
 
 # Option 2: Read directly from GitHub
 
-english_monarchs_marriages_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-08-20/english_monarchs_marriages_df.csv')
+# english_monarchs_marriages_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-08-20/english_monarchs_marriages_df.csv')
 ```
 
 Data Wrangling
@@ -107,19 +108,21 @@ plotdf <- df |>
   mutate(
     king_age = case_when(
       (king_age == consort_age) & 
-        (king_gender == "Male") ~ king_age + 1,
+        (king_gender == "Male") ~ king_age + 2,
       (king_age == consort_age) & 
-        (king_gender == "Female") ~ king_age - 1,
+        (king_gender == "Female") ~ king_age - 2,
       .default = king_age
     ),
     consort_age = case_when(
       (consort_age == king_age) & 
-        (consort_gender == "Male") ~ consort_age + 1,
+        (consort_gender == "Male") ~ consort_age + 2,
       (consort_age == king_age) & 
-        (consort_gender == "Female") ~ consort_age - 1,
+        (consort_gender == "Female") ~ consort_age - 2,
       .default = consort_age
     )
   )
+
+plotdf
 ```
 
 Visualization Parameters
@@ -300,61 +303,81 @@ g <- plotdf |>
     linetype = 3,
     linewidth = 0.5
   ) +
+  geom_text(
+    aes(
+      x = ((king_age + consort_age)/2),
+      label = paste0(abs(king_age - consort_age), " years")
+    ),
+    family = "caption_font",
+    size = bts / 5,
+    hjust = 0.5,
+    nudge_y = 0.15,
+    colour = text_col
+  ) +
   
   # Labels on Year of Marriage
   geom_text(
     mapping = aes(
-      x = 12,
+      x = 11,
       label = year_of_marriage
     ),
     family = "body_font",
-    size = bts / 4,
+    size = bts / 3,
     colour = text_col,
-    hjust = 0
+    hjust = 0,
+    fontface = "bold"
   ) +
   
   # Image, Name and Age of King/Queen
-  geom_point(
+  ggimage::geom_image(
     mapping = aes(
       x = king_age,
-      colour = king_gender
+      image = king_image
     ),
-    size = 20
+    size = 0.05
   ) +
+  ggimage::geom_image(
+    mapping = aes(
+      x = consort_age,
+      image = consort_image
+    ),
+    size = 0.05
+  ) +
+
+  # geom_point(
+  #   mapping = aes(
+  #     x = king_age,
+  #     colour = king_gender
+  #   ),
+  #   size = 20
+  # ) +
   geom_text(
     mapping = aes(
       x = king_age,
       label = str_wrap(paste0(king_name, " (", king_age, ")"), 
                        20)
     ),
-    family = "body_font",
+    family = "caption_font",
     colour = text_col,
     size = bts / 7,
     hjust = 0.5,
-    nudge_y = -0.4,
+    nudge_y = -0.5,
     lineheight = 0.25,
     vjust = 1
   ) +
   
   # Image, Name and Age of Consort
-  geom_point(
-    mapping = aes(
-      x = consort_age,
-      colour = consort_gender
-    ),
-    size = 20
-  ) +
   geom_text(
     mapping = aes(
       x = consort_age,
       label = str_wrap(paste0(consort_name, " (", consort_age, ")"), 
                        20)
     ),
-    family = "body_font",
+    family = "caption_font",
     colour = text_col,
     size = bts / 7,
     hjust = 0.5,
-    nudge_y = -0.4,
+    nudge_y = -0.5,
     lineheight = 0.25,
     vjust = 1
   ) +
@@ -368,7 +391,7 @@ g <- plotdf |>
   ) +
   scale_x_continuous(
     name = "Age at the time of marriage (years)",
-    limits = c(12, 55),
+    limits = c(11, 55),
     breaks = seq(15, 55, 5),
     expand = expansion(0)
   ) +
@@ -394,7 +417,7 @@ g <- plotdf |>
     plot.title.position = "plot",
     plot.title = element_text(
       family = "title_font",
-      size = 2.5 * bts,
+      size = 2.7 * bts,
       hjust = 0.5,
       margin = margin(0,0,0,0, "mm")
     ),
@@ -402,12 +425,13 @@ g <- plotdf |>
       lineheight = 0.35,
       hjust = 0.5,
       margin = margin(5,0,0,0, "mm"),
-      family = "title_font"
+      family = "title_font",
+      size = 1.2 * bts
     ),
     plot.caption = element_textbox(
       family = "caption_font",
       hjust = 0.5,
-      margin = margin(5,0,0,0, "mm")
+      margin = margin(10,0,0,0, "mm")
     ),
     panel.grid = element_blank(),
     axis.ticks = element_blank(),
@@ -423,23 +447,13 @@ g <- plotdf |>
     ),
     legend.position = "none"
   )
-
-
-ggsave(
-  filename = here::here("data_vizs", "tidy_english_monarchs.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 5:4
-  height = 500,   
-  units = "mm",
-  bg = "white"
-)
-
 ```
 
 Savings the graphics
 
 ```{r}
 #| label: save-image
+
 
 ggsave(
   filename = here::here("data_vizs", "tidy_english_monarchs.png"),
