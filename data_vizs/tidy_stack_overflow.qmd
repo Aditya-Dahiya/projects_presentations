@@ -1,0 +1,260 @@
+---
+title: "Stack Overflow Annual Developer Survey 2024"
+author: "Aditya Dahiya"
+date: "2024-09-01"
+subtitle: "Demonstrating the round bias (preference for multiples of 5 or 10) by respondents in the Stack Overflow Annual Developer Survey 2024"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_stack_overflow.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+![Rounding bias, or digit preference bias, occurs when data is rounded to preferred digits, often leading to inaccurate results or skewed patterns. This is common in self-reported surveys where respondents favour certain numbers, such as rounding ages to multiples of 5 or 10. The above bar-chart shows a perfect example from the Stack Overflow Annual Developer Survey 2024 - response to the question - number of years spent coding.](tidy_stack_overflow.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+
+# Option 2: Read directly from GitHub
+# qname_levels_single_response_crosswalk <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-03/qname_levels_single_response_crosswalk.csv')
+# stackoverflow_survey_questions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-03/stackoverflow_survey_questions.csv')
+stackoverflow_survey_single_response <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-03/stackoverflow_survey_single_response.csv')
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Grenze Gotisch",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Bellefair",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "grey95"
+mypal <- c("grey40", "#D94801FF")
+
+text_col <- "grey20"
+text_hil <- text_col
+
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Rounding Bias"
+
+plot_subtitle <- glue::glue("The Stack Overflow Annual Developer<br>Survey 2024 surveyed over 64,000<br>developers, and shows a good example of<br>Rouding Bias (or digit preference bias)<br>where respondents tend to round off<br>their answers to<b style='color:{mypal[2]}'> multiples of 5 or 10</b><br>for the number of years they<br>have spent coding.")
+
+plot_subtitle |> str_view()
+
+plot_caption <- paste0(
+  "**Data:** Havisha Khurana & Stack Overflow", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- stackoverflow_survey_single_response |> 
+  select(years_code) |> 
+  filter(years_code <= 50) |> 
+  mutate(
+    colour_var = ((years_code %% 5) == 0)
+  ) |> 
+  ggplot(
+    mapping = aes(
+      years_code
+    )
+  ) +
+  geom_bar(
+    mapping = aes(
+      years_code,
+      fill = colour_var
+    )
+  ) +
+  geom_text(
+    data = tibble(years_code = 0:50),
+    mapping = aes(
+      y = -10,
+      x = years_code,
+      label = years_code,
+      colour = ((years_code %% 5) == 0)
+    ),
+    vjust = 1,
+    size = bts / 6
+  ) +
+  annotate(
+    geom = "richtext",
+    x = 50,
+    y = 4100,
+    label = plot_subtitle,
+    hjust = 1,
+    vjust = 1,
+    lineheight = 0.3,
+    colour = text_col,
+    family = "body_font",
+    size = bts / 2,
+    label.size = NA
+  ) +
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  scale_x_continuous(
+    expand = expansion(0.02)
+  ) +
+  scale_y_continuous(
+    expand = expansion(c(0.02, 0)),
+    labels = label_number()
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = plot_title,
+    # subtitle = plot_subtitle,
+    caption = plot_caption,
+    y = "Number of respondents",
+    x = "Years spent coding by the respondents"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Legend
+    legend.position = "none",
+    
+    # Axes & Other Stuff
+    panel.grid = element_blank(),
+    plot.margin = margin(15,5,5,5, "mm"),
+    axis.line = element_line(
+      colour = "grey30",
+      arrow = arrow(length = unit(5, "mm")),
+      linewidth = 0.5
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    
+    
+    # Labels
+    plot.title.position = "plot",
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(0,0,0,0, "mm"),
+      size = 5 * bts,
+      hjust = 0.5,
+      colour = mypal[2]
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,0,0, "mm"), 
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      margin = margin(10,0,0,0, "mm"),
+      hjust = 0.5,
+      family = "caption_font"
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_stack_overflow.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_stack_overflow.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_stack_overflow.png"
+    )
+  )
+```
