@@ -1,0 +1,270 @@
+---
+title: "7 decades of the Preston Curve"
+author: "Aditya Dahiya"
+date: "2024-09-02"
+subtitle: "How has the relation between Life Expectancy and GDP per Capita has evolved - demonstrated using a Preston Curve"
+categories:
+  - "{gganimate}"
+  - "Our World in Data"
+  - "Public Health"
+image: "thumbnails/owid_preston_curve.gif"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The **Preston Curve**, developed by Samuel H. Preston in 1975, illustrates the relationship between life expectancy and income per capita across countries. The curve shows that life expectancy tends to rise with higher national income, but the relationship is non-linear. At lower income levels, even small increases in income can lead to significant gains in life expectancy due to improved access to healthcare, sanitation, and disease control. However, at higher income levels, the life expectancy gains flatten, suggesting that other factors like healthcare innovations and policies play a bigger role in further improving health outcomes. The curve highlights that while wealth is important, it is not the only driver of health improvements. Read more about it [here](https://www.jstor.org/stable/2173509) and [here](https://academic.oup.com/ije/article/36/3/498/655864?login=false).
+
+![An animated scatter plot showing relation between longeivity and income levels, with each dot representing a country, and the Preston Curve overlaid on top.](owid_preston_curve.gif)
+
+### How I made this graphic?
+
+Getting the data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(owidR)                # Get data from Our World in R
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # To lighten and darken colours
+library(gganimate)            # For animation across years
+
+# search1 <- owid_search("life expectancy")
+
+# search1 |> as_tibble()
+
+rawdf1 <- owid("life-expectancy-vs-gdp-per-capita")
+
+joindf1 <- wbstats::wb_countries() |>
+  select(iso3c, income_level) |> 
+  rename(code = iso3c) |> 
+  filter(!(income_level %in% c(NA, "Not classified"))) |> 
+  mutate(
+    income_level = fct(
+      income_level,
+      levels = c(
+        "High income",        
+        "Upper middle income",
+        "Lower middle income",
+        "Low income",          
+        "Aggregates"
+      )
+    )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: parameters2
+
+# Font for titles & body text
+font_add_google("Roboto",
+  family = "body_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+plot_caption <- paste0(
+  "Data: Our World in Data  |  ",
+  "Code: @aditya-dahiya (GitHub)")
+```
+
+Exploratory Data Analysis and Data Wrangling
+
+```{r}
+#| label: data-wrangling
+
+df <- rawdf1 |> 
+  as_tibble() |> 
+  filter(year >= 1950 & year <= 2023) |> 
+  filter(str_length(code) == 3) |> 
+  janitor::clean_names()
+
+# Checking the missingness in data
+# df |> 
+#   visdat::vis_miss()
+
+# Remove the countries missing too much info to avoid a jagged animation
+remove_countries1 <- df |> 
+  group_by(entity, code) |> 
+  summarise(
+    life_expectancy_at_birth = mean(is.na(life_expectancy_at_birth)),
+    gdp_per_capita = mean(is.na(gdp_per_capita))
+  ) |> 
+  filter(gdp_per_capita > 0.8) |> 
+  pull(code)
+
+remove_countries2 <- df |> 
+  group_by(entity, code) |> 
+  summarise(
+    life_expectancy_at_birth = mean(is.na(life_expectancy_at_birth)),
+    gdp_per_capita = mean(is.na(gdp_per_capita))
+  ) |> 
+  filter(life_expectancy_at_birth > 0.8) |> 
+  pull(code)
+
+remove_countries <- unique(c(remove_countries1, remove_countries2))
+rm(remove_countries1, remove_countries2)
+
+# Creating the dataframe used to plot
+# Removing some aberrations and outliers
+plotdf <- df |> 
+  filter(!(code %in% remove_countries)) |> 
+  select(-countries_continents) |> 
+  group_by(year) |> 
+  arrange(desc(gdp_per_capita)) |>
+  slice(-1:-5) |> 
+  ungroup() |> 
+  filter(year <= 2020) |> 
+  left_join(joindf1)
+# Recheck for missingness
+# plotdf |> 
+#   visdat::vis_miss()
+```
+
+Visualization & Animation
+
+```{r}
+#| label: visualize
+
+bts = 20
+
+g <- plotdf |> 
+  # filter(year == 1960) |> 
+  ggplot(
+    mapping = aes(
+      x = gdp_per_capita,
+      y = life_expectancy_at_birth,
+      size = population_historical,
+      colour = income_level
+    )
+  ) +
+  geom_point(
+    alpha = 0.4
+  ) +
+  geom_smooth(
+    span = 0.9,
+    colour = "darkred",
+    se = FALSE,
+    size = 1.2
+  ) +
+  scale_x_continuous(
+    labels = label_dollar(),
+    expand = expansion(c(0.01, 0)),
+    limits = c(0, 60000)
+  ) +
+  scale_y_continuous(
+    expand = expansion(c(0.02, 0)),
+    limits = c(30, 83)
+  ) +
+  scale_size(
+    range = c(1.5, 12),
+    labels = label_number(scale = 1e-6),
+    breaks = c(1e6, 10e6, 100e6, 500e6, 1000e6)
+  ) +
+  scale_color_manual(
+    values = paletteer::paletteer_d("PNWColors::Sunset2"),
+    na.value = "grey50",
+    breaks = c(
+        "High income",        
+        "Upper middle income",
+        "Lower middle income",
+        "Low income"
+      )
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 6
+      )
+    )
+  ) +
+  coord_cartesian(clip = "off") +
+  transition_time(year) +
+  labs(
+    title = "The Preston Curve: {frame_time}",
+    y = "Life Expectancy (in years)",
+    x = "GDP per capita, current US $",
+    size = "Population\n(in millions)",
+    colour = "Country's Income\nLevel",
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    axis.line = element_line(
+      arrow = arrow(length = unit(bts/4, "mm")),
+      linewidth = 0.7
+    ),
+    text = element_text(
+      colour = "grey10"
+    ),
+    legend.position = c(1, 0),
+    legend.justification = c(1, -0.05),
+    legend.text = element_text(
+      margin = margin(10,0,10,5, "pt")
+    ),
+    legend.box = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.spacing = unit(0, "pt"),
+    plot.margin = margin(10,40,10,10, "pt"),
+    legend.background = element_rect(
+      fill = "white",
+      colour = "transparent"
+    ),
+    plot.title = element_text(
+      size = bts * 1.5,
+      face = "bold"
+    ),
+    plot.caption = element_text(
+      family = "caption_font",
+      size = 0.5 * bts,
+      hjust = 0
+    )
+  )
+
+
+anim_save(
+  animation = g,
+  filename = here::here("data_vizs", 
+                        "owid_preston_curve.gif"),
+  fps = 4,
+  duration = 30,
+  end_pause = 40,
+  start_pause = 4,
+  height = 600,
+  width = 650,
+  units = "px"
+) 
+```
