@@ -29,7 +29,7 @@ share:
 bibliography: references.bib
 ---
 
-![........................](health_map_hy.png){#fig-1}
+![Map of Haryana showing locations of the health facilities - pharmacies, doctors' and dentists' clinics, and hospitals.](health_map_hy.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -79,21 +79,31 @@ hy_bbox <- osmdata::getbb("Haryana")
 
 
 # Save the large list objects to disk
-saveRDS(hy_health_docs, here("data", "hy_health_docs.rds"))
-saveRDS(hy_health_hospitals, here("data", "hy_health_hospitals.rds"))
-saveRDS(hy_health_pharmacy, here("data", "hy_health_pharmacy.rds"))
+# saveRDS(hy_health_docs, here("data", "hy_health_docs.rds"))
+# saveRDS(hy_health_hospitals, here("data", "hy_health_hospitals.rds"))
+# saveRDS(hy_health_pharmacy, here("data", "hy_health_pharmacy.rds"))
 
-# To reload them back into R later, use:
+# Reload the downloaded data:
 hy_health_docs <- readRDS(here("data", "hy_health_docs.rds"))
 hy_health_hospitals <- readRDS(here("data", "hy_health_hospitals.rds"))
 hy_health_pharmacy <- readRDS(here("data", "hy_health_pharmacy.rds"))
 
+hy_map <- read_sf(here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")) |> 
+  st_transform(crs = 4326) |> 
+  # as_tibble() |> 
+  janitor::clean_names() |> 
+  mutate(
+    district = str_to_sentence(district),
+    district = str_replace_all(district, ">", "a"),
+    district = str_replace_all(district, "\\|", "i")
+  )
 ```
 
 Data Wrangling
 
 ```{r}
 #| label: eda
+
 
 ```
 
@@ -103,17 +113,17 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Carter One",
+font_add_google("Quattrocento",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("M PLUS Code Latin",
+font_add_google("Stint Ultra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Lexend Deca",
+font_add_google("Saira Extra Condensed",
   family = "body_font"
 ) 
 
@@ -121,8 +131,11 @@ showtext_auto()
 
 bg_col <- "white"
 
-text_col <- "#6F008DFF"
-text_hil <- text_col
+text_col <- "grey5"
+text_hil <- "grey10"
+
+mypal <- paletteer::paletteer_d("NineteenEightyR::sunset2")[1:3]
+mypal
 
 bts <- 80
 
@@ -135,16 +148,15 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color:{text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color:{text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Power Rangers Frachise:\nFalling Populatiry over seasons"
+plot_title <- "Health Map of Haryana"
 
-plot_subtitle <- str_wrap("The number of votes polled for ratings of each episode fell after the first three seasons, and never really recovered.", 42)
-plot_subtitle |> str_view()
+plot_subtitle <- plot_subtitle <- glue::glue("Locations of <b style='color:{mypal[3]}'>Hospitals</b>, <b style='color:{mypal[2]}'>doctors' Clinics</b> and <b style='color:{mypal[1]}'>Pharmacies</b>.")
 
 plot_caption <- paste0(
-  "**Data:** Kaggle's Power Rangers Dataset", 
+  "**Data:** Open Street Maps", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -161,8 +173,127 @@ The static plot
 ```{r}
 #| label: static-plot
 
+g <- ggplot() +
+  
+  geom_sf(
+    data = hy_map,
+    colour = "grey5",
+    fill = "grey97",
+    linewidth = 0.5,
+    linejoin = "round"
+  ) +
+  geom_sf_text(
+    data = hy_map,
+    colour = text_col,
+    mapping = aes(
+      label = district
+    ),
+    size = bts/3,
+    family = "body_font",
+    alpha = 0.5
+  ) +
+  
+  # Pharmacies
+  geom_sf(
+    data = hy_health_pharmacy$osm_points |> 
+      st_transform(crs = 4326) |> 
+      st_intersection(hy_map),
+    colour = mypal[1],
+    size = 3,
+    pch = 1,
+    linewidth = 0.2
+  ) +
+  
+  # Hospitals
+  geom_sf(
+    data = hy_health_hospitals$osm_points |> 
+      st_transform(crs = 4326) |> 
+      st_intersection(hy_map),
+    colour = mypal[3],
+    size = 3,
+    pch = 1,
+    linewidth = 0.2
+  ) +
+  # geom_sf(
+  #   data = hy_health_hospitals$osm_polygons |> 
+  #     st_transform(crs = 4326) |> 
+  #     st_intersection(hy_map),
+  #   colour = mypal[3],
+  #   linewidth = 0.5
+  # ) +
+  # geom_sf(
+  #   data = hy_health_hospitals$osm_multipolygons |> 
+  #     st_transform(crs = 4326) |> 
+  #     st_intersection(hy_map),
+  #   colour = mypal[3],
+  #   linewidth = 0.5
+  # ) +
+  
+  # Doctors, Dentists etc.
+  geom_sf(
+    data = hy_health_docs$osm_points |> 
+      st_transform(crs = 4326) |> 
+      st_intersection(hy_map),
+    colour = mypal[2],
+    size = 3,
+    pch = 1,
+    linewidth = 0.2
+  ) +
+  
+  # geom_sf(
+  #   data = hy_health_docs$osm_polygons |> 
+  #     st_transform(crs = 4326) |> 
+  #     st_intersection(hy_map),
+  #   colour = mypal[2],
+  #   linewidth = 0.5
+  # ) +
+  
+  # Themes and Labels
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) + 
+  theme(
+    text = element_text(
+      colour = text_hil
+    ),
+    plot.title = element_text(
+      size = bts * 3.5,
+      hjust = 0.5,
+      face = "bold",
+      margin = margin(5,0,5,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.subtitle = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      face = "bold",
+      margin = margin(5,0,0,0, "mm"),
+      size = 2 * bts
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(10, -20, 10, -20, "mm")
+  )
 
-
+ggsave(
+  filename = here::here("data_vizs", "health_map_hy.png"),
+  plot = g,
+  width = 210 * 2,    # Best Twitter Aspect Ratio = 5:4
+  height = 297 * 2,   
+  units = "mm",
+  bg = "white"
+)
 ```
 
 Savings the graphics
@@ -170,14 +301,6 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
-ggsave(
-  filename = here::here("data_vizs", "health_map_hy.png"),
-  plot = g,
-  width = 400,    # Best Twitter Aspect Ratio = 5:4
-  height = 500,   
-  units = "mm",
-  bg = "white"
-)
 
 library(magick)
 # Saving a thumbnail for the webpage
