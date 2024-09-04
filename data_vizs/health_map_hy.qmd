@@ -1,0 +1,189 @@
+---
+title: "The Health Facilities Map of Haryana"
+author: "Aditya Dahiya"
+date: "2024-09-04"
+subtitle: "Using Open Street Maps database to map out the health facilities in Haryana State"
+categories:
+  - "Maps"
+  - "Public Health"
+  - "India"
+image: "thumbnails/health_map_hy.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+![........................](health_map_hy.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(here)                 # File locations and paths
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Mapping tools
+library(sf)                   # All spatial objects in R
+library(osmdata)              # Getting Open Street Maps data
+
+hy_bbox <- osmdata::getbb("Haryana")
+
+# hy_health_docs <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("clinic", "dentist", "doctors")
+#   ) |> 
+#   osmdata_sf()
+# 
+# hy_health_hospitals <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("hospital", "nursing_home")
+#   ) |> 
+#   osmdata_sf()
+# 
+# hy_health_pharmacy <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("pharmacy")
+#   ) |> 
+#   osmdata_sf()
+
+
+# Save the large list objects to disk
+saveRDS(hy_health_docs, here("data", "hy_health_docs.rds"))
+saveRDS(hy_health_hospitals, here("data", "hy_health_hospitals.rds"))
+saveRDS(hy_health_pharmacy, here("data", "hy_health_pharmacy.rds"))
+
+# To reload them back into R later, use:
+hy_health_docs <- readRDS(here("data", "hy_health_docs.rds"))
+hy_health_hospitals <- readRDS(here("data", "hy_health_hospitals.rds"))
+hy_health_pharmacy <- readRDS(here("data", "hy_health_pharmacy.rds"))
+
+```
+
+Data Wrangling
+
+```{r}
+#| label: eda
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Carter One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("M PLUS Code Latin",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Lexend Deca",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+
+text_col <- "#6F008DFF"
+text_hil <- text_col
+
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Power Rangers Frachise:\nFalling Populatiry over seasons"
+
+plot_subtitle <- str_wrap("The number of votes polled for ratings of each episode fell after the first three seasons, and never really recovered.", 42)
+plot_subtitle |> str_view()
+
+plot_caption <- paste0(
+  "**Data:** Kaggle's Power Rangers Dataset", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "health_map_hy.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "health_map_hy.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails", 
+                         "health_map_hy.png"))
+```
