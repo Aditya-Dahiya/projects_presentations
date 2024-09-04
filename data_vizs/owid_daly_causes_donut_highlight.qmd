@@ -488,3 +488,181 @@ image_read(here::here("data_vizs",
   image_write(here::here("data_vizs", "thumbnails", 
                          "owid_daly_causes_donut_highlight.png"))
 ```
+
+Attempt 2: for a Powerpoint slide (landscape layout) shown in @fig-3
+
+```{r}
+#| label: viz-ppt-2
+
+bts = 40
+
+plot_title <- "Global Health Progress: Drop in Infectious Disease DALYs"
+
+plot_subtitle <- str_wrap("There is a significant global decrease in the share of infectious diseases in total DALYs, dropping from 30.6% in 1990 to 19.3% in 2020. Notably, enteric infections have seen the largest decline, falling from 8.4% to 2.8% over the same period, reflecting improvements in global health and sanitation.", 120)
+str_view(plot_subtitle)
+
+g <- plotdf |>
+  filter(year %in% c(1990, 2000, 2010, 2020)) |> 
+  ggplot(
+    mapping = aes(
+      value = value,
+      fill = indicator_group
+    )
+  ) +
+
+  # Internal donut represents major categories of causes of DALYs
+  geom_donut_int(
+    mapping = aes(
+     highlight = highlight_ext
+    ),
+    r_int = 0, 
+    col = bg_col, 
+    linewidth = 0.5,
+    hl_shift = 0.4,
+    hl_col = "#980000FF"
+  ) +
+  
+  # External donut represents detailed individual causes
+  geom_donut_ext(
+    mapping = aes(
+      opacity = indicator,
+      highlight = highlight_ext
+    ), 
+    col = bg_col, 
+    linewidth = 0.3, 
+    show.legend = F,
+    hl_shift = 0.2,
+    hl_col = "#980000FF"
+  ) +
+  
+  # Text annotations for internal donut
+  geom_text_int(
+    mapping = aes(
+      label = paste0(
+        str_wrap(as.character(indicator_group), 15),
+        "\n",
+        round(perc_inner, 1),
+        " %"
+        )
+      ),
+    size = bts / 3,
+    lineheight = 0.25,
+    colour = "white",
+    hjust = 0.5,
+    r = 0.65,
+    show.legend = F,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  
+  # Label annotations for internal donut
+  geom_text_ext(
+    mapping = aes(
+      colour = indicator_group, 
+      label = paste0(
+        str_wrap(indicator, 15), " (",
+        round(perc_outer, 1), 
+        " %)"
+        ),
+      size = highlight_ext
+      ),
+    
+    hjust = "outward",
+    vjust = "outward",
+    layout = circle(thinner = TRUE), 
+    show.legend = F,
+    lineheight = 0.25,
+    family = "caption_font"
+  ) +
+  scale_size_manual(
+    values = c(bts/5, bts/3)
+  ) +
+  # Link label annotations to outer donut chart
+  geom_pin(
+    mapping = aes(colour = indicator_group),
+    size = 1, 
+    linewidth = .25, 
+    show.legend = F, 
+    cut = 0, 
+    layout = circle(thinner = TRUE), 
+    r = 1.75
+  ) +
+  
+  facet_wrap(~ year, ncol = 4, nrow = 1, dir = "h") +
+  
+  # Scales and Coordinates
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  
+  coord_radial(
+    theta = "y", 
+    expand = F, 
+    clip = "off"
+    ) +
+  xlim(0, 3) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle
+  ) +
+  
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none", 
+    plot.title.position = "plot",
+    plot.title = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 7 * bts,
+      hjust = 0.5,
+      margin = margin(10,0,25,0, "mm"),
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 3.5 * bts,
+      hjust = 0,
+      margin = margin(0,0,0,50, "mm"),
+      lineheight = 0.3
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      family = "caption_font",
+      hjust = 0.5,
+      size = bts * 2,
+      margin = margin(-10,0,0,0, "mm")
+    ),
+    strip.text = element_text(
+      size = 5 * bts,
+      colour = text_hil, 
+      family = "title_font",
+      margin = margin(10,0,-10,0, "mm"),
+      face = "bold"
+    ),
+    plot.margin = margin(10,-25,5,-25, "mm"),
+    panel.spacing.x = unit(-70, "mm"),
+    panel.spacing.y = unit(-20, "mm"),
+    panel.border = element_blank(),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "ppt_owid_daly_causes_donut_highlight.png"),
+  plot = g,
+  height = unit(19.05, "cm"),
+  width = unit(33.867, "cm"),
+  bg = bg_col
+)
+```
+
+![The declining share of infectious etiologies in glabal DALYs, as shown in a donut chart with infections highlighted in red.](ppt_owid_daly_causes_donut_highlight.png){#fig-3}
