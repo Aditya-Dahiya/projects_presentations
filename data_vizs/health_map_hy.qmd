@@ -1,12 +1,13 @@
 ---
 title: "The Health Facilities Map of Haryana"
 author: "Aditya Dahiya"
-date: "2024-09-04"
+date: "2024-09-06"
 subtitle: "Using Open Street Maps database to map out the health facilities in Haryana State"
 categories:
   - "Maps"
   - "Public Health"
   - "India"
+  - "Haryana"
 image: "thumbnails/health_map_hy.png"
 format:
   html:
@@ -29,7 +30,7 @@ share:
 bibliography: references.bib
 ---
 
-![Map of Haryana showing locations of the health facilities - pharmacies, doctors' and dentists' clinics, and hospitals.](health_map_hy.png){#fig-1}
+![Map of Haryana showing locations of the health facilities - pharmacies, doctors' and dentists' clinics, and hospitals.](poster_health_map_hy.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -76,7 +77,34 @@ hy_bbox <- osmdata::getbb("Haryana")
 #     value = c("pharmacy")
 #   ) |> 
 #   osmdata_sf()
+# Getting Haryana Roads and streets data
+hy_roads <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("trunk")
+  ) |> 
+  osmdata_sf()
 
+hy_roads1 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("motorway")
+  ) |> 
+  osmdata_sf()
+
+hy_roads2 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("primary")
+  ) |> 
+  osmdata_sf()
+
+hy_roads3 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("secondary")
+  ) |> 
+  osmdata_sf()
 
 # Save the large list objects to disk
 # saveRDS(hy_health_docs, here("data", "hy_health_docs.rds"))
@@ -97,14 +125,6 @@ hy_map <- read_sf(here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")) |>
     district = str_replace_all(district, ">", "a"),
     district = str_replace_all(district, "\\|", "i")
   )
-```
-
-Data Wrangling
-
-```{r}
-#| label: eda
-
-
 ```
 
 Visualization Parameters
@@ -175,13 +195,54 @@ The static plot
 
 g <- ggplot() +
   
+  # Outline Map of Haryana and districts
   geom_sf(
     data = hy_map,
-    colour = "grey5",
-    fill = "grey97",
-    linewidth = 0.5,
+    colour = "grey15",
+    fill = "grey98",
+    linewidth = 0.4,
     linejoin = "round"
   ) +
+  
+  # Main Roads of Haryana - Motorways, Trunk, Primary & Secondary Roads
+  geom_sf(
+    data = hy_roads1$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = "grey30",
+    alpha = 0.5,
+    linewidth = 0.4,
+    linetype = 1
+  ) +
+  geom_sf(
+    data = hy_roads$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = "grey30",
+    alpha = 0.4,
+    linewidth = 0.2,
+    linetype = 1
+  ) +
+  geom_sf(
+    data = hy_roads2$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = "grey30",
+    alpha = 0.4,
+    linewidth = 0.1,
+    linetype = 1
+  ) +
+   geom_sf(
+    data = hy_roads3$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = "grey30",
+    alpha = 0.3,
+    linewidth = 0.1,
+    linetype = 1
+  ) +
+  
+  # Labels of the districts names
   geom_sf_text(
     data = hy_map,
     colour = text_col,
@@ -273,7 +334,8 @@ g <- ggplot() +
       colour = text_hil,
       hjust = 0.5,
       family = "caption_font",
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,0,0, "mm"),
+      size = bts / 3
     ),
     plot.subtitle = element_textbox(
       colour = text_hil,
@@ -287,7 +349,7 @@ g <- ggplot() +
   )
 
 ggsave(
-  filename = here::here("data_vizs", "health_map_hy.png"),
+  filename = here::here("data_vizs", "poster_health_map_hy.png"),
   plot = g,
   width = 210 * 2,    # Best Twitter Aspect Ratio = 5:4
   height = 297 * 2,   
@@ -304,7 +366,7 @@ Savings the graphics
 
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "health_map_hy.png")) |> 
+image_read(here::here("data_vizs", "poster_health_map_hy.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(here::here("data_vizs", 
                          "thumbnails", 
