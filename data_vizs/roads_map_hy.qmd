@@ -1,0 +1,342 @@
+---
+title: "A Roads and Highways Map of Haryana"
+author: "Aditya Dahiya"
+date: "2024-09-07"
+subtitle: "Using Open Street Maps database to map out the roads, highways, priamry and secondary streets in Haryana State"
+categories:
+  - "Maps"
+  - "India"
+  - "Haryana"
+image: "thumbnails/roads_map_hy.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+![Map of Haryana showing highways, roads, streets and connectivity.](roads_map_hy.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(here)                 # File locations and paths
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Mapping tools
+library(sf)                   # All spatial objects in R
+library(osmdata)              # Getting Open Street Maps data
+
+hy_bbox <- osmdata::getbb("Haryana")
+
+# hy_health_docs <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("clinic", "dentist", "doctors")
+#   ) |> 
+#   osmdata_sf()
+# 
+# hy_health_hospitals <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("hospital", "nursing_home")
+#   ) |> 
+#   osmdata_sf()
+# 
+# hy_health_pharmacy <- opq(bbox = hy_bbox) |> 
+#   add_osm_feature(
+#     key = "amenity",
+#     value = c("pharmacy")
+#   ) |> 
+#   osmdata_sf()
+# Getting Haryana Roads and streets data
+hy_roads <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("trunk")
+  ) |> 
+  osmdata_sf()
+
+hy_roads1 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("motorway")
+  ) |> 
+  osmdata_sf()
+
+hy_roads2 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("primary")
+  ) |> 
+  osmdata_sf()
+
+hy_roads3 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("secondary")
+  ) |> 
+  osmdata_sf()
+
+hy_roads4 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("tertiary")
+  ) |> 
+  osmdata_sf()
+
+hy_roads5 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("unclassified")
+  ) |> 
+  osmdata_sf()
+
+hy_map <- read_sf(here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")) |> 
+  st_transform(crs = 4326) |> 
+  # as_tibble() |> 
+  janitor::clean_names() |> 
+  mutate(
+    district = str_to_sentence(district),
+    district = str_replace_all(district, ">", "a"),
+    district = str_replace_all(district, "\\|", "i")
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Tangerine",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- paletteer::paletteer_d("futurevisions::cancri")
+seecolor::print_color(mypal)
+
+bg_col <- mypal[6]
+
+text_col <- mypal[1]
+text_hil <- mypal[1]
+
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color:{text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color:{text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Haryana: Roads and Highways"
+
+plot_subtitle <- plot_subtitle <- glue::glue("Displaying <b style='color:{mypal[2]}'>Highways</b>, <b style='color:{mypal[3]}'>Primary</b>, <b style='color:{mypal[3]}'>Secondary</b> and <b style='color:{mypal[4]}'>Tertiary</b> Roads.")
+
+plot_caption <- paste0(
+  "**Data:** Open Street Maps", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- ggplot() +
+  
+  # Outline Map of Haryana and districts
+  geom_sf(
+    data = hy_map,
+    colour = mypal[1],
+    fill = bg_col,
+    linewidth = 0.2,
+    linejoin = "round",
+    alpha = 0.8
+  ) +
+  
+  # Plotting Roads of Haryana 
+  
+  # Motorways
+  geom_sf(
+    data = hy_roads1$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = mypal[2],
+    alpha = 0.9,
+    linewidth = 0.5,
+    linetype = 1
+  ) +
+  
+  # Trunk Roads
+  geom_sf(
+    data = hy_roads$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = mypal[2],
+    alpha = 0.9,
+    linewidth = 0.4,
+    linetype = 1
+  ) +
+  
+  # Primary Roads
+  geom_sf(
+    data = hy_roads2$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = mypal[3],
+    alpha = 0.7,
+    linewidth = 0.3,
+    linetype = 1
+  ) +
+  
+  # Secondary Roads
+  geom_sf(
+    data = hy_roads3$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = mypal[3],
+    alpha = 0.6,
+    linewidth = 0.2,
+    linetype = 1
+  ) +
+  
+  # Tertiary Roads
+  geom_sf(
+    data = hy_roads4$osm_lines |> 
+            st_transform(crs = 4326) |> 
+            st_intersection(hy_map),
+    colour = mypal[4],
+    alpha = 0.5,
+    linewidth = 0.1,
+    linetype = 1
+  ) +
+  
+  # Labels of the districts names
+  geom_sf_text(
+    data = hy_map,
+    colour = text_col,
+    mapping = aes(
+      label = district
+    ),
+    size = bts/3,
+    family = "body_font",
+    alpha = 0.4
+  ) +
+  
+  # Themes and Labels
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) + 
+  theme(
+    text = element_text(
+      colour = text_hil
+    ),
+    plot.title = element_text(
+      size = bts * 4.5,
+      hjust = 0.5,
+      face = "bold",
+      margin = margin(5,0,5,0, "mm"),
+      colour = text_hil,
+      family = "title_font"
+    ),
+    plot.caption = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      family = "body_font",
+      margin = margin(0,0,0,0, "mm"),
+      size = bts / 1.5
+    ),
+    plot.subtitle = element_textbox(
+      colour = text_hil,
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      size = 1.2 * bts
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(10, -20, 10, -20, "mm")
+  )
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "roads_map_hy.png"),
+  plot = g,
+  width = 24, 
+  height = 36,   
+  units = "in",
+  bg = "white"
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "roads_map_hy.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails", 
+                         "roads_map_hy.png"))
+```
