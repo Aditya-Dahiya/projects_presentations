@@ -605,86 +605,79 @@ selected_countries <- c(
   "THA", "USA", "GBR"
   )
 
-library(gganimate)
+misdf <- rawdf1  |> 
+  summarise(across(everything(), ~ mean(!is.na(.)))) |> 
+  pivot_longer(
+    everything(), 
+    names_to = "column", 
+    values_to = "percentage_non_missing"
+  ) |> 
+  arrange(desc(percentage_non_missing)) |> 
+  filter(percentage_non_missing > 0.5) |> 
+  left_join(
+    codes_df |> select(`variable code`, `variable name`),
+    by = join_by(column == `variable code`)
+  )
+
+dflabels <- misdf |> 
+  filter(column %in% c("hf1_che", "hf3_che")) |> 
+  janitor::clean_names()
+
 g <- rawdf1 |> 
   # filter(code %in% selected_countries) |> 
-  select(country, year, income, gghed_gge, oops_che) |> 
-  # filter(year == 2020) |> 
+  select(
+    country, year, income, 
+    hf1_che, hf3_che
+  ) |> 
+  # filter(year == 2000) |> 
   ggplot(
     mapping = aes(
-      x = gghed_gge,
-      y = oops_che,
-      colour = country,
-      group = year
-    )
-  ) +
-  geom_point() +
-  geom_smooth(
-    se = FALSE,
-    method = "lm"
-  ) +
-  scale_y_continuous(
-    limits = c(0, 80)
-  ) +
-  scale_x_continuous(
-    limits = c(0, 30)
-  ) +
-  labs(
-    title = "Year: {frame_time}"
-  ) +
-  theme(
-    legend.position = "none"
-  ) +
-  transition_time(year)
-
-animate(
-  plot = g,
-  fps = 5,
-  duration = 10,
-  height = 400,
-  width = 400,
-  end_pause = 10
-)
-
-rawdf1 |> 
-  filter(code %in% selected_countries) |> 
-  select(country, year, income, gghed_gge, oops_che) |> 
-  # filter(year == 2020) |> 
-  ggplot(
-    mapping = aes(
-      x = gghed_gge,
-      y = oops_che,
-      colour = country
+      x = hf1_che,
+      y = hf3_che,
+      colour = income
     )
   ) +
   geom_point(
-    size = 3,
-    alpha = 0.3
+    size = 1.2,
+    alpha = 0.9
   ) +
-  geom_path() +
-  # geom_smooth(
-  #   se = FALSE,
-  #   method = "lm"
-  # ) +
-  geom_text(
-    mapping = aes(
-      label = year
-    ),
-    colour = "black",
-    size = 2,
-    alpha = 0.6
+  annotate(
+    geom = "text",
+    label = "Year: {frame_time}",
+    x = 80,
+    y = 100,
+    hjust = 1, 
+    vjut = 1
   ) +
-  
   scale_y_continuous(
-    limits = c(0, 80)
+    limits = c(0, 100)
   ) +
   scale_x_continuous(
-    limits = c(0, 25)
+    limits = c(0, 100)
   ) +
   labs(
-    title = "Year: {frame_time}"
+    x = dflabels$variable_name[1],
+    y = dflabels$variable_name[2],
+    colour = "Income Levels"
   ) +
+  coord_fixed(
+    clip = "off"
+  ) +
+  theme_minimal() +
   theme(
-    legend.position = "none"
+    legend.position = c(1, 0.7),
+    legend.justification = c(1,1)
   )
+
+library(gganimate)
+
+g_anim <- g +
+  transition_time(year) +
+  ease_aes("linear")
+
+animate(
+  plot = g_anim, 
+  fps = 5,
+  duration = 10
+)
 ```
