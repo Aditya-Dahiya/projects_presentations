@@ -5,6 +5,7 @@ date: "2024-09-10"
 subtitle: "US Data exploring economic diversity and student outcomes."
 categories:
   - "#TidyTuesday"
+  - "{waffle}"
 image: "thumbnails/tidy_ed_diversity.png"
 format:
   html:
@@ -27,7 +28,7 @@ share:
 bibliography: references.bib
 ---
 
-![.........................](tidy_ed_diversity.png){#fig-1}
+![A waffle chart on what percentage of students by each income group (by parents' income) get selected in different Colleges of U.S.A., for otherwise similar scores and profiles.](tidy_ed_diversity.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -57,21 +58,21 @@ Data Wrangling and EDA
 ```{r}
 #| label: eda-data
 
-college_admissions |> 
-  summarytools::dfSummary() |> 
-  summarytools::view()
-
-college_admissions |> 
-  group_by(tier) |> 
-  distinct(name) |> 
-  arrange(tier) |> 
-  View()
-
-college_admissions |> 
-  select(tier, name, par_income_lab, attend_unwgt) |> 
-  group_by(par_income_lab) |> 
-  summarise(total = sum(attend_unwgt, na.rm = T)) |> 
-  mutate(total2 = cumsum(total))
+# college_admissions |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+# 
+# college_admissions |> 
+#   group_by(tier) |> 
+#   distinct(name) |> 
+#   arrange(tier) |> 
+#   View()
+# 
+# college_admissions |> 
+#   select(tier, name, par_income_lab, attend_unwgt) |> 
+#   group_by(par_income_lab) |> 
+#   summarise(total = sum(attend_unwgt, na.rm = T)) |> 
+#   mutate(total2 = cumsum(total))
 
 levels_tier <- c("Ivy Plus",                      
   "Other elite schools (public and private)",
@@ -193,7 +194,7 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Grenze Gotisch",
+font_add_google("Sofia",
   family = "title_font"
 ) 
 
@@ -203,19 +204,20 @@ font_add_google("Barlow Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Bellefair",
+font_add_google("Iceberg",
   family = "body_font"
 ) 
 
 showtext_auto()
 
-bg_col <- "grey95"
-mypal <- c("grey40", "#D94801FF")
+bg_col <- "white"
+mypal <- paletteer::paletteer_d("beyonce::X39")
+mypal1 <- paletteer::paletteer_d("LaCroixColoR::Lemon")
 
-text_col <- "grey20"
-text_hil <- text_col
+text_col <- "grey15"
+text_hil <- "grey15"
 
-bts <- 90
+bts <- 80
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -229,9 +231,11 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "................."
+plot_title <- "Parents' Incomes & College Admissions"
 
-plot_subtitle <- glue::glue("................")
+plot_subtitle <- str_wrap("For similar test scores and profile, kids of richer parents are more likely to end up in the prestigious Ivy Leagues and elite schools in the USA. The data collected from NY Times, shows a sample of 100 kids from each income slab, and where they end up.", 110)
+
+# plot_subtitle <- glue::glue("................")
 
 plot_subtitle |> str_view()
 
@@ -268,13 +272,71 @@ g <- df3 |>
     ~par_income_lab2,
     ncol = 1
   ) +
-  paletteer::scale_fill_paletteer_d("beyonce::X6") +
-  theme_void() +
+  scale_fill_manual( 
+    values = paletteer::paletteer_d("LaCroixColoR::Berry")
+  ) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_continuous(expand = expansion(0)) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    fill = NULL
+  ) +
+  theme_void(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
   theme(
-    legend.position = "bottom"
+    legend.position = "bottom",
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.margin = margin(5,30,5,30, "mm"),
+    plot.title = element_text(
+      size = 2.5 * bts,
+      hjust = 0.5,
+      margin = margin(10,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      lineheight = 0.3,
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5,
+      size = 0.9 * bts
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(5,0,0,0, "mm")
+    ),
+    strip.text = element_text(
+      margin = margin(0,0,1,0, "mm"),
+      size = 1.2 * bts,
+      hjust = 0
+    ),
+    panel.spacing.y = unit(5, "mm"),
+    # Legend
+    legend.text = element_text(
+      margin = margin(0,0,0,3, "mm"),
+      size = bts
+    ),
+    legend.spacing.y = unit(2, "mm"),
+    legend.spacing.x = unit(1, "mm"),
+    legend.key.spacing = unit(5, "mm"),
+    legend.margin = margin(5,15,5,15, "mm"),
+    legend.key.width = unit(5, "mm"),
+    legend.key.height = unit(5, "mm")
   )
 
-g
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
 
 ggsave(
   filename = here::here("data_vizs", "tidy_ed_diversity.png"),
@@ -285,12 +347,6 @@ ggsave(
   bg = "white"
 )
 
-```
-
-Savings the graphics
-
-```{r}
-#| label: save-image
 
 library(magick)
 # Saving a thumbnail for the webpage
