@@ -1,0 +1,306 @@
+---
+title: "Economic Diversity and Student Outcomes"
+author: "Aditya Dahiya"
+date: "2024-09-10"
+subtitle: "US Data exploring economic diversity and student outcomes."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_ed_diversity.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+![.........................](tidy_ed_diversity.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+library(waffle)               # Waffle Charts in R
+
+college_admissions <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-10/college_admissions.csv')
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+college_admissions |> 
+  summarytools::dfSummary() |> 
+  summarytools::view()
+
+college_admissions |> 
+  group_by(tier) |> 
+  distinct(name) |> 
+  arrange(tier) |> 
+  View()
+
+college_admissions |> 
+  select(tier, name, par_income_lab, attend_unwgt) |> 
+  group_by(par_income_lab) |> 
+  summarise(total = sum(attend_unwgt, na.rm = T)) |> 
+  mutate(total2 = cumsum(total))
+
+levels_tier <- c("Ivy Plus",                      
+  "Other elite schools (public and private)",
+  "Highly selective private", 
+  "Highly selective public", 
+  "Selective private",                        
+  "Selective public",        
+  "Out of College"
+)
+
+# Attempt: College Tier vs. par_income_bin numbers
+df <- college_admissions |> 
+  select(tier, name, par_income_bin, attend) |> 
+  group_by(par_income_bin, tier) |> 
+  summarise(
+    attend = sum(attend, na.rm = T)
+  ) |> 
+  # pivot_wider(
+  #   id_cols = par_income_bin,
+  #   names_from = tier,
+  #   values_from = attend
+  # ) |> 
+  # mutate(
+  #   `Out of College` = 1 - (
+  #     `Highly selective private` +
+  #     `Highly selective public` +
+  #     `Ivy Plus` +
+  #     `Other elite schools (public and private)` +
+  #     `Selective private` +
+  #     `Selective public`),
+  #   `Out of College` = if_else(
+  #     `Out of College` < 0,
+  #     0,
+  #     `Out of College`
+  #   )
+  # ) |> 
+  # pivot_longer(
+  #   cols = -c(par_income_bin),
+  #   names_to = "tier",
+  #   values_to = "attend"
+  # ) |> 
+  ungroup() |> 
+  mutate(
+    tier = fct(tier, levels = levels_tier)
+  ) |> 
+  arrange(par_income_bin, tier)
+
+levels_income_lab2 <- c(
+  "Bottom 20% income",
+  "2nd Quintile",
+  "3rd Quintile",
+  "4th Quintile",
+  "Top 20% income",
+  "Top 1% income",
+  "Top 0.1% income")
+
+
+df2 <- college_admissions |> 
+  select(tier, name, par_income_lab, attend) |> 
+  group_by(par_income_lab, tier) |> 
+  summarise(
+    attend = sum(attend, na.rm = T)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    tier = fct(tier, levels = levels_tier)
+  ) |> 
+  arrange(par_income_lab, tier) |> 
+  mutate(
+    par_income_lab2 = case_when(
+      par_income_lab %in% c("0-20") ~ "Bottom 20% income",
+      par_income_lab %in% c("20-40") ~ "2nd Quintile",
+      par_income_lab %in% c("40-60") ~ "3rd Quintile",
+      par_income_lab %in% c("60-70", "70-80") ~ "4th Quintile",
+      par_income_lab %in% c("80-90",
+                            "90-95",
+                            "95-96",
+                            "96-97",
+                            "97-98",
+                            "98-99") ~ "Top 20% income",
+      par_income_lab %in% c("99-99.9", "Top 1") ~ "Top 1% income",
+      par_income_lab %in% c("Top 0.1") ~ "Top 0.1% income",
+      .default = NA
+    )
+  ) |> 
+  group_by(par_income_lab2, tier) |> 
+  summarise(
+    attend = sum(attend)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    par_income_lab2 = fct(par_income_lab2, levels = levels_income_lab2)
+  ) |> 
+  group_by(par_income_lab2) |> 
+  mutate(attend = round(100 * attend / sum(attend), 0))
+
+# Minor manual rounding-off correction
+df3 <- df2 |> 
+  mutate(
+    attend = case_when(
+      (par_income_lab2 == "2nd Quintile" & 
+         tier == "Selective private")       ~ 2,
+      (par_income_lab2 == "3rd Quintile" & 
+         tier == "Ivy Plus")                ~ 26,
+      (par_income_lab2 == "Top 1% income" & 
+         tier == "Ivy Plus")                ~ 26,
+      (par_income_lab2 == "Top 20% income" & 
+         tier == "Ivy Plus")                ~ 23,
+      .default = attend
+    )
+  )
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Grenze Gotisch",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Bellefair",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "grey95"
+mypal <- c("grey40", "#D94801FF")
+
+text_col <- "grey20"
+text_hil <- text_col
+
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "................."
+
+plot_subtitle <- glue::glue("................")
+
+plot_subtitle |> str_view()
+
+plot_caption <- paste0(
+  "**Data:** New York Times (The Upshot) & Havisha Khurana", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- df3 |> 
+  ggplot() +
+  geom_waffle(
+    mapping = aes(
+      fill = tier,
+      values = attend
+    ),
+    colour = "white",
+    size = 1.125,
+    n_rows = 4
+  ) +
+  facet_wrap(
+    ~par_income_lab2,
+    ncol = 1
+  ) +
+  paletteer::scale_fill_paletteer_d("beyonce::X6") +
+  theme_void() +
+  theme(
+    legend.position = "bottom"
+  )
+
+g
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_ed_diversity.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_ed_diversity.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_ed_diversity.png"
+    )
+  )
+```
