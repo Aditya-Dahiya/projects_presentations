@@ -1,5 +1,5 @@
 ---
-title: "Exploring Chess Game Dataset on Lichess.org"
+title: "Games of high-rated chess players last longer!"
 author: "Aditya Dahiya"
 date: "2024-09-17"
 subtitle: "Exploring Chess Game Dataset on Lichess.org"
@@ -27,7 +27,7 @@ share:
 bibliography: references.bib
 ---
 
-![tidy_li_chess](tidy_li_chess.png){#fig-1}
+![A scatter plot on player-ratings shows that the average number of moves per game are higher (red colour) for high-rated players, and lower (green-colour) for low-rated players.](tidy_li_chess.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -53,7 +53,7 @@ library(waffle)               # Waffle Charts in R
 chess <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-01/chess.csv')
 ```
 
-Data Wrangling and EDAgeom_abline( slope = 1, intercept = 0, linetype = 3 ) +
+Data Wrangling and EDA
 
 ```{r}
 #| label: eda-data
@@ -176,7 +176,7 @@ df2 <- df1 |>
     percentage_games = round(100 * total_games / sum(total_games), 
                              2),
     x_var = c(1450, 1550, 1550, 1450),
-    y_var = c(2520, 2520, 750, 750),
+    y_var = c(2520, 2520, 770, 770),
     hjust_var = c(1, 0, 0, 1)
   )
 ```
@@ -187,7 +187,7 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Sofia",
+font_add_google("Nova Cut",
   family = "title_font"
 ) 
 
@@ -197,20 +197,18 @@ font_add_google("Barlow Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Iceberg",
+font_add_google("Headland One",
   family = "body_font"
 ) 
 
 showtext_auto()
 
 bg_col <- "white"
-mypal <- paletteer::paletteer_d("beyonce::X39")
-mypal1 <- paletteer::paletteer_d("LaCroixColoR::Lemon")
 
-text_col <- "grey15"
-text_hil <- "grey15"
+text_col <- "grey25"
+text_hil <- "grey25"
 
-bts <- 80
+bts <- 90
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -224,16 +222,12 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Parents' Incomes & College Admissions"
+plot_title <- "Chess Games' moves !" 
 
-plot_subtitle <- str_wrap("For similar test scores and profile, kids of richer parents are more likely to end up in the prestigious Ivy Leagues and elite schools in the USA. The data collected from NY Times, shows a sample of 100 kids from each income slab, and where they end up.", 110)
-
-# plot_subtitle <- glue::glue("................")
-
-plot_subtitle |> str_view()
+plot_subtitle <- "Games of High-Rated players last longer,\non average, by atleast 10 moves."
 
 plot_caption <- paste0(
-  "**Data:** New York Times (The Upshot) & Havisha Khurana", 
+  "**Data:** Kaggle, lichess.org & Mitchell J.", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -250,7 +244,7 @@ The static plot
 ```{r}
 #| label: static-plot
 
-df1 |> 
+g <- df1 |> 
   ggplot(
     mapping = aes(
       x = loser_rating, 
@@ -260,11 +254,13 @@ df1 |>
   ) + 
   geom_hline(
     yintercept = 1500,
-    linetype = "longdash"
+    linetype = "longdash",
+    linewidth = 1
   ) +
   geom_vline(
     xintercept = 1500,
-    linetype = "longdash"
+    linetype = "longdash",
+    linewidth = 1
   ) +
   # geom_abline(
   #   slope = 1,
@@ -273,7 +269,7 @@ df1 |>
   # ) +
   geom_jitter(
     alpha = 0.4,
-    size = 1.2
+    size = 3
   ) +
   geom_text(
     data = df2,
@@ -290,7 +286,10 @@ df1 |>
     ),
     lineheight = 0.3,
     vjust = 0,
-    colour = "black"
+    colour = text_col,
+    family = "title_font",
+    size = bts / 3,
+    fontface = "bold"
   ) +
   # Scales and Coordinates
   scale_x_continuous(
@@ -307,18 +306,73 @@ df1 |>
     oob = squish,
     breaks = seq(40, 70, 10)
   ) +
-  coord_fixed(ratio = 1) +
+  coord_fixed(ratio = 1, clip = "off") +
   
   # Themes and Labels
   labs(
     x = "Loser's Rating",
     y = "Winner's Rating",
-    colour = "Number of turns in the Chess Game"
+    colour = "Number of turns in the Chess Game",
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
-  theme_minimal() +
+  theme_minimal(
+    base_family = "title_font",
+    base_size = bts
+  ) +
   theme(
     legend.position = "bottom",
-    legend.title.position = "top"
+    legend.title.position = "top",
+    legend.key.height = unit(10, "mm"),
+    legend.key.width = unit(50, "mm"),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.title = element_text(
+      margin = margin(-2,0,-2,0, "mm")
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    legend.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,10,0, "mm")
+    ),
+    legend.margin = margin(-20,0,0,0, "mm"),
+    legend.justification = c(0,0),
+    
+    plot.margin = margin(10,-25,10,-35, "mm"),
+    plot.title.position = "plot",
+    
+    panel.grid = element_line(
+      colour = "grey80",
+      linewidth = 0.5
+    ),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.35
+    ),
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0,
+      size = 3 * bts,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0,
+      margin = margin(0,0,20,0, "mm"),
+      size = 1.2 * bts
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0
+    )
   )
 ```
 
@@ -335,7 +389,6 @@ ggsave(
   units = "mm",
   bg = "white"
 )
-
 
 library(magick)
 # Saving a thumbnail for the webpage
