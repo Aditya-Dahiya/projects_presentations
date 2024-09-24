@@ -1,10 +1,12 @@
 ---
-title: "Mathematics Olympiad Data Insights"
+title: "India at Mathematics Olympiad over the years"
 author: "Aditya Dahiya"
 date: "2024-09-24"
-subtitle: "Exploring dataset from the International Mathematical Olympiad (IMO)"
+subtitle: "Exploring dataset from the International Mathematical Olympiad (IMO), to see the rankings of countries (particularly India) on the medal tally."
 categories:
   - "#TidyTuesday"
+  - "{ggflags}"
+  - "{ggbump}"
 image: "thumbnails/tidy_math_olymp.png"
 format:
   html:
@@ -27,7 +29,7 @@ share:
 bibliography: references.bib
 ---
 
-![...................................](tidy_math_olymp.png){#fig-1}
+![A bump Chart on Ranking of India at the International Mathematics Olympiad (by number of medals won) in last 3 decades. India's ranking is improving, while China and USA continue to dominate the olympiad.](tidy_math_olymp.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -50,9 +52,9 @@ library(patchwork)            # Combining plots
 # Getting the data
 country_results_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-24/country_results_df.csv')
 
-individual_results_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-24/individual_results_df.csv')
-
-timeline_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-24/timeline_df.csv')
+# individual_results_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-24/individual_results_df.csv')
+# 
+# timeline_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-09-24/timeline_df.csv')
 
 # Using ChatGPT, a tibble for ISO 2 Codes for the countries
 # needed for the flags
@@ -171,7 +173,7 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 plot_title <- "India at International Mathematics Olympiad" 
 
-plot_subtitle <- "China and USA have dominated the rankings in last three decades,\nbut India seems to be catching up, and reached 3rs position in 2024."
+plot_subtitle <- "China and USA have dominated the rankings in last three decades,\nbut India seems to be catching up, and reached 3rd rank in 2024."
 
 plot_caption <- paste0(
   "**Data:** International Mathematical Olympiad", 
@@ -198,12 +200,18 @@ g <- plotdf |>
       y = rank
     )
   ) +
+  geom_point(
+    data = plotdf |> filter(country %in% sel_cons),
+    alpha = 0.9,
+    size = 14,
+    colour = text_col
+  ) +
   ggbump::geom_bump(
     data = plotdf |> filter(country %in% sel_cons),
     mapping = aes(group = country),
-    alpha = 1,
-    linewidth = 2.5,
-    colour = "orange"
+    alpha = 0.9,
+    linewidth = 3,
+    colour = text_col
   ) +
   ggflags::geom_flag(
     mapping = aes(country = iso_a2),
@@ -225,7 +233,7 @@ g <- plotdf |>
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
-    x = "Year", y = "Rank"
+    x = "Year", y = "Rank of Country in the Olympiad (by medals)"
   ) +
   theme_minimal(
     base_family = "title_font",
