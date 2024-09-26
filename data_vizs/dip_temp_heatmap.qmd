@@ -1,0 +1,329 @@
+---
+title: "Hourly Temperature Heat-Map: New Delhi"
+author: "Aditya Dahiya"
+date: "2024-09-27"
+subtitle: "Comparing temperature data from Historical Weather API of Open-Meteo.com to generate  hourly temperature heat map of New Delhi for last 32 years"
+categories:
+  - "Heat Map"
+  - "Data is Plural"
+image: "thumbnails/dip_temp_heatmap.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+Inspiration from [R-Graph-Gallery](https://r-graph-gallery.com/283-the-hourly-heatmap.html). Data from <https://open-meteo.com/> historical weather [API](https://open-meteo.com/en/docs/historical-weather-api) shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-09-25-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+
+![An hourly temperature heat map of the city of New Delhi from 1991-2023. X-axis denotes months and days, Y-axis denotes hours. Horizontal facets are the Months, and Vertical facets are the Years. Temperatures are coded in colour from green (cold) to yellow (medium) to red (hot).](dip_temp_heatmap.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+library(waffle)               # Waffle Charts in R
+
+# Get data in .csv from https://open-meteo.com
+
+# URL for this data:
+# https://open-meteo.com/en/docs/historical-weather-api#start_date=1990-01-01&end_date=2024-09-01&location_mode=csv_coordinates&csv_coordinates=28.7041,+77.1025
+
+rawdf <- read_csv(
+  here::here("data/open-meteo-new-delhi.csv"),
+  skip = 2
+)
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+df <- rawdf |> 
+  janitor::clean_names() |> 
+  mutate(
+    time_local = with_tz(time, "Asia/Kolkata"),
+    var_year = year(time_local),
+    var_month = month(time_local, label = TRUE),
+    var_hour = hour(time_local),
+    var_day = day(time_local),
+    .keep = "unused"
+  )
+
+# df_names <- rawdf1 |> 
+#   as_tibble() |> 
+#   slice_head(n = 5) |> 
+#   select(1:4) |> 
+#   mutate(
+#     city = c(
+#       "New Delhi",
+#       "Cairo",
+#       "Islamabad",
+#       "Kuwait City",
+#       "Baghdad"
+#     )
+#   )
+# temp1 |> 
+#   mutate(
+#     local_time = case_when(
+#       location_id == 0 ~ with_tz(time, "Asia/Kolkata"),
+#       location_id == 1 ~ with_tz(time, "Africa/Cairo"),
+#       location_id == 2 ~ with_tz(time, "Asia/Karachi"),
+#       location_id == 3 ~ with_tz(time, "Asia/Kuwait"),
+#       location_id == 4 ~ with_tz(time, "Asia/Baghdad"),
+#       .default = NA
+#     )
+#   )
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Oswald",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Kanit",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+
+text_col <- "grey15"
+text_hil <- "grey15"
+
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "New Delhi: Hourly Temperature Heat-Map (1991-2023)" 
+
+plot_subtitle <- "The hourly temperature in India's Capital ........."
+
+plot_caption <- paste0(
+  "**Data:** open-meteo.com", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- df |> 
+  filter(var_year > 1990 & var_year < 2024) |> 
+  ggplot(
+    mapping = aes(
+      x = var_day,
+      y = var_hour,
+      fill = temperature_2m_c
+    )
+  ) +
+  geom_tile(
+    linewidth = 0.01,
+    colour = bg_col
+  ) +
+  
+  # Scales and Coordinates
+  scale_x_continuous(
+    breaks = c(0, 10, 20, 30),
+    expand = expansion(0)
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    breaks = seq(0, 24, 6)
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Temps",
+    # "ggthemes::Red-Green-Gold Diverging",
+    direction = 1,
+    breaks = seq(0, 50, 10)
+  ) +
+  facet_grid(
+    var_year ~ var_month,
+    scales = "free_x"
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  labs(
+    x = "Day of the month (1 - 31)",
+    y = "Hour of the day (24 hrs)",
+    fill = "Temperature (in degrees Celsius)",
+    title = plot_title,
+    subtitle = NULL,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "title_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    panel.grid = element_blank(),
+    legend.position = "bottom",
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(5,10,5,5, "mm"),
+    
+    # Strips and Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.x = element_text(
+      margin = margin(1,0,0,0, "mm"),
+      size = 0.3 * bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,1,0,0, "mm"),
+      size = 0.2 * bts
+    ),
+    axis.title = element_text(
+      margin = margin(-2,0,0,0, "mm")
+    ),
+    panel.spacing = unit(0.9, "mm"),
+    strip.text.x = element_text(
+      margin = margin(0,0,3,0, "mm"),
+      size = 1.2 * bts
+    ),
+    strip.text.y = element_text(
+      margin = margin(0,0,0,3, "mm"),
+      angle = 0,
+      size = 0.8 * bts
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(10,0,5,0, "mm"),
+      size = 1.75 * bts,
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(-10,0,0,0, "mm"),
+      size = 0.6 * bts
+    ),
+    
+    # Legend
+    legend.title.position = "top",
+    legend.key.height = unit(5, "mm"),
+    legend.key.width = unit(70, "mm"),
+    legend.title = element_text(
+      margin = margin(-30,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm")
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "dip_temp_heatmap.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+
+
+ggsave(
+  filename = here::here("data_vizs", "a4_dip_temp_heatmap.png"),
+  plot = g,
+  width = 210 * 2,    # Best Twitter Aspect Ratio = 5:4
+  height = 297 * 2,   
+  units = "mm",
+  bg = "white"
+)
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "dip_temp_heatmap.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "dip_temp_heatmap.png"
+    )
+  )
+```
