@@ -1,11 +1,13 @@
 ---
-title: "GDP per capita in Western Europe"
+title: "GDP per capita in Europe"
 author: "Aditya Dahiya"
 date: "2024-09-28"
-subtitle: "................................."
+subtitle: "An animated chloropleth shows the transition of GDP per Capita in Europe from 1980 to 2022, with country-wise data"
 categories:
   - "Maps"
   - "Data is Plural"
+  - "Animation"
+  - "Governance"
 image: "thumbnails/dip_eu_gdppc.png"
 format:
   html:
@@ -28,9 +30,7 @@ share:
 bibliography: references.bib
 ---
 
-Inspiration from [R-Graph-Gallery](https://r-graph-gallery.com/283-the-hourly-heatmap.html). Data from <https://open-meteo.com/> historical weather [API](https://open-meteo.com/en/docs/historical-weather-api) shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-09-25-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
-
-![.....................](dip_eu_gdppc.png){#fig-1}
+![An animated chloropleth map of Europe depicting change in GDP per capita from 1980 to 2022.](dip_eu_gdppc.gif){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -89,13 +89,28 @@ select_countries <- distinct(sf_df, iso_a3) |> pull()
 df <- rawdf |> 
   as_tibble() |> 
   rename(iso_a3 = countrycode) |> 
-  filter(year > 1900) |> 
+  filter(year > 1980 & year <= 2022) |> 
   filter(iso_a3 %in% select_countries) |> 
   filter(!(iso_a3 %in% c("RUS"))) |> 
   # filter(region %in% c("Eastern Europe", "Western Europe")) |> 
-  select(-pop) |> 
+  select(-pop, -country) |> 
   left_join(sf_df) |> 
   st_as_sf()
+
+
+# Get the suitable rangle for fill scale to exagerrate differences
+range_cols <- c(12000, 60000)
+
+df$gdppc |> range(na.rm = TRUE)
+
+df2 <- df |> 
+  mutate(gdppc = log(gdppc))
+
+# range_log_fill <- range(df2$gdppc)
+
+breaks_fill <- c(10000, 20000, 40000, 70000)
+
+breaks_log_fill <- log(breaks_fill)
 ```
 
 Visualization Parameters
@@ -127,13 +142,13 @@ text_hil <- "grey15"
 
 bts <- 20
 
-plot_title <- "GDP per Capita (Europe)" 
+plot_title <- "GDP per Capita" 
 
-plot_subtitle <- "Year: {frame_time}"
+plot_subtitle <- "Year: {closest_state}"
 
 plot_caption <- paste0(
-  "Data: Maddison Project Database 2023, University of Groningen",
-  " |  Code & Graphics: @aditya-dahiya on GitHub"
+  "Data: Maddison Project Database 2023",
+  "  |  Code & Graphics: @aditya-dahiya (GitHub)"
   )
 ```
 
@@ -142,8 +157,7 @@ The static plot
 ```{r}
 #| label: static-plot
 
-g <- df |> 
-  filter(year > 1980 & year < 2022) |> 
+g <- df2 |> 
   ggplot(
     mapping = aes(
       fill = gdppc
@@ -160,12 +174,19 @@ g <- df |>
     ylim = c(33, 70)
   ) +
    paletteer::scale_fill_paletteer_c(
-    "grDevices::RdYlBu",
-    direction = 1,
-    labels = scales::label_dollar(
+    "viridis::turbo",
+    direction = -1,
+    name = NULL,
+    limits = range(breaks_log_fill),
+    breaks = breaks_log_fill,
+    labels = number(
+      breaks_fill,
+      accuracy = 1,
+      prefix = "$",
       scale_cut = cut_short_scale()
     ),
-    name = NULL
+    oob = scales::squish,
+    na.value = "grey80"
   ) +
   
   # Labels and Themes
@@ -191,37 +212,129 @@ g <- df |>
     # Labels
     plot.title = element_text(
       family = "title_font",
-      hjust = 0.5
+      hjust = 0,
+      size = bts * 1.1
     ),
     plot.subtitle = element_text(
-      hjust = 0.1,
-      margin = margin(20,0,-30,0, "mm"),
+      hjust = 0,
+      margin = margin(10,0,-30,0, "mm"),
       face = "bold",
       size = bts * 1.2
     ),
     plot.caption = element_text(
       family = "caption_font",
-      size = 0.3 * bts
+      size = 0.6 * bts,
+      hjust = 0.5, 
+      margin = margin(0,0,4,0, "mm")
     )
   ) +
-  transition_time(~year)
+  transition_states(
+    year,
+    transition_length = 0.1,
+    state_length = 1
+  )
 
 anim_save(
   filename = here::here("data_vizs", "dip_eu_gdppc.gif"),
-  animation = g
+  animation = g,
+  fps = 5,
+  start_pause = 1,
+  end_pause = 1,
+  rewind = FALSE,
+  height = 600,
+  width = 600,
+  units = "px"
 )
 ```
 
-Savings the graphics
+A static plot for thumbnail
 
 ```{r}
 #| label: save-image
 
+bts = 40
+
+g <- df2 |>
+  filter(year == 2022) |> 
+  ggplot(
+    mapping = aes(
+      fill = gdppc
+    )
+  ) +
+  geom_sf(
+    colour = bg_col,
+    linewidth = 0.2
+  ) +
+  
+  # Coordinates and Scales
+  coord_sf(
+    xlim = c(-11, 41),
+    ylim = c(33, 70)
+  ) +
+   paletteer::scale_fill_paletteer_c(
+    "viridis::turbo",
+    direction = -1,
+    name = NULL,
+    limits = range(breaks_log_fill),
+    breaks = breaks_log_fill,
+    labels = number(
+      breaks_fill,
+      accuracy = 1,
+      prefix = "$",
+      scale_cut = cut_short_scale()
+    ),
+    oob = scales::squish,
+    na.value = "grey80"
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = "GDP per Capita\n(2022)",
+    caption = plot_caption,
+    subtitle = "Year: 2022"
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(2,2,2,2, "mm"),
+    legend.position = c(0.5, 0),
+    legend.justification = c(0.5, 0),
+    legend.direction = "horizontal",
+    legend.key.height = unit(2, "mm"),
+    legend.key.width = unit(10, "mm"),
+    text = element_text(
+      colour = text_col
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(1,0,0,0, "mm")
+    ),
+    
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      hjust = 0,
+      size = bts * 1.1,
+      margin = margin(2,0,-10,0, "mm"),
+      lineheight = 0.4
+    ),
+    plot.subtitle = element_blank(),
+    plot.caption = element_text(
+      family = "caption_font",
+      size = 0.6 * bts,
+      hjust = 0.5, 
+      margin = margin(0,0,1,0, "mm")
+    )
+  )
+
 ggsave(
   filename = here::here("data_vizs", "dip_eu_gdppc.png"),
   plot = g,
-  width = 500,    # Best Twitter Aspect Ratio = 5:4
-  height = 400,   
+  width = 100,    # Best Twitter Aspect Ratio = 5:4
+  height = 100,   
   units = "mm",
   bg = "white"
 )
