@@ -1,0 +1,241 @@
+---
+title: "GDP per capita in Western Europe"
+author: "Aditya Dahiya"
+date: "2024-09-28"
+subtitle: "................................."
+categories:
+  - "Maps"
+  - "Data is Plural"
+image: "thumbnails/dip_eu_gdppc.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+Inspiration from [R-Graph-Gallery](https://r-graph-gallery.com/283-the-hourly-heatmap.html). Data from <https://open-meteo.com/> historical weather [API](https://open-meteo.com/en/docs/historical-weather-api) shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-09-25-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+
+![.....................](dip_eu_gdppc.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(sf)                   # Maps
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+library(openxlsx)             # Get Excel File data from Web Sources
+
+library(gganimate)            # Animation
+
+url <- "https://dataverse.nl/api/access/datafile/421302"
+rawdf <- read.xlsx(
+  url,
+  sheet = "Full data",
+  na.strings = ""
+)
+
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+sf_df <- rnaturalearth::ne_countries(
+  scale = "large",
+  returnclass = "sf"
+  ) |> 
+  filter(name == sovereignt) |> 
+  filter(continent == "Europe") |> 
+  select(name, iso_a3, admin, geometry) |> 
+  mutate(
+    iso_a3 = case_when(
+      name == "Norway" ~ "NOR",
+      name == "France" ~ "FRA",
+      .default = iso_a3
+    )
+  )
+
+select_countries <- distinct(sf_df, iso_a3) |> pull()
+
+df <- rawdf |> 
+  as_tibble() |> 
+  rename(iso_a3 = countrycode) |> 
+  filter(year > 1900) |> 
+  filter(iso_a3 %in% select_countries) |> 
+  filter(!(iso_a3 %in% c("RUS"))) |> 
+  # filter(region %in% c("Eastern Europe", "Western Europe")) |> 
+  select(-pop) |> 
+  left_join(sf_df) |> 
+  st_as_sf()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Fira Sans",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Fira Sans",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+
+text_col <- "grey15"
+text_hil <- "grey15"
+
+bts <- 20
+
+plot_title <- "GDP per Capita (Europe)" 
+
+plot_subtitle <- "Year: {frame_time}"
+
+plot_caption <- paste0(
+  "Data: Maddison Project Database 2023, University of Groningen",
+  " |  Code & Graphics: @aditya-dahiya on GitHub"
+  )
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- df |> 
+  filter(year > 1980 & year < 2022) |> 
+  ggplot(
+    mapping = aes(
+      fill = gdppc
+    )
+  ) +
+  geom_sf(
+    colour = bg_col,
+    linewidth = 0.1
+  ) +
+  
+  # Coordinates and Scales
+  coord_sf(
+    xlim = c(-11, 41),
+    ylim = c(33, 70)
+  ) +
+   paletteer::scale_fill_paletteer_c(
+    "grDevices::RdYlBu",
+    direction = 1,
+    labels = scales::label_dollar(
+      scale_cut = cut_short_scale()
+    ),
+    name = NULL
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = c(0.5, 0),
+    legend.justification = c(0.5, 0),
+    legend.direction = "horizontal",
+    legend.key.height = unit(5, "mm"),
+    legend.key.width = unit(30, "mm"),
+    text = element_text(
+      colour = text_col
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.1,
+      margin = margin(20,0,-30,0, "mm"),
+      face = "bold",
+      size = bts * 1.2
+    ),
+    plot.caption = element_text(
+      family = "caption_font",
+      size = 0.3 * bts
+    )
+  ) +
+  transition_time(~year)
+
+anim_save(
+  filename = here::here("data_vizs", "dip_eu_gdppc.gif"),
+  animation = g
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "dip_eu_gdppc.png"),
+  plot = g,
+  width = 500,    # Best Twitter Aspect Ratio = 5:4
+  height = 400,   
+  units = "mm",
+  bg = "white"
+)
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "dip_eu_gdppc.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "dip_eu_gdppc.png"
+    )
+  )
+```
