@@ -57,7 +57,7 @@ library(patchwork)            # Combining plots
 # https://open-meteo.com/en/docs/historical-weather-api#start_date=1990-01-01&end_date=2024-09-01&location_mode=csv_coordinates&csv_coordinates=28.7041,+77.1025
 
 rawdf <- read_csv(
-  here::here("data/open-meteo-new-delhi.csv"),
+  here::here("data/open-meteo-new-delhi-1950.csv"),
   skip = 2
 )
 ```
@@ -168,7 +168,6 @@ The static plot
 
 ```{r}
 #| label: static-plot
-
 g <- df |> 
   filter(var_year > 1990 & var_year < 2024) |> 
   ggplot(
@@ -302,8 +301,6 @@ Savings the graphics
 ```{r}
 #| label: save-image
 
-
-
 ggsave(
   filename = here::here("data_vizs", "a4_dip_temp_heatmap.png"),
   plot = g,
@@ -326,3 +323,243 @@ image_read(here::here("data_vizs", "dip_temp_heatmap.png")) |>
     )
   )
 ```
+
+To bring out a pattern, lets try a line graph or boxplots
+
+```{r}
+
+# https://open-meteo.com/en/docs/historical-weather-api#start_date=1950-01-01&end_date=2023-12-31&timezone=GMT
+
+rawdf <- read_csv(
+  here::here("data/open-meteo-new-delhi-1950.csv"),
+  skip = 2
+)
+
+df <- rawdf |> 
+  janitor::clean_names() |> 
+  mutate(
+    time_local = with_tz(time, "Asia/Kolkata"),
+    var_year = year(time_local),
+    var_month = month(time_local, label = TRUE),
+    var_hour = hour(time_local),
+    var_day = day(time_local),
+    .keep = "unused"
+  ) |> 
+  filter(var_year < 2024)
+
+vline_df <- df |> 
+  group_by(var_month) |> 
+  summarise(
+    med_temp = median(temperature_2m_c, na.rm = TRUE)
+  )
+
+g <- df |> 
+  ggplot(
+    mapping = aes(
+      x = temperature_2m_c
+    )
+  ) +
+  geom_boxplot(
+    outliers = F,
+    staplewidth = 0.25,
+    colour = "grey10",
+    linewidth = 0.25
+  ) +
+  geom_vline(
+    data = vline_df,
+    mapping = aes(
+      xintercept = med_temp
+    ),
+    colour = "purple",
+    linetype = 1,
+    linewidth = 1.5,
+    alpha = 0.3
+  ) +
+  facet_grid(
+    var_year~var_month,
+    scales = "free_x"
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  
+  labs(
+    x = "Temperature (in degrees Celsius)",
+    y = NULL,
+    title = "New Delhi: Daily Temperatures (1950 - 2023)",
+    subtitle = NULL,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "title_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    panel.grid = element_blank(),
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(5,10,5,5, "mm"),
+    
+    # Strips and Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.x = element_text(
+      margin = margin(1,0,0,0, "mm"),
+      size = 0.3 * bts
+    ),
+    axis.text.y = element_blank(),
+    axis.title = element_text(
+      margin = margin(-2,0,0,0, "mm")
+    ),
+    panel.spacing = unit(0.2, "mm"),
+    strip.text.x = element_text(
+      margin = margin(0,0,3,0, "mm"),
+      size = 1.2 * bts
+    ),
+    strip.text.y = element_text(
+      margin = margin(0,0,0,3, "mm"),
+      angle = 0,
+      size = 0.4 * bts
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(10,0,5,0, "mm"),
+      size = 1.75 * bts,
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      size = 0.6 * bts
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "dip_temp_heatmap_boxplot.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+```
+
+![The same data with a boxplot. So indeed, we dont see any noticeable increase in temperatures - no discernable movement of boxplots to the right.](dip_temp_heatmap_boxplot.png)
+
+Another attempt with a boxplot overlaid with a smoother curve to see pattern
+
+```{r}
+
+g <- df |> 
+  ggplot(
+    mapping = aes(
+      x = var_year,
+      y = temperature_2m_c
+    )
+  ) +
+  geom_boxplot(
+    mapping = aes(
+      group = var_year
+    ),
+    outliers = FALSE,
+    linewidth = 0.2,
+    colour = "grey20"
+  ) +
+  geom_smooth(
+    colour = "red",
+    se = TRUE,
+    span = 0.9
+  ) +
+  facet_wrap(
+    ~var_month,
+    scales = "free_y",
+    ncol = 2
+  ) +
+  
+  labs(
+    y = "Temperature (in degrees Celsius)",
+    x = "Year",
+    title = "New Delhi: Monthly Temperatures (1950 - 2023)",
+    subtitle = NULL,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "title_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      colour = "grey40",
+      linetype = "longdash",
+      linewidth = 0.25
+    ),
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(5,10,5,5, "mm"),
+    
+    # Strips and Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      margin = margin(1,0,0,0, "mm"),
+      size = 0.5 * bts
+    ),
+    axis.title = element_text(
+      margin = margin(-2,0,0,0, "mm")
+    ),
+    panel.spacing = unit(0.2, "mm"),
+    strip.text = element_text(
+      margin = margin(3,0,-1,0, "mm"),
+      size = 1.2 * bts
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(10,0,5,0, "mm"),
+      size = 1.75 * bts,
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      size = 0.6 * bts
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", "dip_temp_heatmap_boxplot2.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+```
+
+![Boxplot of monthly temperature ranges, with a overlaid smoother line, from 1950 to 2023.](dip_temp_heatmap_boxplot2.png)
