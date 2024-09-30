@@ -1,0 +1,180 @@
+---
+title: "H1B Visas data"
+author: "Aditya Dahiya"
+date: "2024-09-30"
+subtitle: "...................."
+categories:
+  - "Data is Plural"
+image: "thumbnails/dip_h1b_visas.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+A recent [Bloomberg News investigation](https://www.bloomberg.com/graphics/2024-staffing-firms-game-h1b-visa-lottery-system/) into the U.S. government's annual [H-1B lottery](https://www.uscis.gov/working-in-the-united-states/temporary-workers/h-1b-specialty-occupations-and-fashion-models) revealed that "thousands of companies gained an unfair advantage by securing extra lottery tickets." To support these findings, Bloomberg obtained data on all H-1B lottery registrations, selections, and petitions for fiscal years 2021 through 2024 after filing a [Freedom of Information Act (FOIA)](https://www.foia.gov/) lawsuit against the Department of Homeland Security. The [dataset](https://github.com/BloombergGraphics/2024-h1b-immigration-data) includes details such as each registration’s employer, the proposed beneficiary’s gender, nationality, and birth year. For registrations that led to visa petitions, additional information is provided, including the worksite, salary, job title, and the beneficiary’s field of study. The data can be accessed as part of their investigation, shared by reporter [Eric Fan](https://www.linkedin.com/posts/ericfan24_every-year-a-random-drawing-determines-which-activity-7224534067688427520-QyqO/).
+
+The H-1B Visa Lottery and Petition data for fiscal years 2021 through 2024 was produced by the [U.S. Citizenship and Immigration Services (USCIS)](https://www.uscis.gov/), a division of the [Department of Homeland Security (DHS)](https://www.dhs.gov/) responsible for processing H-1B petitions. Bloomberg News obtained this data through a [Freedom of Information Act (FOIA)](https://www.foia.gov/) lawsuit against the DHS. Each row of the dataset represents a lottery registration, and in some cases, a single individual may have multiple registrations submitted by different employers. In cases where a visa petition was submitted, the dataset includes details about the job, such as salary and location. The data was featured in Bloomberg's article ["Thousands of US Work Visas Are Going to Middlemen Gaming the System"](https://www.bloomberg.com/), which can be reproduced using the methodology described therein.
+
+Shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-08-21-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+
+![................](dip_h1b_visas.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(seecolor)             # To print and view colours
+library(patchwork)            # Combining plots
+
+library(httr)                 # Download files
+library(zip)                  # Handle ZIP files
+
+# Download the ZIP file from the URL
+url <- "https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_single_reg.zip?raw=true"
+temp_zip <- tempfile(fileext = ".zip")
+GET(url, write_disk(temp_zip, overwrite = TRUE))
+
+# Unzip the file to a temporary directory
+temp_dir <- tempdir()
+unzip(temp_zip, exdir = temp_dir)
+
+# Read the CSV file into R
+csv_file <- file.path(temp_dir, "TRK_13139_FY2024_single_reg.csv")
+rawdf <- read_csv(csv_file)
+
+# Clean up temporary files
+unlink(temp_zip)      # Delete the temporary zip file
+
+# Remove the temporary directory and its contents
+unlink(temp_dir, recursive = TRUE)  
+rm(csv_file, temp_dir, temp_zip, url)
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Oswald",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Kanit",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+bg_col <- "white"
+
+text_col <- "grey15"
+text_hil <- "grey15"
+
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "New Delhi: Hourly Temperature Heat-Map (1991-2023)" 
+
+plot_subtitle <- "The hourly temperature in India's Capital ........."
+
+plot_caption <- paste0(
+  "**Data:** open-meteo.com", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "dip_h1b_visas.png"),
+  plot = g,
+  width = 210 * 2,    # Best Twitter Aspect Ratio = 5:4
+  height = 297 * 2,   
+  units = "mm",
+  bg = "white"
+)
+
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "dip_h1b_visas.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "dip_h1b_visas.png"
+    )
+  )
+```
