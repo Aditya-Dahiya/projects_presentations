@@ -1,10 +1,11 @@
 ---
-title: "Insights from H1B-visas dataset"
+title: "How USA's H1B visa lottery gets gamed!"
 author: "Aditya Dahiya"
-date: "2024-09-30"
-subtitle: "...................."
+date: "2024-10-02"
+subtitle: "Unveiling how firms and applicants leverage multiple submissions and salaries to game the H1B visa lottery system."
 categories:
   - "Data is Plural"
+  - "Governance"
 image: "thumbnails/dip_h1b_visas.png"
 format:
   html:
@@ -35,7 +36,7 @@ Using the data on single registrations (from [here](https://github.com/Bloomberg
 
 Data Source: [Data](https://github.com/BloombergGraphics/2024-h1b-immigration-data) as sourced from [USCIS](https://www.uscis.gov/) and obtained by [Bloomberg](https://www.bloomberg.com/graphics).
 
-![................](dip_h1b_visas.png){#fig-1}
+![The scatterplot shows how different firms are using various strategies to navigate the H1B visa lottery. The **red dots**, representing large U.S. tech companies like Amazon and Google, offer high salaries and follow a straightforward approach, submitting only one application per candidate. On the other hand, the **orange dots**—Indian outsourcing firms such as Infosys and Wipro—submit many applications for lower-paying positions, relying on sheer volume to get a portion of their candidates selected. The **green dots** show newer firms that have emerged specifically to help applicants submit multiple entries, greatly increasing their chances. Lastly, the **blue dots** represent highly paid applicants, often startup founders, who also use multiple applications but through smaller, niche companies to boost their odds.](dip_h1b_visas.png){#fig-1}
 
 Loading libraries & data
 
@@ -469,7 +470,11 @@ plotdf <- df4 |>
   mutate(
     cluster = case_when(
       ((wage > 250000) & (perc_multiple > 0.5)) ~ "A",
-      ((total > 1000) & (perc_multiple < 0.5)) ~ "B",
+      ((total > 1000) & (perc_multiple < 0.5) & 
+         (wage > 110000)) ~ "B1",
+      ((total > 1000) & (perc_multiple < 0.5) & 
+         (wage < 110000)) ~ "B2",
+      ((total > 1000) & (perc_multiple < 0.5)) ~ "B1",
       ((perc_multiple > 0.5) & (wage < 200000)) ~ "C",
       .default = "D"
     )
@@ -491,7 +496,7 @@ plotdf <- df4 |>
 #   mutate(cluster_var = LETTERS[1:clus_nos])
 
 # The top n companies / visa sponsors to be labelled
-labels_df <- plotdf1 |> 
+labels_df <- plotdf |> 
   slice_max(order_by = total, n = 15)
 ```
 
@@ -520,9 +525,10 @@ showtext_auto()
 bg_col <- "white"
 
 text_col <- "grey15"
-text_hil <- "#C70000FF"
-mypal <- paletteer::paletteer_d("ltc::trio1")
-
+text_hil <- "grey25"
+# mypal <- paletteer::paletteer_d("ltc::trio1")
+mypal <- paletteer::paletteer_d("suffrager::CarolMan")
+mypal <- mypal[c(4, 1, 2, 3)]
 bts <- 90
 
 # Caption stuff for the plot
@@ -537,17 +543,25 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Gaming the H1B Lottery System" 
+plot_title <- "How the H1B Visa lottery gets gamed !" 
 
-plot_subtitle <- "............................."
+plot_subtitle <- "Each dot represents an American firm that sponsored more than 100 successful H1B Visas in 2023. While large companies & outsourcing firms with more applications naturally get more overall successful numbers, emerging cover firms and high-earning applicants (Start-ups) are using multiple submissions to improve their chances, revealing a growing trend in gaming the visa lottery."
 
 plot_caption <- paste0(
   "**Data:** USCIS, Bloomberg News", 
-  " |  **Code:** ", 
+  "<br>**Code:** ", 
   social_caption_1, 
-  " |  **Graphics:** ", 
+  "<br>**Graphics:** ", 
   social_caption_2
   )
+
+annotation_1 <- "Highly paid applicants, often self-sponsored startup founders, who submit multiple applications through smaller niche firms to increase their chances."
+
+annotation_2 <- "Large tech firms that hire in bulk, offer high salaries, and candidates mostly play by the rules - submit only one application."
+
+annotation_3 <- "Outsourcing companies submit numerous applications to boost their overall successful numbers, despite offering lower median wages to their off-shore employees."
+
+annotation_4 <- "New emerging firms that specialize in allowing applicants to submit multiple applications, to game the system. Nearly all of their candidates have multiple entries."
 
 rm(github, github_username, xtwitter, 
    xtwitter_username, social_caption_1, 
@@ -563,7 +577,7 @@ The static plot
 g <- plotdf |> 
 
   # Keep only companies with more than 100 visa applications
-  filter(total > 100) |> 
+  filter(total >= 100) |> 
 
   # Start Plot
   ggplot(
@@ -586,7 +600,7 @@ g <- plotdf |>
         ")"
       )
     ),
-    size = bts / 4,
+    size = bts / 5,
     family = "caption_font",
     colour = text_col,
     lineheight = 0.3,
@@ -610,37 +624,111 @@ g <- plotdf |>
       )
     ) +
   
+  # Add Text-Annotations
+  annotate(
+    geom = "text",
+    label = str_wrap(annotation_1, 60),
+    lineheight = 0.3,
+    family = "caption_font",
+    colour = mypal[1],
+    x = 0.75, y = 280000,
+    hjust = 0.5,
+    vjust = 1,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "text",
+    label = str_wrap(annotation_2, 60),
+    lineheight = 0.3,
+    family = "caption_font",
+    colour = mypal[2],
+    x = 0.005, y = 250000,
+    hjust = 0,
+    vjust = 0,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "text",
+    label = str_wrap(annotation_3,90),
+    lineheight = 0.2,
+    family = "caption_font",
+    colour = mypal[3],
+    x = 0.005, y = 57000,
+    hjust = 0,
+    vjust = 0,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "text",
+    label = str_wrap(annotation_4, 60),
+    lineheight = 0.3,
+    family = "caption_font",
+    colour = mypal[4],
+    x = 0.75, y = 130000,
+    hjust = 0.5,
+    vjust = 0,
+    size = bts / 4
+  ) +
+  annotate(
+    geom = "text",
+    label = "Names of the largest firms are shown\n(Successful visa applications in brackets)",
+    lineheight = 0.3,
+    family = "caption_font",
+    colour = text_col,
+    x = 0.005, y = 460000,
+    hjust = 0,
+    vjust = 1,
+    size = bts / 3
+  ) +
+  
   # Scales and Coordinates
   scale_x_continuous(
-    labels = label_percent()
+    labels = label_percent(),
+    expand = expansion(0.01)
   ) +
   scale_y_continuous(
     oob = scales::squish,
     trans = "log10",
     limits = c(50000, 500000),
     breaks = c(5e4, 1e5, 2e5, 3e5, 4e5, 5e5),
-    labels = c("$50K", "$100K", "$200K", "$300K", "$400K", "$500K")
+    labels = c("$50K", "$100K", "$200K", "$300K", "$400K", "$500K"),
+    expand = expansion(0.01)
   ) +
   scale_size_continuous(
-    range = c(0.5, 70),
-    breaks = c(0.5, 1, 5, 20)
+    range = c(1, 50),
+    breaks = c(100, 500, 1000,
+               5000, 10000, 
+               12500),
+    labels = number(
+      c(100, 500, 1000,
+               5000, 10000, 
+               12500)
+    )
   ) +
   scale_colour_manual(
     values = c(mypal, "grey70")
   ) +
   guides(
-    colour = "none"
+    colour = "none",
+    size = guide_legend(
+      direction = "horizontal",
+      override.aes = list(
+        colour = "grey70"
+      ),
+      nrow = 1
+    )
   ) +
+  coord_cartesian(clip = "off") +
   
   # Labels and Themes
   labs(
     title = plot_title,
-    subtitle = plot_subtitle,
+    subtitle = str_wrap(plot_subtitle, 135),
     caption = plot_caption,
     
     x = "Applicants sponsored by the employer, who had multiple applications",
     y = "Median Annual Salary for applicants sponsored by the employer",
-    size = "Number of applicants Sponsored by the firm"
+    size = "Number of successful applicants Sponsored by each firm (who won the lottery)"
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -648,11 +736,15 @@ g <- plotdf |>
   ) +
   theme(
     # Overall Plot
-    panel.grid.minor = element_blank(),
+    panel.grid.minor = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = "grey50"
+    ),
     panel.grid.major = element_line(
       linetype = 3,
       linewidth = 0.5,
-      colour = "grey50"
+      colour = "grey30"
     ),
     text = element_text(
       margin = margin(0,0,0,0, "mm"),
@@ -660,48 +752,63 @@ g <- plotdf |>
       lineheight = 0.3
     ),
     plot.title.position = "plot",
-    plot.margin = margin(5,5,5,5, "mm"),
+    plot.margin = margin(5,15,5,10, "mm"),
     
     # Axes
+    axis.line = element_line(
+      colour = text_col,
+      linewidth = 0.7,
+      arrow = arrow(length = unit(8, "mm"))
+    ),
     axis.ticks = element_blank(),
     axis.ticks.length = unit(0, "mm"),
     axis.text = element_text(
       margin = margin(0,0,0,0, "mm")
     ),
     axis.title = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(-5,0,-2,0, "mm")
     ),
     
     # Labels
     plot.title = element_text(
       family = "title_font",
-      margin = margin(0,0,0,0, "mm"),
-      size = 1.75 * bts,
+      margin = margin(10,0,3,0, "mm"),
+      size = 2.4 * bts,
       hjust = 0.5,
-      colour = text_hil
+      colour = text_hil,
+      face = "bold"
     ),
     plot.subtitle = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      hjust = 0.5
+      margin = margin(2,0,4,0, "mm"),
+      hjust = 0.5,
+      size = 0.9 * bts,
+      family = "caption_font"
     ),
     plot.caption = element_textbox(
       family = "caption_font",
-      hjust = 0.5,
-      margin = margin(0,0,0,0, "mm"),
+      hjust = 0,
+      margin = margin(-35,0,5,-40, "mm"),
       size = 0.6 * bts,
-      colour = text_hil
+      colour = text_hil,
+      lineheight = 0.4
     ),
     
     # Legend
     legend.position = "bottom",
     legend.title.position = "top",
     legend.title = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      hjust = 0.5
+      margin = margin(0,0,-2,0, "mm"),
+      hjust = 0.5,
+      family = "caption_font"
     ),
     legend.text = element_text(
-      margin = margin(0,0,0,0, "mm")
-    )
+      margin = margin(0,5,0,0, "mm")
+    ),
+    legend.margin = margin(-20,0,0,0, "mm"),
+    legend.key.spacing = unit(0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.location = "plot",
+    legend.justification = 1
   )
 
 ggsave(
