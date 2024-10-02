@@ -1,5 +1,5 @@
 ---
-title: "H1B Visas data"
+title: "Insights from H1B-visas dataset"
 author: "Aditya Dahiya"
 date: "2024-09-30"
 subtitle: "...................."
@@ -31,7 +31,9 @@ A recent [Bloomberg News investigation](https://www.bloomberg.com/graphics/2024-
 
 The H-1B Visa Lottery and Petition data for fiscal years 2021 through 2024 was produced by the [U.S. Citizenship and Immigration Services (USCIS)](https://www.uscis.gov/), a division of the [Department of Homeland Security (DHS)](https://www.dhs.gov/) responsible for processing H-1B petitions. Bloomberg News obtained this data through a [Freedom of Information Act (FOIA)](https://www.foia.gov/) lawsuit against the DHS. Each row of the dataset represents a lottery registration, and in some cases, a single individual may have multiple registrations submitted by different employers. In cases where a visa petition was submitted, the dataset includes details about the job, such as salary and location. The data was featured in Bloomberg's article ["Thousands of US Work Visas Are Going to Middlemen Gaming the System"](https://www.bloomberg.com/), which can be reproduced using the methodology described therein.
 
-Shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-08-21-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+Using the data on single registrations (from [here](https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_single_reg.zip)) and on multiple registrations (from [here](https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_multi_reg.zip)) on [GitHub repo](https://github.com/BloombergGraphics/2024-h1b-immigration-data) by Bloomberg Graphics. Shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-08-21-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+
+Data Source: [Data](https://github.com/BloombergGraphics/2024-h1b-immigration-data) as sourced from [USCIS](https://www.uscis.gov/) and obtained by [Bloomberg](https://www.bloomberg.com/graphics).
 
 ![................](dip_h1b_visas.png){#fig-1}
 
@@ -56,18 +58,39 @@ library(httr)                 # Download files
 library(zip)                  # Handle ZIP files
 library(countrycode)
 
+# Get Data Dictionary used by Bloomberg
+dictionary <- openxlsx::read.xlsx(
+  "https://github.com/BloombergGraphics/2024-h1b-immigration-data/raw/refs/heads/main/TRK_13139_I129_H1B_Registrations_FY21_FY24_FOIA_FIN.xlsx",
+  sheet = "Data Dictionary",
+  rows = 1:57,
+  cols = 1:2
+) |> 
+  janitor::clean_names()
+
+
+# Single registrations data
 # Download the ZIP file from the URL
 url <- "https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_single_reg.zip?raw=true"
 temp_zip <- tempfile(fileext = ".zip")
 GET(url, write_disk(temp_zip, overwrite = TRUE))
-
 # Unzip the file to a temporary directory
 temp_dir <- tempdir()
 unzip(temp_zip, exdir = temp_dir)
-
 # Read the CSV file into R
 csv_file <- file.path(temp_dir, "TRK_13139_FY2024_single_reg.csv")
-rawdf <- read_csv(csv_file) |> 
+rawdf_single <- read_csv(csv_file) |> 
+  janitor::clean_names()
+
+# Multiple registrations data
+url1 <- "https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_multi_reg.zip?raw=true"
+temp_zip <- tempfile(fileext = ".zip")
+GET(url1, write_disk(temp_zip, overwrite = TRUE))
+# Unzip the file to a temporary directory
+temp_dir <- tempdir()
+unzip(temp_zip, exdir = temp_dir)
+# Read the CSV file into R
+csv_file <- file.path(temp_dir, "TRK_13139_FY2024_multi_reg.csv")
+rawdf_multi <- read_csv(csv_file) |> 
   janitor::clean_names()
 
 # Clean up temporary files
@@ -75,40 +98,30 @@ unlink(temp_zip)      # Delete the temporary zip file
 
 # Remove the temporary directory and its contents
 # unlink(temp_dir, recursive = TRUE)  
-rm(csv_file, temp_dir, temp_zip, url)
+rm(csv_file, temp_dir, temp_zip, url, url1)
 
-
+print(object.size(rawdf_single), units = "Mb")
+print(object.size(rawdf_multi), units = "Mb")
 ```
 
-Total 85000 are approximately selected each year. Total number of applicants by the country and success rates.
+Total number of applicants by the country and success rates.
 
 ```{r}
 #| label: eda-data
 
-df_app <- rawdf |> 
+df_app <- rawdf_single |> 
   count(country_of_birth, sort = T) |> 
   rename(applied = n)
 
-df_sel <- rawdf |> 
+df_sel <- rawdf_single |> 
   filter(status_type == "SELECTED") |> 
   count(country_of_birth, sort = T) |> 
   rename(selected = n)
 
-df1
-
-df_app |> 
+df1 <- df_app |> 
   left_join(df_sel) |> 
-  arrange(desc(success_rate)) |> 
-  mutate(
-    country_of_birth = fct_lump_n(
-      f = country_of_birth,
-      n = 10,
-      w = applied,
-      ties.method = "first"
-    )
-  )
   mutate(success_rate = selected / applied) |> 
-  
+  arrange(desc(success_rate)) |> 
   mutate(
     full_country_name = countrycode::countrycode(
       country_of_birth,
@@ -117,11 +130,369 @@ df_app |>
       warn = F
     )
   )
-
-
 rm(df_sel, df_app)
 
+sel_cons <- df1 |> 
+  slice_max(applied, n = 10) |> 
+  pull(country_of_birth)
 
+plotdf1 <- df1 |> 
+  mutate(
+    country_of_birth = if_else(
+      country_of_birth %in% sel_cons,
+      country_of_birth,
+      "Others"
+    )
+  ) |> 
+  group_by(country_of_birth) |> 
+  summarise(
+    applied = sum(applied, na.rm = T),
+    selected = sum(selected, na.rm = T)
+  ) |> 
+  mutate(
+    country_of_birth = fct(
+      country_of_birth,
+      levels = c(sel_cons, "Others")
+    )
+  ) |> 
+  arrange(country_of_birth) |> 
+  mutate(
+    full_country_name = countrycode::countrycode(
+      country_of_birth,
+      "iso3c", 
+      "country.name",
+      warn = F
+    )
+  ) |> 
+  replace_na(list(full_country_name = "Others"))
+
+plotdf1 |> 
+  ggplot(
+    mapping = aes(
+      y = fct_rev(country_of_birth),
+      x = applied
+    )
+  ) +
+  geom_col(
+    alpha = 0.5
+  ) +
+  geom_col(
+    aes(x = selected),
+    alpha = 1
+  )
+```
+
+Wage Amounts for successful H1B applicants
+
+```{r}
+rawdf_single |> 
+  filter(status_type == "SELECTED") |> 
+  group_by(country_of_birth)
+
+wages_units <- c("YEAR", "HOUR", "MONTH", "WEEK")
+
+df2 <- rawdf_single |> 
+  filter(wage_unit %in% wages_units) |> 
+  mutate(
+    wage_amt = case_when(
+      wage_unit == "YEAR" ~ wage_amt,
+      wage_unit == "HOUR" ~ wage_amt * 8760,
+      wage_unit == "MONTH" ~ wage_amt * 12,
+      wage_unit == "WEEK" ~ wage_amt * 52,
+      .default = NA
+    )
+  ) |> 
+  group_by(country_of_birth) |> 
+  summarise(
+    mean_wage_amt = mean(wage_amt, na.rm = T),
+    median_wage_amt = median(wage_amt, na.rm = T),
+    n = n()
+  ) |> 
+  arrange(desc(n))
+
+plotdf2 <- df2 |> 
+  select(-mean_wage_amt) |> 
+  slice_max(order_by = n, n = 15) |> 
+  bind_rows(
+    df2 |>
+      select(-mean_wage_amt) |> 
+      slice_max(order_by = n, n = 15) |> 
+      summarise(
+        median_wage_amt = weighted.mean(median_wage_amt, w = n),
+        n = sum(n)
+      ) |> 
+      mutate(country_of_birth = "Average")
+  ) |> 
+  mutate(
+    full_country_name = countrycode::countrycode(
+      country_of_birth,
+      "iso3c", 
+      "country.name",
+      warn = F
+    ),
+    iso2c = str_to_lower(
+      countrycode::countrycode(
+        country_of_birth,
+        "iso3c", 
+        "iso2c",
+        warn = F
+      )
+    )
+  ) |> 
+  replace_na(
+    list(
+      full_country_name = "All Countries"
+    )
+  ) |> 
+  left_join(
+    bind_rows(
+      df1,
+      
+      
+      df1 |> 
+        summarise(
+          applied = sum(applied, na.rm = T),
+          selected = sum(selected, na.rm = T)
+        ) |> 
+        mutate(
+          country_of_birth = "Average",
+          full_country_name = "All Countries",
+          success_rate = selected / applied
+        )
+    )
+  )
+
+g <- plotdf2 |> 
+  mutate(
+    print_amount = number(
+        median_wage_amt, 
+        prefix = "$",
+        accuracy = 100
+      )
+  ) |> 
+  ggplot(
+    mapping = aes(
+      y = reorder(full_country_name, median_wage_amt),
+      x = median_wage_amt,
+      fill = country_of_birth == "Average"
+    )
+  ) +
+  
+  # Bar Plot
+  geom_col() +
+  
+  # Persons Applied
+  geom_text(
+    mapping = aes(
+      x = 20000,
+      label = number(applied)
+    ),
+    hjust = 1
+  ) +
+  
+  # Persons Selected
+  geom_text(
+    mapping = aes(
+      x = 40000,
+      label = number(selected)
+    ),
+    hjust = 1
+  ) +
+  
+  # Success Rate
+  geom_text(
+    mapping = aes(
+      x = 60000,
+      label = number(
+        success_rate, 
+        scale = 100, 
+        suffix = " %",
+        accuracy = 0.1
+      )
+    ),
+    hjust = 1
+  ) +
+  
+  geom_text(
+    mapping = aes(
+      label = print_amount
+    ),
+    hjust = 0,
+    nudge_x = 1000
+  ) +
+  scale_x_continuous(
+    labels = label_currency(
+      prefix = "$ ",
+      scale_cut = cut_short_scale()
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank()
+  )
+
+plotdf2
+```
+
+Analysis on single vs. multiple registrations:
+
+```{r}
+#| label: multi-reg
+
+# =========================================
+# Understanding the meaning of variable "ben_multi_reg_ind"
+# Indicator of multiple registrations for beneficiary (a value of 
+# 1 represents a registration for a beneficiary who has multiple 
+# registrations with different employers)
+
+# rawdf_single |> 
+#   count(ben_multi_reg_ind)
+# 
+# rawdf_multi |> 
+#   filter(!is.na(ben_multi_reg_ind))
+
+# ==========================================
+# Analysis Question
+# Are employer_name and FEIn matched 1-is-to-1: Answer: No. 
+# So better to stick to employer_name.
+# rawdf_multi |> 
+#   count(employer_name, fein) |> 
+#   select(-n) |> 
+#   count(employer_name) |> 
+#   filter(n > 1)
+
+# =========================================
+
+# Combine multiple and single applications' data
+rawdf <- bind_rows(
+  rawdf_multi,
+  rawdf_single
+  ) |> 
+  select(
+    employer_name, 
+    state,
+    
+    status_type,
+    first_decision,
+    
+    ben_multi_reg_ind,
+    
+    # For fuzzy matching to find duplicates
+    # since we dont have person's ID number to distinguish uniquely
+    country_of_birth,
+    country_of_nationality,
+    ben_year_of_birth,
+    
+    # Salary
+    wage_amt,
+    wage_unit
+  )
+
+# =====================================
+# Check status_type vs. first decisions
+# They are similar in name, except that some selected persons will
+# ultimately have their visas rejected. So, for purposes of analysing
+# the lottery, we take the variable "status_type" only.
+rawdf |> 
+  count(status_type, first_decision)
+
+# Data from on percentage of applications of a sponsor organization 
+# that are multiple entry applications
+df4 <- rawdf |> 
+  count(employer_name, ben_multi_reg_ind, sort = T) |>
+  mutate(
+    ben_multi_reg_ind = case_when(
+      ben_multi_reg_ind == 0 ~ "single_entry",
+      ben_multi_reg_ind == 1 ~ "multiple_entry",
+      .default = "others"
+    )
+  ) |> 
+  pivot_wider(
+    id_cols = employer_name,
+    names_from = ben_multi_reg_ind,
+    values_from = n
+  ) |> 
+  replace_na(
+    replace = list(
+      single_entry = 0,
+      multiple_entry = 0,
+      others = 0
+    )
+  ) |> 
+  mutate(
+    total = single_entry + multiple_entry + others,
+    perc_single = single_entry / total,
+    perc_multiple = multiple_entry / total
+  )
+
+# Percentage of applicants for each 
+df5 <- rawdf |> 
+  count(employer_name, status_type, sort = T) |> 
+  mutate(status_type = str_to_lower(status_type)) |> 
+  filter(status_type %in% c("eligible", "selected")) |> 
+  pivot_wider(
+    id_cols = employer_name,
+    names_from = status_type,
+    values_from = n
+  ) |> 
+  replace_na(
+    replace = list(
+      eligible = 0,
+      selected = 0
+    )
+  ) |> 
+  mutate(
+    perc_selected = selected / (eligible + selected)
+  )
+
+wages_units <- c("YEAR", "HOUR", "MONTH", "WEEK")
+
+df6 <- rawdf |> 
+  filter(wage_unit %in% wages_units) |> 
+  mutate(
+    wage_amt = case_when(
+      wage_unit == "YEAR" ~ wage_amt,
+      wage_unit == "HOUR" ~ wage_amt * 8760,
+      wage_unit == "MONTH" ~ wage_amt * 12,
+      wage_unit == "WEEK" ~ wage_amt * 52,
+      .default = NA
+    )
+  ) |>
+  group_by(employer_name) |> 
+  summarise(
+    wage = median(wage_amt, na.rm = T)
+  )
+
+plotdf <- df4 |> 
+  left_join(df5) |> 
+  left_join(df6) |> 
+  mutate(
+    cluster = case_when(
+      ((wage > 250000) & (perc_multiple > 0.5)) ~ "A",
+      ((total > 1000) & (perc_multiple < 0.5)) ~ "B",
+      ((perc_multiple > 0.5) & (wage < 200000)) ~ "C",
+      .default = "D"
+    )
+  )
+
+# Do a k-means clustering to identify patters
+# Number of clusters in K-Mean Clustering
+# clus_nos = 10
+# set.seed(42)
+# k_out <- kmeans(
+#   plotdf |> select(perc_multiple, wage) |> as.matrix(),
+#   centers = clus_nos
+#   )
+# plotdf1 <- plotdf |> 
+#   mutate(cluster = as_factor(k_out$cluster))
+# 
+# plotdf1 |> 
+#   count(cluster, sort = T) |> 
+#   mutate(cluster_var = LETTERS[1:clus_nos])
+
+# The top n companies / visa sponsors to be labelled
+labels_df <- plotdf1 |> 
+  slice_max(order_by = total, n = 15)
 ```
 
 Visualization Parameters
@@ -130,17 +501,17 @@ Visualization Parameters
 #| label: viz-params
 
 # Font for titles
-font_add_google("Oswald",
+font_add_google("Roboto Condensed",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Barlow Condensed",
+font_add_google("Saira Extra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Kanit",
+font_add_google("Roboto Condensed",
   family = "body_font"
 ) 
 
@@ -149,7 +520,8 @@ showtext_auto()
 bg_col <- "white"
 
 text_col <- "grey15"
-text_hil <- "grey15"
+text_hil <- "#C70000FF"
+mypal <- paletteer::paletteer_d("ltc::trio1")
 
 bts <- 90
 
@@ -165,12 +537,12 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "New Delhi: Hourly Temperature Heat-Map (1991-2023)" 
+plot_title <- "Gaming the H1B Lottery System" 
 
-plot_subtitle <- "The hourly temperature in India's Capital ........."
+plot_subtitle <- "............................."
 
 plot_caption <- paste0(
-  "**Data:** open-meteo.com", 
+  "**Data:** USCIS, Bloomberg News", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -187,6 +559,159 @@ The static plot
 ```{r}
 #| label: static-plot
 
+# The actual plot
+g <- plotdf |> 
+
+  # Keep only companies with more than 100 visa applications
+  filter(total > 100) |> 
+
+  # Start Plot
+  ggplot(
+    mapping = aes(
+      x = perc_multiple,
+      y = wage,
+      size = total,
+      colour = cluster
+      )
+    ) +
+  
+  # Label the biggest / important employers
+  ggrepel::geom_text_repel(
+    data = labels_df,
+    mapping = aes(
+      label = paste0(
+        employer_name,
+        "  (", 
+        number(total), 
+        ")"
+      )
+    ),
+    size = bts / 4,
+    family = "caption_font",
+    colour = text_col,
+    lineheight = 0.3,
+    hjust = 0,
+    min.segment.length = unit(2, "mm"),
+    
+    direction = "y",
+    force = 20,
+    segment.size = 0.1,
+    segment.curvature = -0.1,
+    force_pull = 1,
+    nudge_x = 0.15
+  ) +
+  
+  # The points for each company / applicant firm
+  geom_point(
+      alpha = 0.3,
+      position = position_jitter(
+        height = 0.02,
+        width = 0
+      )
+    ) +
+  
+  # Scales and Coordinates
+  scale_x_continuous(
+    labels = label_percent()
+  ) +
+  scale_y_continuous(
+    oob = scales::squish,
+    trans = "log10",
+    limits = c(50000, 500000),
+    breaks = c(5e4, 1e5, 2e5, 3e5, 4e5, 5e5),
+    labels = c("$50K", "$100K", "$200K", "$300K", "$400K", "$500K")
+  ) +
+  scale_size_continuous(
+    range = c(0.5, 70),
+    breaks = c(0.5, 1, 5, 20)
+  ) +
+  scale_colour_manual(
+    values = c(mypal, "grey70")
+  ) +
+  guides(
+    colour = "none"
+  ) +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    
+    x = "Applicants sponsored by the employer, who had multiple applications",
+    y = "Median Annual Salary for applicants sponsored by the employer",
+    size = "Number of applicants Sponsored by the firm"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = "grey50"
+    ),
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm"),
+    
+    # Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      margin = margin(0,0,0,0, "mm"),
+      size = 1.75 * bts,
+      hjust = 0.5,
+      colour = text_hil
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm"),
+      size = 0.6 * bts,
+      colour = text_hil
+    ),
+    
+    # Legend
+    legend.position = "bottom",
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "dip_h1b_visas.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
 ```
 
 Savings the graphics
