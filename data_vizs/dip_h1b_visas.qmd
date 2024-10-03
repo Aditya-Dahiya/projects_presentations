@@ -30,13 +30,11 @@ bibliography: references.bib
 
 A recent [Bloomberg News investigation](https://www.bloomberg.com/graphics/2024-staffing-firms-game-h1b-visa-lottery-system/) into the U.S. government's annual [H-1B lottery](https://www.uscis.gov/working-in-the-united-states/temporary-workers/h-1b-specialty-occupations-and-fashion-models) revealed that "thousands of companies gained an unfair advantage by securing extra lottery tickets." To support these findings, Bloomberg obtained data on all H-1B lottery registrations, selections, and petitions for fiscal years 2021 through 2024 after filing a [Freedom of Information Act (FOIA)](https://www.foia.gov/) lawsuit against the Department of Homeland Security. The [dataset](https://github.com/BloombergGraphics/2024-h1b-immigration-data) includes details such as each registration’s employer, the proposed beneficiary’s gender, nationality, and birth year. For registrations that led to visa petitions, additional information is provided, including the worksite, salary, job title, and the beneficiary’s field of study. The data can be accessed as part of their investigation, shared by reporter [Eric Fan](https://www.linkedin.com/posts/ericfan24_every-year-a-random-drawing-determines-which-activity-7224534067688427520-QyqO/).
 
-The H-1B Visa Lottery and Petition data for fiscal years 2021 through 2024 was produced by the [U.S. Citizenship and Immigration Services (USCIS)](https://www.uscis.gov/), a division of the [Department of Homeland Security (DHS)](https://www.dhs.gov/) responsible for processing H-1B petitions. Bloomberg News obtained this data through a [Freedom of Information Act (FOIA)](https://www.foia.gov/) lawsuit against the DHS. Each row of the dataset represents a lottery registration, and in some cases, a single individual may have multiple registrations submitted by different employers. In cases where a visa petition was submitted, the dataset includes details about the job, such as salary and location. The data was featured in Bloomberg's article ["Thousands of US Work Visas Are Going to Middlemen Gaming the System"](https://www.bloomberg.com/), which can be reproduced using the methodology described therein.
+Credits: Original Data by [U.S. Citizenship and Immigration Services (USCIS)](https://www.uscis.gov/), now hosted on [GitHub repo](https://github.com/BloombergGraphics/2024-h1b-immigration-data) by Bloomberg Graphics. Shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-08-21-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
 
-Using the data on single registrations (from [here](https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_single_reg.zip)) and on multiple registrations (from [here](https://github.com/BloombergGraphics/2024-h1b-immigration-data/blob/main/TRK_13139_FY2024_multi_reg.zip)) on [GitHub repo](https://github.com/BloombergGraphics/2024-h1b-immigration-data) by Bloomberg Graphics. Shared in [D.I.P.](https://www.data-is-plural.com/archive/2024-08-21-edition/) by [Jeremy S. Vine](https://www.jsvine.com/).
+*Note: The data was featured in Bloomberg's article ["Thousands of US Work Visas Are Going to Middlemen Gaming the System"](https://www.bloomberg.com/), which can be reproduced using the methodology described therein.*
 
-Data Source: [Data](https://github.com/BloombergGraphics/2024-h1b-immigration-data) as sourced from [USCIS](https://www.uscis.gov/) and obtained by [Bloomberg](https://www.bloomberg.com/graphics).
-
-![The scatterplot shows how different firms are using various strategies to navigate the H1B visa lottery. The **red dots**, representing large U.S. tech companies like Amazon and Google, offer high salaries and follow a straightforward approach, submitting only one application per candidate. On the other hand, the **orange dots**—Indian outsourcing firms such as Infosys and Wipro—submit many applications for lower-paying positions, relying on sheer volume to get a portion of their candidates selected. The **green dots** show newer firms that have emerged specifically to help applicants submit multiple entries, greatly increasing their chances. Lastly, the **blue dots** represent highly paid applicants, often startup founders, who also use multiple applications but through smaller, niche companies to boost their odds.](dip_h1b_visas.png){#fig-1}
+![The scatterplot shows how different firms are using various strategies to navigate the H1B visa lottery. The **red dots**, representing large U.S. tech companies like Amazon and Google, offer high salaries and follow a straightforward approach, submitting only one application per candidate. On the other hand, the **orange dots**—Indian outsourcing firms such as Infosys and Wipro—submit many applications for lower-paying positions, relying on sheer volume to get a portion of their candidates selected. The **green dots** show newer firms that have emerged specifically to help applicants submit multiple entries, greatly increasing their chances. Lastly, the **blue dots** represent highly paid applicants, often start-up founders, who also use multiple applications but through smaller, niche companies to boost their odds.](dip_h1b_visas.png){#fig-1}
 
 Loading libraries & data
 
@@ -186,6 +184,8 @@ plotdf1 |>
 Wage Amounts for successful H1B applicants
 
 ```{r}
+#| label: wages
+
 rawdf_single |> 
   filter(status_type == "SELECTED") |> 
   group_by(country_of_birth)
@@ -545,11 +545,13 @@ social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 
 plot_title <- "How the H1B Visa lottery gets gamed !" 
 
-plot_subtitle <- "Each dot represents an American firm that sponsored more than 100 successful H1B Visas in 2023. While large companies & outsourcing firms with more applications naturally get more overall successful numbers, emerging cover firms and high-earning applicants (Start-ups) are using multiple submissions to improve their chances, revealing a growing trend in gaming the visa lottery."
+plot_subtitle <- glue::glue(
+  "Each dot represents an American firm that sponsored more than 100 successful H1B Visas in 2023. While <b style='color:{mypal[2]}'>large companies</b> & <b style='color:{mypal[3]}'>outsourcing<br>firms</b> with more applications naturally get more overall successful numbers, <b style='color:{mypal[4]}'>emerging cover firms</b> and <b style='color:{mypal[1]}'>high-earning applicants</b><br>(Start-ups) are now using multiple submissions to improve their chances, revealing how the visa lottery is getting gamed !"
+)
 
 plot_caption <- paste0(
   "**Data:** USCIS, Bloomberg News", 
-  "<br>**Code:** ", 
+  "<br>**Analysis:** ", 
   social_caption_1, 
   "<br>**Graphics:** ", 
   social_caption_2
@@ -765,8 +767,11 @@ g <- plotdf |>
     axis.text = element_text(
       margin = margin(0,0,0,0, "mm")
     ),
-    axis.title = element_text(
-      margin = margin(-5,0,-2,0, "mm")
+    axis.title.x = element_text(
+      margin = margin(2,0,0,0, "mm")
+    ),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm")
     ),
     
     # Labels
@@ -778,7 +783,7 @@ g <- plotdf |>
       colour = text_hil,
       face = "bold"
     ),
-    plot.subtitle = element_text(
+    plot.subtitle = element_textbox(
       margin = margin(2,0,4,0, "mm"),
       hjust = 0.5,
       size = 0.9 * bts,
@@ -787,7 +792,7 @@ g <- plotdf |>
     plot.caption = element_textbox(
       family = "caption_font",
       hjust = 0,
-      margin = margin(-35,0,5,-40, "mm"),
+      margin = margin(-35,0,-5,-40, "mm"),
       size = 0.6 * bts,
       colour = text_hil,
       lineheight = 0.4
@@ -814,6 +819,70 @@ g <- plotdf |>
 ggsave(
   filename = here::here("data_vizs", "dip_h1b_visas.png"),
   plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+```
+
+Add a QR code
+
+```{r}
+#| label: add-qr-code
+
+
+# QR Code for the plot
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/projects/",
+  # The file name of the current .qmd file
+  "dip_h1b_visas",
+  ".qmd"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1
+    ) +
+  # labs(caption = "Full Analysis here") +
+  coord_fixed() +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+    fill = "transparent", 
+    colour = "transparent"
+    )
+  )
+
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0, right = 0.1,
+    top = 0.17, bottom = 0.07,
+    align_to = "full",
+    clip = FALSE
+  ) +
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      ),
+      panel.background = element_rect(
+        fill = "transparent", colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "dip_h1b_visas.png"),
+  plot = g_full,
   width = 400,    # Best Twitter Aspect Ratio = 5:4
   height = 500,   
   units = "mm",
