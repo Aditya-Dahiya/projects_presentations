@@ -1,0 +1,389 @@
+---
+title: "Sentiments' timeline in Works of William Shakespeare"
+author: "Aditya Dahiya"
+date: "2024-09-17"
+subtitle: "....................."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_shakespeare.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+![...............](tidy_shakespeare.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+library(tidytext)             # Text & Sentiment Analysis
+
+# Option 1: tidytuesdayR package 
+tuesdata <- tidytuesdayR::tt_load(2024, week = 38)
+
+hamlet <- tuesdata$hamlet
+macbeth <- tuesdata$macbeth
+romeo_juliet <- tuesdata$romeo_juliet
+rm(tuesdata)
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+# A custom function to convert Roman numerals to numbers
+roman_to_num_map <- c(I = 1, II = 2, III = 3, IV = 4, V = 5, 
+                      VI = 6, VII = 7, VIII = 8, IX = 9, X = 10)
+roman_to_number <- function(roman_vector) {
+  roman_vector %>%
+    map_dbl(~ roman_to_num_map[.x])
+}
+# Function to convert numbers to Roman numerals
+# Reverse the mapping to create a number-to-Roman map
+num_to_roman_map <- set_names(names(roman_to_num_map), roman_to_num_map)
+number_to_roman <- function(num_vector) {
+  num_vector %>%
+    map_chr(~ num_to_roman_map[as.character(.x)])
+}
+
+# Custom function to calculate the mode
+get_mode <- function(temp) {
+  temp |> 
+  as_tibble() |> 
+  count(value) |> 
+  slice_max(order_by = n, n = 1) |> 
+  pull(value)
+}
+
+# Sentiments under afinn
+sentiment_df <- get_sentiments("afinn")
+
+# A function to generate the sentiments timeline for any book
+get_sentiment_graph_data <- function(dataset){
+  dataset |> 
+    mutate(
+      act = str_remove(act, "Act "),
+      scene = str_remove(scene, "Scene "),
+      act = roman_to_number(act),
+      scene = roman_to_number(scene)
+    ) |> 
+    select(-character) |> 
+    unnest_tokens(
+      output = "word",
+      input = dialogue
+    ) |> 
+    inner_join(sentiment_df) |> 
+    mutate(
+      id = row_number(),
+      id = round(rescale(id), 2)
+    ) |> 
+    group_by(id) |> 
+    summarise(
+      sent_value = sum(value, na.rm = T),
+      act = get_mode(act)
+    )
+}
+
+# Composing the final dataframe for the plot
+plotdf <- bind_rows(
+  get_sentiment_graph_data(macbeth) |> 
+    mutate(novel = "Macbeth"),
+  get_sentiment_graph_data(romeo_juliet) |> 
+    mutate(novel = "Romeo and Juliet"),
+  get_sentiment_graph_data(hamlet) |> 
+    mutate(novel = "Hamlet")
+)
+
+plotdf_acts <- plotdf |> 
+  group_by(novel, act) |> 
+  summarise(
+    xmin = min(id),
+    xmax = max(id),
+    xmed = (xmin + xmax)/2
+  ) |> 
+  mutate(act = number_to_roman(act))
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Maiden Orange",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("BioRhyme",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c("#DF6589FF", "#603F83FF", "#C7D3D4FF", "#3C1053FF")
+
+bg_col <- mypal[3]
+
+text_col <- mypal[4]
+text_hil <- mypal[4]
+
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Sentiments' timeline in Shakespeare’s Plays" 
+
+plot_subtitle <- "The flow of sentiments (positive to negative) across three Shakespearean plays, over the progression of the narrative (0% to 100%). While Hamlet, and, Romeo and Juliet culminate in sorrow, Macbeth transitions from sadness to a positive conclusion."
+
+plot_caption <- paste0(
+  "**Data:** shakespeare.mit.edu & Nicola Rennie", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+g <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = id,
+      y = sent_value
+    )
+  ) +
+  
+  # Background emotion colours annotation &  horizontal line
+  annotate(
+    geom = "rect",
+    xmin = 0, xmax = 1,
+    ymin = 0, ymax = 30,
+    fill = mypal[1],
+    colour = "transparent",
+    alpha = 0.2
+  ) +
+  annotate(
+    geom = "rect",
+    xmin = 0, xmax = 1,
+    ymin = 0, ymax = -30,
+    fill = mypal[2],
+    colour = "transparent",
+    alpha = 0.2
+  ) +
+  geom_hline(
+    yintercept = 0,
+    linetype = 3,
+    colour = "grey10",
+    linewidth = 0.5
+  ) +
+  
+  # Background area map of sentiments
+  geom_area(
+    alpha = 0.2
+  ) +
+  
+  # Smoother Plot
+  geom_smooth(
+    span = 0.2,
+    se = FALSE,
+    colour = "grey10",
+    lineend = "round",
+    linewidth = 1.25
+  ) +
+  
+  # Labelling the Acts of each play
+  geom_errorbar(
+    data = plotdf_acts,
+    mapping = aes(
+      x = xmed,
+      xmin = xmin,
+      xmax = xmax,
+      y = -24
+    ),
+    width = 2
+  ) +
+  geom_text(
+    data = plotdf_acts,
+    mapping = aes(
+      x = xmed,
+      y = -23,
+      label = paste0("Act ", act)
+    ),
+    vjust = 0,
+    hjust = 0.5,
+    family = "body_font",
+    size = bts / 4
+  ) +
+  
+  # Scales and Coordinates
+  scale_x_continuous(
+    expand = expansion(0.005),
+    labels = label_percent()
+  ) +
+  scale_y_continuous(
+    expand = expansion(0)
+  ) +
+  coord_cartesian(
+    clip = "off",
+    ylim = c(-30, 30)
+  ) +
+  
+  # Faceting across the three books
+  facet_wrap(
+    ~novel,
+    ncol = 1
+  ) +
+  
+  # Labels and Themes
+  labs(
+    x = "Progression of the narrative (0 % to 100 %)",
+    y = NULL,
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 100),
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "title_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall Plot
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    panel.grid = element_blank(),
+    
+    # Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col
+    ),
+    
+    # Strip Text
+    strip.background = element_blank(),
+    strip.text = element_text(
+      hjust = 1,
+      size = bts * 2,
+      margin = margin(0,0,-20,0, "mm"),
+      family = "body_font"
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      size = bts * 2.5,
+      hjust = 0.5,
+      margin = margin(10,0,0,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      size = 0.75 * bts
+    )
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_shakespeare.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_shakespeare.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_shakespeare.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_math_olymp.png"
+    )
+  )
+```
