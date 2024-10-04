@@ -9,6 +9,7 @@ categories:
   - "Maps"
   - "Geopolitics"
   - "Sciences"
+  - "{packagename}"
 image: ".png"
 format:
   html:
@@ -23,11 +24,12 @@ execute:
 filters:
   - social-share
 share:
-  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
   twitter: true
   linkedin: true
   email: true
   mastodon: true
+bibliography: references.bib
 ---
 
 **\|** [Source](#) **\|** [Data](#)
@@ -142,12 +144,6 @@ xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-```
-
-Plot Text
-
-```{r}
-#| label: plot-text
 
 plot_title <- ""
 
@@ -162,6 +158,10 @@ plot_caption <- paste0(
 subtitle_text <- ""
 plot_subtitle <- str_wrap(subtitle_text, width = 100)
 plot_subtitle |> str_view()
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
 ```
 
 Data Analysis and Wrangling
@@ -171,10 +171,10 @@ Data Analysis and Wrangling
 
 ```
 
-The Base Plot - World Map
+The Base Plot
 
 ```{r}
-#| label: main-dataviz
+#| label: base-plot
 
 
 ```
@@ -186,7 +186,7 @@ Add-on maps, insets and annotations
 
 ```
 
-Compiling Plots with Patchwork
+Compiling Plots with `{patchwork}`[@patchwork]
 
 ```{r}
 #| label: patchwork
@@ -207,8 +207,14 @@ g <- g_base +
   plot_annotation(
     theme = theme(
       plot.background = element_rect(
-        fill = bg_col, 
-        colour = NA, linewidth = 0
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
+      ),
+      panel.background = element_rect(
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
       )
     )
   )
@@ -221,11 +227,47 @@ Savings the graphics
 #| label: save-image
 
 ggsave(
-  filename = here::here("data_vizs", ".png"),
+  filename = here::here("data_vizs", "....png"),
   plot = g,
   width = 210,    # Default A4 size page
   height = 297,   # Default A4 size page
   units = "mm",
   bg = bg_col
 )
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "....png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "....png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
 ```
