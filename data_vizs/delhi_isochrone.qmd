@@ -1,0 +1,341 @@
+---
+title: "Isochrone Map: Delhi's Airport driving time"
+author: "Aditya Dahiya"
+date: "2024-10-04"
+subtitle: "An isochrone showing the time it takes to drive to New Delhi IGI Airport from different parts of India's National Capital Region"
+categories:
+  - "Maps"
+  - "India"
+  - "Geocomputation"
+image: "thumbnails/delhi_isochrone.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: true
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+**Isochrones** are lines on a map that connect points where travel time from a specific location is the same. In the context of my map, the isochrones represent driving distances at 10-minute intervals, starting from 10 minutes and extending up to 60 minutes from New Delhi Indira Gandhi International (IGI) Airport Terminal 3. This visualization helps users understand how far they can travel within specific time frames under normal traffic conditions. The map was created using open-source data from [OpenRouteService](https://openrouteservice.org/), and the methodology and code were inspired by the work of Milos Popovic, whose detailed tutorial and code are available on [GitHub](https://github.com/milos-agathon/isochrone_maps) and through [his video tutorial](https://www.youtube.com/watch?v=UNGzJrx8VrE).
+
+![An isochrone map (map showing areas with equal distances in driving time) from New Delhi's International Airport, using data from www.openrouteservice.org and Open Street Maps](delhi_isochrone.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+library(openrouteservice)     # Get catchment areas in sf format
+library(leaflet)              # Interactive Maps
+library(tidyverse)            # Data Wrangling & ggplot2
+# library(maptiles)             # Get map data rasters for background
+library(sf)                   # for SF objects in ggplot2
+# library(tidyterra)            # Use maptiles with ggplot2
+# library(fontawesome)          # Icons display in ggplot2
+# library(ggtext)               # Markdown text support for ggplot2
+# library(showtext)             # Display fonts in ggplot2
+
+# Mapping travel catchment areas by Milos Popovic 2023/10/10
+# Video Link: https://www.youtube.com/watch?v=UNGzJrx8VrE
+# Code: https://github.com/milos-agathon/isochrone_maps
+
+# Install the Open Route Service R-package
+# remotes::install_github(
+#   "GIScience/openrouteservice-r"
+# )
+
+# Getting the main parameters
+
+# Seeing the available kinds of modes of travel
+# openrouteservice::ors_profile()
+# api_key <- "" # API key from https://openrouteservice.org/
+
+# Coordinates of IGI Airport Terminal 3, New Delhi, India
+# coords <- data.frame(
+#   lon = 77.0857630708, 
+#   lat = 28.5554206018
+#   )
+
+# Getting the Iso-chrones data from OpenRouteService
+# car_delhi <- openrouteservice::ors_isochrones(
+#   locations = coords,
+#   profile = "driving-car",
+#   range = 3600,
+#   interval = 600,
+#   api_key = api_key,
+#   output = "sf"
+# )
+
+# write_rds(car_delhi, here::here("data", "delhi_isochrone.rds"))
+# Check the size fo the data fetched
+# object.size(car_delhi) |> print(units = "Kb")
+
+# For purpose of rendering this page, I have used 
+# downloaded data
+
+car_delhi <- read_rds(here::here("data", 
+                                 "delhi_isochrone.rds"))
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+#| eval: false
+
+
+# Font for titles
+font_add_google("Teko",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Teko",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "white"
+
+# Colour for the text
+text_col <- "grey5" 
+
+# Colour for highlighted text
+text_hil <- "grey10" 
+
+# Define Base Text Size
+bts <- 120 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Driving Time to Delhi's International Airport\n(Isochrones)"
+
+plot_caption <- paste0(
+  "**Data:** openrouteservice.org<br>",
+  "**Technique:** Milos Popovic<br>", 
+  "**Code:** ", 
+  social_caption_1, 
+  "**<br>Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Data Analysis and Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# We need to intersect the bigger and smaller polygons so that 
+# they dont overlap, and bigger polygons dont overshadow
+sf::sf_use_s2(F)        # Turn off spherical geometry
+car_delhi_cropped <- car_delhi |> 
+  mutate(mins = as_factor(value / 60)) |> 
+  group_by(mins) |> 
+  st_intersection() |>
+  ungroup()
+
+# Data needed to make a Static Graphic with ggplot2
+# car_delhi_merc <- sf::st_transform(
+#   car_delhi_cropped,
+#   4326
+# )
+# 
+# delhi_layer <- maptiles::get_tiles(
+#   car_delhi_merc,
+#   provider = "CartoDB.Positron",
+#   zoom = 9
+# )
+# 
+# object.size(delhi_layer) |> print(units = "Kb")
+```
+
+An interactive plot using {leaflet}
+
+```{r}
+#| eval: true
+#| fig-cap: "An interactive isochrone map of driving times to the New Delhi's International Airport"
+#| label: fig-interact
+#| fig-width: 10
+#| fig-asp: 1
+
+# An interactive map with leaflet
+pal_fact <- leaflet::colorFactor(
+  "RdPu",
+  domain = car_delhi_cropped$mins,
+  reverse = T,
+  na.color = "transparent"
+)
+
+leaflet::leaflet(
+  car_delhi_cropped
+  ) |>
+  leaflet::addPolygons(
+    fill = T,
+    stroke = T,
+    color = pal_fact,
+    weight = .3,
+    fillColor = ~pal_fact(mins),
+    fillOpacity = .2
+  ) |>
+  leaflet::addProviderTiles(
+    "CartoDB.Positron"
+  ) |>
+  leaflet::addLegend(
+    "bottomright",
+    pal = pal_fact,
+    values = car_delhi_cropped$mins,
+    labels = car_delhi_cropped$mins,
+    opacity = .5,
+    title = "Driving Time to IGI Airport (Delhi)"
+  )
+
+```
+
+The Base Plot - static graphics
+
+```{r}
+#| label: base-plot
+#| eval: false
+
+# oops! code deleted by mistake, here is Milo's original code
+
+ggplot() +
+    tidyterra::geom_spatraster_rgb(
+        data = ams_layer
+    ) +
+    geom_sf(
+        data = cycling_ams_merc,
+        aes(
+            fill = factor(mins),
+            color = factor(mins),
+            geometry = geometry
+        ),
+        size = .2,
+        alpha = .5,
+        inherit.aes = F
+    ) +
+    scale_fill_manual(
+        name = "Minutes",
+        values = hcl.colors(
+            6, "RdPu"
+        )
+    ) +
+    scale_color_manual(
+        values = hcl.colors(
+            6, "RdPu"
+        )
+    ) +
+    guides(
+        color = "none",
+        fill = guide_legend(
+            nrow = 1,
+            byrow = T,
+            keyheight = unit(5, "mm"),
+            keywidth = unit(5, "mm"),
+            title.position = "top",
+            label.position = "bottom",
+            label.hjust = .5
+        )
+    ) +
+    theme_void() +
+    theme(
+        legend.position = "top",
+        plot.margin = unit(
+            c(
+                t = 0, r = 0,
+                b = 0, l = 0
+            ), "lines"
+        )
+    ) +
+    labs(
+        title = "Cycling distance in Amsterdam"
+    )
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+#| eval: false
+
+ggsave(
+  filename = here::here("data_vizs", "....png"),
+  plot = g,
+  width = 210,    # Default A4 size page
+  height = 297,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "delhi_isochrone.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "delhi_isochrone.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
