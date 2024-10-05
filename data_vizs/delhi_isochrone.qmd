@@ -7,6 +7,8 @@ categories:
   - "Maps"
   - "India"
   - "Geocomputation"
+  - "Haryana"
+  - "Interactive"
 image: "thumbnails/delhi_isochrone.png"
 format:
   html:
@@ -31,7 +33,7 @@ bibliography: references.bib
 
 **Isochrones** are lines on a map that connect points where travel time from a specific location is the same. In the context of my map, the isochrones represent driving distances at 10-minute intervals, starting from 10 minutes and extending up to 60 minutes from New Delhi Indira Gandhi International (IGI) Airport Terminal 3. This visualization helps users understand how far they can travel within specific time frames under normal traffic conditions. The map was created using open-source data from [OpenRouteService](https://openrouteservice.org/), and the methodology and code were inspired by the work of Milos Popovic, whose detailed tutorial and code are available on [GitHub](https://github.com/milos-agathon/isochrone_maps) and through [his video tutorial](https://www.youtube.com/watch?v=UNGzJrx8VrE).
 
-![An isochrone map (map showing areas with equal distances in driving time) from New Delhi's International Airport, using data from www.openrouteservice.org and Open Street Maps](delhi_isochrone.png){#fig-1}
+![Driving time [isochrone map](https://en.wikipedia.org/wiki/Isochrone_map) from New Delhi IGI International Airport Terminal 3, displaying 10-minute intervals from 10 minutes to 60 minutes. Each shaded region represents areas reachable within a specific travel time, providing a clear visualization of driving distances under normal traffic conditions. Data sourced from [OpenRouteService](https://openrouteservice.org/) and generated using map tiles from [Stadia Maps](https://stadiamaps.com/)' Stamen [Design](https://stadiamaps.com/stamen).](delhi_isochrone_2.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -66,10 +68,11 @@ library(sf)                   # for SF objects in ggplot2
 # api_key <- "" # API key from https://openrouteservice.org/
 
 # Coordinates of IGI Airport Terminal 3, New Delhi, India
-# coords <- data.frame(
-#   lon = 77.0857630708, 
-#   lat = 28.5554206018
-#   )
+coords <- data.frame(
+  lon = 77.0857630708,
+  lat = 28.5554206018,
+  image = "https://cdn-icons-png.flaticon.com/512/7720/7720736.png"
+  )
 
 # Getting the Iso-chrones data from OpenRouteService
 # car_delhi <- openrouteservice::ors_isochrones(
@@ -140,7 +143,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Driving Time to Delhi's International Airport\n(Isochrones)"
+plot_title <- "Driving Time to Delhi's International Airport (Isochrones)"
 
 plot_caption <- paste0(
   "**Data:** openrouteservice.org<br>",
@@ -183,6 +186,40 @@ car_delhi_cropped <- car_delhi |>
 # )
 # 
 # object.size(delhi_layer) |> print(units = "Kb")
+
+
+# Data needed to make a Static Graphic with ggmap
+# library(ggmap)
+# Register your Stadia Maps key
+# stadia_maps_api_key
+# register_stadiamaps(stadia_maps_api_key, write = FALSE)
+# 
+# background_tiles_bbox <- c(
+#   left = 76.45,
+#   right = 77.75,
+#   top = 29.1,
+#   bottom = 27.9
+# )
+# 
+# stamen_tiles_10 <- ggmap::get_stadiamap(
+#   background_tiles_bbox,
+#   zoom = 10,
+#   maptype = "stamen_toner"
+# )
+# 
+# stamen_tiles_11 <- ggmap::get_stadiamap(
+#   background_tiles_bbox,
+#   zoom = 11,
+#   maptype = "stamen_toner"
+# )
+# 
+# mypal <- paletteer::paletteer_d("rcartocolor::Geyser")[c(1:3,5:7)]
+# 
+# library(magick)
+# airport_icon <- magick::image_read("https://cdn-icons-png.flaticon.com/512/7720/7720736.png")
+# 
+# airport_icon |> 
+#   image_background("transparent")
 ```
 
 An interactive plot using {leaflet}
@@ -233,59 +270,112 @@ The Base Plot - static graphics
 #| label: base-plot
 #| eval: false
 
-# oops! code deleted by mistake, here is Milo's original code
-
-ggplot() +
-    tidyterra::geom_spatraster_rgb(
-        data = ams_layer
-    ) +
-    geom_sf(
-        data = cycling_ams_merc,
-        aes(
-            fill = factor(mins),
-            color = factor(mins),
-            geometry = geometry
-        ),
-        size = .2,
-        alpha = .5,
-        inherit.aes = F
-    ) +
-    scale_fill_manual(
-        name = "Minutes",
-        values = hcl.colors(
-            6, "RdPu"
-        )
-    ) +
-    scale_color_manual(
-        values = hcl.colors(
-            6, "RdPu"
-        )
-    ) +
-    guides(
-        color = "none",
-        fill = guide_legend(
-            nrow = 1,
-            byrow = T,
-            keyheight = unit(5, "mm"),
-            keywidth = unit(5, "mm"),
-            title.position = "top",
-            label.position = "bottom",
-            label.hjust = .5
-        )
-    ) +
-    theme_void() +
-    theme(
-        legend.position = "top",
-        plot.margin = unit(
-            c(
-                t = 0, r = 0,
-                b = 0, l = 0
-            ), "lines"
-        )
-    ) +
-    labs(
-        title = "Cycling distance in Amsterdam"
+g <- ggmap(stamen_tiles) +
+  geom_sf(
+    data = car_delhi_cropped,
+    mapping = aes(
+      x = NULL, y = NULL,
+      geometry = geometry,
+      fill = mins
+      ),
+    alpha = 0.4,
+    colour = "transparent"
+    )  +
+  scale_fill_manual(
+    values = mypal
+  ) +
+  ggimage::geom_image(
+    data = coords,
+    mapping = aes(
+      x = lon, y = lat,
+      image = image
     )
+  ) +
+  guides(
+    color = "none",
+    fill = guide_legend(
+      nrow = 1,
+      byrow = T,
+      keyheight = unit(20, "mm"),
+      keywidth = unit(20, "mm"),
+      title.position = "top",
+      label.position = "bottom",
+      label.hjust = .5
+      )
+    ) +
+  
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    fill = "Driving Time (in minutes)"
+  ) +
+  theme_void(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    # Overall Plot
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = "transparent",
+      linewidth = unit(5, "mm")
+    ),
+    plot.margin = margin(5,5,5,5, "mm"),
+    text = element_text(
+      colour = text_hil,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(1,0),
+    legend.margin = margin(3,10,1,10, "mm"),
+    legend.background = element_rect(
+      fill = alpha(bg_col, 0.2),
+      colour = "transparent"
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "mm")
+    ),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "mm")
+    ),
+    legend.justification = c(1, 1),
+    
+    # Labels
+    plot.caption = element_textbox(
+      fill = alpha(bg_col, 0.3),
+      box.colour = "transparent",
+      hjust = 0,
+      family = "caption_font",
+      margin = margin(5,0,0,0, "mm"),
+      padding = unit(c(2, 2, 2, 2), "mm"),
+      size = bts * 0.6,
+      lineheight = 0.35
+    ),
+    plot.title = element_textbox(
+      fill = alpha(bg_col, 0.3),
+      box.colour = "transparent",
+      hjust = 0.5,
+      size = bts * 1.5,
+      face = "bold",
+      family = "caption_font",
+      margin = margin(0,0,10,0, "mm"),
+      padding = unit(c(2, 2, 2, 2), "mm")
+    )
+    
+  )
+
+ggsave(
+  filename = here::here("data_vizs", "delhi_isochrone_2.png"),
+  plot = g,
+  width = 400,    # Default A4 size page
+  height = 500,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Savings the graphics
@@ -295,7 +385,7 @@ Savings the graphics
 #| eval: false
 
 ggsave(
-  filename = here::here("data_vizs", "....png"),
+  filename = here::here("data_vizs", "delhi_isochrone_2.png"),
   plot = g,
   width = 210,    # Default A4 size page
   height = 297,   # Default A4 size page
@@ -307,7 +397,7 @@ ggsave(
 
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", "delhi_isochrone.png")) |> 
+image_read(here::here("data_vizs", "delhi_isochrone_2.png")) |> 
   image_resize(geometry = "400") |> 
   image_write(
     here::here(
