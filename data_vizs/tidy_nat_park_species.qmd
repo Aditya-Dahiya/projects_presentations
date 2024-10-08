@@ -1,0 +1,453 @@
+---
+title: "Taxonomical Overview of Species in National Parks"
+author: "Aditya Dahiya"
+date: "2024-10-08"
+subtitle: "A hierarchical breakdown of number of species listed as 'abundant' in the most visited U.S. National Parks. Each concentric ring representing a taxonomical level. The numbers in parentheses indicate the count of species within each respective Category, Order, Family, or Genus."
+categories:
+  - "#TidyTuesday"
+  - "Donut Chart"
+  - "Hierarchical Data"
+image: "thumbnails/tidy_nat_park_species.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+This week, we’re diving into species data from the most visited National Parks in the USA, focusing on the top 15 parks. The dataset comes from [*NPSpecies*](https://irma.nps.gov/NPSpecies/Search/SpeciesList), a biodiversity database managed by the [National Park Service](https://www.nps.gov/) (NPS), which lists species found in National Parks. Each species listed in *NPSpecies* ideally has credible evidence, such as observations or reports, to confirm its presence. For more technical details on the dataset, including column definitions and field tags, refer to the [NPSpecies User Guide](https://irma.nps.gov/content/npspecies/Help/docs/NPSpecies_User_Guide.pdf). The full dataset, curated by [Frank Hull](https://github.com/frankiethull), is also available on [GitHub](https://github.com/frankiethull/NPSpecies) for further exploration.
+
+![This hierarchical donut chart visualizes the taxonomical structure of species classified as 'abundant' in the 15 most visited U.S. National Parks. The innermost ring represents the broader taxonomical Category, followed by rings for Order, Family, and Genus as we move outward. Each label includes the number of species in parentheses, illustrating how many species belong to that specific Category, Order, Family, or Genus. The chart highlights the diversity and taxonomical distribution of abundant species in these protected natural areas.](tidy_nat_park_species.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading libraries & data
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Option 2: Read data directly from GitHub
+
+nps_species_data <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-08/most_visited_nps_species_data.csv') |> 
+  janitor::clean_names()
+```
+
+Data Wrangling and EDA
+
+```{r}
+#| label: eda-data
+
+# nps_species_data |> 
+#   names()
+# 
+# nps_species_data |> 
+#   count(abundance)
+# 
+# nps_species_data |> 
+#   separate_wider_delim(
+#     cols = sci_name,
+#     delim = " ",
+#     names = c("genus", "species"),
+#     too_few = "align_start",
+#     too_many = "drop"
+#   ) |> 
+#   count(category_name, order, family, genus)
+  
+df_ab <- nps_species_data |> 
+  filter(park_accepted) |> 
+  filter(abundance %in% c("Abundant")) |> 
+  separate_wider_delim(
+    cols = sci_name,
+    delim = " ",
+    names = c("genus", "species"),
+    too_few = "align_start",
+    too_many = "drop"
+  ) |> 
+  distinct(
+    category_name, order, 
+    family, genus, species)
+
+# nps_species_data |> 
+#   count(abundance)
+
+border_val <- unit(1.5, "mm")
+
+# A sequence of Alpha Values for using in scale
+generate_alphas <- function(n, increment){
+  sequence <- numeric(n)  # Initialize sequence vector
+  sequence[1] <- 0.05     # Starting value
+  for (i in 2:n) {
+    next_value <- sequence[i - 1] + increment
+    if (next_value > 1) {
+      next_value <- next_value - 1
+    }
+    sequence[i] <- next_value
+  }
+  return(sequence)
+}
+
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira Semi Condensed",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+bg_col = "white"
+text_col <- "grey20"
+text_hil <- "grey20"
+mypal <- paletteer::paletteer_d(
+  "ggsci::flattastic_flatui",
+  direction = -1)
+mypal <- mypal[c(2, 4:12)]
+mypal
+bts <- 20
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Taxonomical Overview of Abundant Species\nacross the 15 most visited U.S. National Parks" 
+
+plot_subtitle <- str_wrap("A hierarchical breakdown of number of species listed as 'abundant' in the most visited U.S. National Parks. Each concentric ring representing a taxonomical level. The numbers in parentheses indicate the count of species within each respective Category, Order, Family, or Genus.", 98)
+str_view(plot_subtitle)
+
+plot_caption <- paste0(
+  "**Data:** US National Park Service; Frank Hull", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+The static plot
+
+```{r}
+#| label: static-plot
+
+# Inspiration
+# https://medium.com/optima-blog/create-basic-sunburst-graphs-with-ggplot2-7d7484d92c61
+# https://www.pipinghotdata.com/posts/2021-06-01-custom-interactive-sunbursts-with-ggplot-in-r/
+# https://twitter.com/PipingHotData/status/1215699305555746816
+
+
+g <- ggplot() +
+  
+  # Tier 1: Category (0.6 to 1.4 on x-axis / radius)
+  geom_col(
+    data = df_ab |> count(category_name),
+    mapping = aes(
+      x = 1, 
+      y = n,
+      fill = category_name
+    ),
+    width = 0.8,
+    colour = bg_col,
+    linewidth = border_val
+  ) +
+  geom_text(
+    data = df_ab |> count(category_name),
+    mapping = aes(
+      x = 1,
+      y = n,
+      group = category_name,
+      label = paste0(category_name, " (", n, ")")    
+    ),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    angle = 90,
+    family = "body_font",
+    size = 0.8 * bts,
+    fontface = "bold"
+  ) +
+  annotate(
+    geom = "text",
+    x = 1.45,
+    y = 0,
+    label = "Category",
+    size = 1.5 * bts,
+    family = "title_font",
+    colour = text_col,
+    fontface = "bold"
+  ) +
+  
+  
+  # Tier 2: Order (1.6 to 2.2 on x-axis / radius)
+  geom_col(
+    data = df_ab |> count(category_name, order),
+    mapping = aes(
+      x = 1.9, 
+      y = n,
+      group = category_name,
+      fill = category_name,
+      alpha = order
+    ),
+    width = 0.6,
+    colour = bg_col,
+    linewidth = border_val * 0.75
+  ) +
+  geom_text(
+    data = df_ab |> count(category_name, order),
+    mapping = aes(
+      x = 1.9,
+      y = n,
+      group = category_name,
+      label = paste0(order, " (", n, ")")    
+    ),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    angle = 90,
+    check_overlap = TRUE,
+    family = "body_font",
+    size = 0.5 * bts
+  ) +
+  annotate(
+    geom = "text",
+    x = 2.25,
+    y = 0,
+    label = "Order",
+    size = 1.5 * bts,
+    family = "title_font",
+    colour = text_col,
+    fontface = "bold"
+  ) +
+  
+  
+  # Tier 3: Family (2.4 to 2.8 on x-axis / radius)
+  geom_col(
+    data = df_ab |> count(category_name, order, family),
+    mapping = aes(
+      x = 2.6, 
+      y = n,
+      group = category_name,
+      fill = category_name,
+      alpha = family
+    ),
+    width = 0.4,
+    colour = bg_col,
+    linewidth = border_val * 0.5
+  ) +
+  geom_text(
+    data = df_ab |> count(category_name, order, family),
+    mapping = aes(
+      x = 2.6,
+      y = n,
+      group = category_name,
+      label = paste0(family, " (", n, ")")    
+    ),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    angle = 90,
+    check_overlap = TRUE,
+    family = "body_font",
+    size = 0.35 * bts
+  ) +
+  annotate(
+    geom = "text",
+    x = 2.85,
+    y = 0,
+    label = "Family",
+    size = 1.5 * bts,
+    colour = text_col,
+    family = "title_font",
+    fontface = "bold"
+  ) +
+  
+  
+  # Tier 4: Genus (3 to 3.2 on x-axis / radius)
+  geom_col(
+    data = df_ab |> count(category_name, order, family, genus),
+    mapping = aes(
+      x = 3.1, 
+      y = n,
+      group = category_name,
+      fill = category_name,
+      alpha = genus
+    ),
+    width = 0.2,
+    colour = bg_col,
+    linewidth = border_val * 0.25
+  ) +
+  geom_text(
+    data = df_ab |> count(category_name, order, family, genus),
+    mapping = aes(
+      x = 3.1,
+      y = n,
+      group = category_name,
+      label = paste0(genus, " (", n, ")")    
+    ),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    angle = 90,
+    check_overlap = TRUE,
+    family = "body_font",
+    size = 0.2 * bts
+  ) +
+  annotate(
+    geom = "text",
+    x = 3.25,
+    y = 0,
+    label = "Genus",
+    size = 1.5 * bts,
+    colour = text_col,
+    family = "title_font",
+    fontface = "bold"
+  ) +
+  
+  coord_radial(
+    theta = "y",
+    expand = FALSE,
+    inner.radius = 0.1,
+    rotate.angle = TRUE,
+    clip = "off"
+  ) +
+  scale_x_continuous(
+    limits = c(0.5, 3.3),
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(
+    values = mypal
+  ) +
+  scale_alpha_manual(
+    values = generate_alphas(2000, 0.3)
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme_void(
+    base_size = bts * 3,
+    base_family = "title_font"
+  ) +
+  theme(
+    # Overall
+    legend.position = "none",
+    plot.margin = margin(0,-60,0,-60, "mm"),
+    text = element_text(
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      margin = margin(20,0,5,0, "mm"),
+      hjust = 0.5,
+      size = 8 * bts,
+      face = "bold",
+      colour = "grey25"
+    ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,-45,0, "mm"),
+      hjust = 0.5,
+      size = 4 * bts,
+      colour = "grey25"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(-45,0,5,0, "mm"),
+      hjust = 0.5
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs", 
+    "tidy_nat_park_species.png"
+  ),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", 
+                        "tidy_nat_park_species.png"),
+  plot = g,
+  width = 400,    # Best Twitter Aspect Ratio = 5:4
+  height = 500,   
+  units = "mm",
+  bg = "white"
+)
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_nat_park_species.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_nat_park_species.png"
+    )
+  )
+```
