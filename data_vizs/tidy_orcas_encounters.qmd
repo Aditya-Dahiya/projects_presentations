@@ -33,7 +33,7 @@ This week's Tidy Tuesday dataset comes from the Center for Whale Research (CWR),
 
 ### **How I made this graphic?**
 
-Loading required libraries, data import & creating custom functions
+Loading required libraries, data import & creating custom functions.
 
 ```{r}
 #| label: setup
@@ -51,6 +51,7 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
+library(ggmap)                # To get background map tiles
 
 # Option 1: Loading data directly from GitHub
 orcas <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-15/orcas.csv')
@@ -64,7 +65,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Scope One",
+font_add_google("Lato",
   family = "title_font"
 ) 
 
@@ -74,23 +75,23 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Barlow Semi Condensed",
+font_add_google("Oswald",
   family = "body_font"
 ) 
 
 showtext_auto()
 
 # Background Colour
-bg_col <- "lightblue"
+bg_col <- "white"
 
 # Colour for the text
-text_col <- "grey15" 
+text_col <- colorspace::darken("#3d545e", 0.2) 
 
 # Colour for highlighted text
-text_hil <- "grey20" 
+text_hil <- colorspace::darken("#3d545e", 0.2) 
 
 # Define Base Text Size
-bts <- 40 
+bts <- 90 
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -104,18 +105,18 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- ""
+plot_title <- "Tracing Encounters: Orcas in the Salish Sea"
 
 plot_caption <- paste0(
-  "**Data:** ", 
+  "**Data:** Center for Whale Research (CWR)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-subtitle_text <- ""
-plot_subtitle <- str_wrap(subtitle_text, width = 100)
+subtitle_text <- "Arrows trace the journey of each encounter with a Southern Resident killer whale, offering a visual exploration of where these whales are most frequently observed. The map shows a dense cluster of sightings, underscoring the importance of specific areas in the Salish Sea."
+plot_subtitle <- str_wrap(subtitle_text, width = 95)
 plot_subtitle |> str_view()
 
 rm(github, github_username, xtwitter, 
@@ -128,26 +129,13 @@ Exploratory Data Analysis and Wrangling
 ```{r}
 #| label: data-wrangling
 
-summarytools::dfSummary(orcas) |> 
-  summarytools::view()
+# summarytools::dfSummary(orcas) |> 
+#   summarytools::view()
 
-orcas |> 
-  select(
-    duration,
-    begin_latitude,
-    begin_longitude,
-    end_latitude,
-    end_longitude,
-    location
-  ) |> 
-  mutate(
-    duration = as.numeric(
-      str_extract(
-        duration,
-        "\\d+(?=s)"
-      )
-    )
-  )
+# Manually drop the erratic ids by looking at the map
+id_to_filter <- c(7, 221, 167, 499, 152, 8, 21, 
+                  157, 56, 471, 193, 419, 562)
+
 
 df <- orcas |> 
   # Only keep relevant variables
@@ -171,50 +159,118 @@ df <- orcas |>
   ) |> 
   
   # remove aberrant durations
-  filter(duration >= 0)
-```
-
-The Base Plot
-
-```{r}
-#| label: base-plot
-
-df |> 
+  filter(duration >= 0) |> 
+  
   filter(
     !(
       (begin_latitude == end_latitude) &
       (begin_longitude == end_longitude)  
     )
   ) |> 
-  ggplot() +
-  # geom_point(
-  #   mapping = aes(
-  #     x = begin_longitude,
-  #     y = begin_latitude
-  #   ),
-  #   alpha = 0.5,
-  #   colour = "red"
-  # ) +
-  # geom_point(
-  #   mapping = aes(
-  #     x = end_longitude,
-  #     y = end_latitude
-  #   ),
-  #   alpha = 0.5,
-  #   colour = "blue"
-  # ) +
+  mutate(
+    id = row_number()
+  ) |> 
+  filter(!(id %in% id_to_filter))
+
+# Data needed to make a Static Graphic with ggmap
+library(ggmap)
+# Register your Stadia Maps key
+stadia_maps_api_key
+register_stadiamaps(stadia_maps_api_key, write = FALSE)
+ 
+background_tiles_bbox <- c(
+ left = min(c(df$begin_longitude, df$end_longitude), na.rm = T) - 0.2,
+ right = max(c(df$begin_longitude, df$end_longitude), na.rm = T) + 0.2,
+ top = max(c(df$begin_latitude, df$end_latitude), na.rm = T),
+ bottom = min(c(df$begin_latitude, df$end_latitude), na.rm = T) - 0.1
+)
+
+background_tiles_bbox <- c(
+ left = min(c(df$begin_longitude, df$end_longitude), na.rm = T) - 0.2,
+ right = -122.2,
+ top = max(c(df$begin_latitude, df$end_latitude), na.rm = T),
+ bottom = min(c(df$begin_latitude, df$end_latitude), na.rm = T) - 0.1
+)
+
+stamen_tiles_lowres <- ggmap::get_stadiamap(
+   background_tiles_bbox,
+   zoom = 9,
+   maptype = "stamen_terrain_background"
+)
+
+# stamen_tiles_10 <- ggmap::get_stadiamap(
+#    background_tiles_bbox,
+#    zoom = 11,
+#    maptype = "stamen_terrain_background"
+# )
+
+object.size(stamen_tiles_lowres) |> print(units = "Mb")
+```
+
+The Base Plot [@ggmap]
+
+```{r}
+#| label: base-plot
+
+g <- ggmap(
+  stamen_tiles_lowres
+) +
   geom_segment(
+    data = df,
     mapping = aes(
       x = begin_longitude,
       y = begin_latitude,
       xend = end_longitude,
       yend = end_latitude
     ),
-    linewidth = 0.1,
+    linewidth = 0.5,
     arrow = arrow(
-      length = unit(1, "mm")
+      length = unit(2, "mm")
     ),
-    alpha = 0.5
+    alpha = 0.7,
+    linetype = 1,
+    colour = "grey20"
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  # Add a north arrow
+  annotation_north_arrow(
+    location = "tl",
+    style = north_arrow_nautical(text_size = bts, text_col = text_col)
+    
+  ) + 
+  
+  theme(
+    text = element_text(
+      colour = text_hil,
+      hjust = 0.5,
+      lineheight = 0.3
+    ),
+    plot.title = element_text(
+      margin = margin(10,0,5,0, "mm"),
+      hjust = 0.5,
+      size = 2 * bts,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      size = bts
+    ),
+    plot.caption = element_textbox(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5,
+      size = 0.5 * bts
+    ),
+    plot.margin = margin(0,5,0,0, "mm"),
+    panel.border = element_blank()
   )
 ```
 
@@ -223,6 +279,68 @@ Add-on maps, insets and annotations
 ```{r}
 #| label: insets
 
+g_month <- orcas |> 
+  mutate(
+    month = month(date, label = TRUE), 
+    year = year(date),
+    .keep = "used"
+  
+  ) |> 
+  drop_na() |> 
+  count(month) |> 
+  ggplot(
+    mapping = aes(y = month, x = n, label = n)
+  ) +
+  geom_col(
+    colour = "transparent",
+    fill = alpha(text_col, 0.5),
+    width = 0.75
+  ) +
+  geom_text(
+    hjust = 0,
+    nudge_x = 2,
+    family = "body_font",
+    colour = text_col,
+    fontface = "bold",
+    size = bts / 6
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0, 0.05)), 
+    breaks = seq(0, 160, 40)
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = "Encounters by the Month\n(2017-2024)",
+    y = NULL,
+    x = "Number of Encounters"
+  ) +
+  theme_minimal(
+    base_size = bts / 2,
+    base_family = "body_font"
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = alpha(text_col, 0.5),
+      linetype = 1,
+      linewidth = 0.5
+    ),
+    text = element_text(
+      colour = text_col,
+      family = "body_font"
+    ),
+    plot.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
+    ),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm")
+  )
+
 ```
 
 Compiling Plots with `{patchwork}`[@patchwork]
@@ -230,16 +348,16 @@ Compiling Plots with `{patchwork}`[@patchwork]
 ```{r}
 #| label: patchwork
 
-g <- g_base +
+g_full <- g +
   
   # Add inset to the plot
   inset_element(
-    p = g1, 
+    p = g_month, 
     left = 0, 
-    right = 0.27,
-    bottom = 0.01,
-    top = 0.65, 
-    align_to = "plot"
+    right = 0.2,
+    bottom = 0,
+    top = 0.5, 
+    align_to = "panel"
   ) +
   
   # Basix Plot Annotations
@@ -258,6 +376,16 @@ g <- g_base +
     )
   )
 
+
+ggsave(
+  filename = here::here("data_vizs", 
+                        "tidy_orcas_encounters.png"),
+  plot = g_full,
+  width = 400, 
+  height = 400,
+  units = "mm",
+  bg = "#99b3cc"
+)
 ```
 
 Savings the graphics
