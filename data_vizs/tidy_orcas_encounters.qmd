@@ -1,0 +1,312 @@
+---
+title: "tidy_orcas_encounters"
+author: "Aditya Dahiya"
+date: "2024-10-15"
+subtitle: "tidy_orcas_encounters tidy_orcas_encounters"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_orcas_encounters.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+This week's Tidy Tuesday dataset comes from the Center for Whale Research (CWR), which monitors Southern Resident killer whales in the Salish Sea, part of the Pacific Northwest. The dataset, scraped by [Jadey Ryan](https://github.com/jadeynryan) and documented [here](https://jadeynryan.github.io/orcas/), contains information on encounters from 2017 to 2024. Each encounter involves photographing and identifying individual whales. The data can be accessed via the {`orcas`} R package and includes variables like encounter duration, location, and pod. While the dataset is mostly tidy, some inconsistencies such as missing values and negative durations remain. **\|** [Source](https://github.com/jadeynryan/orcas) **\|** [Data](https://github.com/rfordatascience/tidytuesday/blob/master/data/2024/2024-10-15/readme.md)
+
+![.......................](tidy_orcas_encounters.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(here)                 # Root Directory Management
+library(dataverse)            # Getting data from Harvard Dataverse
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Option 1: Loading data directly from GitHub
+orcas <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-15/orcas.csv')
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Scope One",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "lightblue"
+
+# Colour for the text
+text_col <- "grey15" 
+
+# Colour for highlighted text
+text_hil <- "grey20" 
+
+# Define Base Text Size
+bts <- 40 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- ""
+
+plot_caption <- paste0(
+  "**Data:** ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+subtitle_text <- ""
+plot_subtitle <- str_wrap(subtitle_text, width = 100)
+plot_subtitle |> str_view()
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: data-wrangling
+
+summarytools::dfSummary(orcas) |> 
+  summarytools::view()
+
+orcas |> 
+  select(
+    duration,
+    begin_latitude,
+    begin_longitude,
+    end_latitude,
+    end_longitude,
+    location
+  ) |> 
+  mutate(
+    duration = as.numeric(
+      str_extract(
+        duration,
+        "\\d+(?=s)"
+      )
+    )
+  )
+
+df <- orcas |> 
+  # Only keep relevant variables
+  select(
+    duration,
+    begin_latitude,
+    begin_longitude,
+    end_latitude,
+    end_longitude,
+    location
+  ) |>
+  mutate(
+    # remove parenthesis content from duration
+    duration = str_remove(duration, "\\s*\\(.*\\)"),
+    
+    # remove the "s" for seconds
+    duration = str_extract(duration, "-?\\d+"),
+    
+    # convert the duration into number
+    duration = as.numeric(duration)
+  ) |> 
+  
+  # remove aberrant durations
+  filter(duration >= 0)
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+df |> 
+  filter(
+    !(
+      (begin_latitude == end_latitude) &
+      (begin_longitude == end_longitude)  
+    )
+  ) |> 
+  ggplot() +
+  # geom_point(
+  #   mapping = aes(
+  #     x = begin_longitude,
+  #     y = begin_latitude
+  #   ),
+  #   alpha = 0.5,
+  #   colour = "red"
+  # ) +
+  # geom_point(
+  #   mapping = aes(
+  #     x = end_longitude,
+  #     y = end_latitude
+  #   ),
+  #   alpha = 0.5,
+  #   colour = "blue"
+  # ) +
+  geom_segment(
+    mapping = aes(
+      x = begin_longitude,
+      y = begin_latitude,
+      xend = end_longitude,
+      yend = end_latitude
+    ),
+    linewidth = 0.1,
+    arrow = arrow(
+      length = unit(1, "mm")
+    ),
+    alpha = 0.5
+  )
+```
+
+Add-on maps, insets and annotations
+
+```{r}
+#| label: insets
+
+```
+
+Compiling Plots with `{patchwork}`[@patchwork]
+
+```{r}
+#| label: patchwork
+
+g <- g_base +
+  
+  # Add inset to the plot
+  inset_element(
+    p = g1, 
+    left = 0, 
+    right = 0.27,
+    bottom = 0.01,
+    top = 0.65, 
+    align_to = "plot"
+  ) +
+  
+  # Basix Plot Annotations
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
+      ),
+      panel.background = element_rect(
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
+      )
+    )
+  )
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+ggsave(
+  filename = here::here("data_vizs", "tidy_orcas_encounters.png"),
+  plot = g,
+  width = 210,    # Default A4 size page
+  height = 297,   # Default A4 size page
+  units = "mm",
+  bg = bg_col
+)
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_orcas_encounters.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_orcas_encounters.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
