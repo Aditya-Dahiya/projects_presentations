@@ -2,9 +2,11 @@
 title: "The CIA World Factbook Data Visualization"
 author: "Aditya Dahiya"
 date: "2024-10-22"
-subtitle: "..........................."
+subtitle: "A cartogram of World Map that distorts the size of each country based on its population, with larger areas representing more populous nations."
 categories:
   - "#TidyTuesday"
+  - "Maps"
+  - "{cartogram}"
 image: "thumbnails/tidy_cia_factbook.png"
 format:
   html:
@@ -31,7 +33,7 @@ The dataset for this analysis comes from the [CIA World Factbook](https://www.ci
 
 Key variables in the dataset include country names, population figures, birth and death rates, life expectancy, maternal and infant mortality rates, internet users, migration statistics, and more. These metrics provide a well-rounded view of each country's demographic and social health indicators. No further data cleaning was necessary as the dataset was already well-prepared for analysis.
 
-![tidy_cia_factbook](tidy_cia_factbook.png)
+![This cartogram distorts the size of each country based on its population, with larger areas representing more populous nations. The colors indicate population density, where darker shades show higher concentrations of people per square kilometer, offering a visual contrast between vast, sparsely populated regions and densely packed areas.](tidy_cia_factbook.png)
 
 ### **How I made this graphic?**
 
@@ -65,7 +67,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Lato",
+font_add_google("Offside",
   family = "title_font"
 ) 
 
@@ -75,7 +77,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Oswald",
+font_add_google("Smooch Sans",
   family = "body_font"
 ) 
 
@@ -84,11 +86,11 @@ showtext_auto()
 # Background Colour
 bg_col <- "white"
 
-# Colour for the text
-text_col <- colorspace::darken("#3d545e", 0.2) 
+# Colour for the text (highlighted)
+text_hil <- "#00778BFF" 
 
-# Colour for highlighted text
-text_hil <- colorspace::darken("#3d545e", 0.2) 
+# Colour for text
+text_col <- "#211747FF" 
 
 # Define Base Text Size
 bts <- 90 
@@ -105,17 +107,17 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "..................."
+plot_title <- "A Cartogram of the countries' population\n and Population Density"
 
 plot_caption <- paste0(
-  "**Data:** ..................", 
+  "**Data:** CIA World Factbook, {openintro}", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
 
-subtitle_text <- "............................."
+subtitle_text <- "Countries resized to reflect their population, with vibrant shades depicting population density (persons per square kilometer) -- revealing the dominance of Asia and Africa."
 plot_subtitle <- str_wrap(subtitle_text, width = 95)
 plot_subtitle |> str_view()
 
@@ -130,15 +132,12 @@ Exploratory Data Analysis and Wrangling
 #| label: data-wrangling
 
 # Get world map data
-world_map <- rnaturalearth::ne_countries(scale = "small") |> 
+world_map <- rnaturalearth::ne_countries(scale = "medium") |> 
   select(name, geometry, iso_a3, pop_est) |> 
   group_by(name) |> 
   slice_max(order_by = pop_est, n = 1) |> 
   ungroup()
 
-world_map |> 
-  ggplot() +
-  geom_sf()
 
 df1 <- cia_factbook |> 
   mutate(
@@ -148,8 +147,9 @@ df1 <- cia_factbook |>
       destination = "iso3c"
     )
   ) |> 
-  select(country, iso_a3, population) |> 
-  drop_na()
+  select(country, iso_a3, population, area) |> 
+  drop_na() |> 
+  mutate(pop_density = population / area)
 
 plotdf <- world_map |> 
   left_join(df1) |> 
@@ -158,20 +158,33 @@ plotdf <- world_map |>
     weight = "population"
   )
 
-plotdf2 <- world_map |> 
-  left_join(df1) |> 
-  st_transform(3857) |> 
-  cartogram_ncont(
-    weight = "population"
-  )
+# Other types of cartograms
+# 
+# plotdf2 <- world_map |> 
+#   left_join(df1) |> 
+#   st_transform(3857) |> 
+#   cartogram_ncont(
+#     weight = "population"
+#   )
+# 
+# plotdf3 <- world_map |> 
+#   left_join(df1) |> 
+#   st_transform(3857) |>
+#   filter(!is.na(population)) |> 
+#   cartogram_dorling(
+#     weight = "population"
+#   )
+# 
+# plotdf2 |> 
+#   ggplot() +
+#   geom_sf()
+# 
+# plotdf3 |> 
+#   ggplot() +
+#   geom_sf() +
+#   geom_sf_text(aes(label = name, size = population)) +
+#   coord_sf(crs = 3857)
 
-plotdf3 <- world_map |> 
-  left_join(df1) |> 
-  st_transform(3857) |>
-  filter(!is.na(population)) |> 
-  cartogram_dorling(
-    weight = "population"
-  )
 ```
 
 The Base Plot [@ggmap]
@@ -179,32 +192,111 @@ The Base Plot [@ggmap]
 ```{r}
 #| label: base-plot
 
-plotdf |> 
+g <- plotdf |> 
+  arrange(desc(area)) |> 
   ggplot() +
-  geom_sf() +
+  geom_sf(
+    mapping = aes(
+      fill = pop_density
+    ),
+    colour = bg_col,
+    linewidth = 0.5
+  ) +
   geom_sf_text(
-    aes(label = name)
+    mapping = aes(
+      label = name,
+      size = population
+    ),
+    family = "body_font",
+    check_overlap = TRUE
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "pals::kovesi.isoluminant_cgo_80_c38",
+    limits = c(0, 500),
+    oob = scales::squish
+  ) +
+  scale_size_continuous(
+    range = c(bts / 20, bts)
+  ) +
+  guides(
+    size = "none",
+    fill = guide_colourbar(
+      title = "Population Density (in persons per sq. km.)",
+      direction = "horizontal"
+    )
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(10,-25,10,-25, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      family = "body_font",
+      lineheight = 0.35
+    ),
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0.5, 0),
+    legend.justification = c(0.5, 0.5),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,3,0, "mm"),
+      size = 1.5 * bts,
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      size = 1.2 * bts
+    ),
+    legend.key.height = unit(5, "mm"),
+    legend.key.width = unit(60, "mm"),
+    legend.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      size = 2.5 * bts,
+      hjust = 0.5,
+      margin = margin(20,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.subtitle = element_text(
+      margin = margin(15,0,-10,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.25,
+      size = 1.7 * bts
+    ),
+    plot.caption = element_textbox(
+      margin = margin(50,0,10,0, "mm"),
+      family = "caption_font",
+      hjust = 0.5,
+      size = 0.8 * bts,
+      colour = text_hil
+    )
   )
-
-plotdf2 |> 
-  ggplot() +
-  geom_sf()
-
-plotdf3 |> 
-  ggplot() +
-  geom_sf() +
-  geom_sf_text(aes(label = name, size = population)) +
-  coord_sf(crs = 3857)
-
 
 ggsave(
   filename = here::here("data_vizs", 
                         "tidy_cia_factbook.png"),
-  plot = g_full,
-  width = 400, 
-  height = 400,
+  plot = g,
+  width = 600, 
+  height = 600,
   units = "mm",
-  bg = "#99b3cc"
+  bg = "white"
 )
 ```
 
@@ -306,6 +398,7 @@ sessioninfo::session_info()$packages |>
          version = loadedversion, 
          date, source) |> 
   arrange(package) |> 
+  filter(package %in% .packages()) |> 
   janitor::clean_names(
     case = "title"
   ) |> 
