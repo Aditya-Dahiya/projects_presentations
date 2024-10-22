@@ -1,0 +1,317 @@
+---
+title: "The CIA World Factbook Data Visualization"
+author: "Aditya Dahiya"
+date: "2024-10-22"
+subtitle: "..........................."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_cia_factbook.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+---
+
+The dataset for this analysis comes from the [CIA World Factbook](https://www.cia.gov/the-world-factbook/), specifically the [2014 Country Comparisons section](https://www.cia.gov/the-world-factbook/references/guide-to-country-comparisons). This comprehensive resource provides essential intelligence on various global aspects, including demographics, government, economics, and military statistics across 265 world entities. The data has been accessed via the [{`openintro`}](https://openintrostat.github.io/openintro/) R package and the [{`usdatasets`}](https://cran.r-project.org/package=usdatasets) R package, with additional insights shared through [this LinkedIn post](https://www.linkedin.com/posts/andrescaceresrossi_rstats-rstudio-opensource-activity-7249513444830318592-r395).
+
+Key variables in the dataset include country names, population figures, birth and death rates, life expectancy, maternal and infant mortality rates, internet users, migration statistics, and more. These metrics provide a well-rounded view of each country's demographic and social health indicators. No further data cleaning was necessary as the dataset was already well-prepared for analysis.
+
+![tidy_cia_factbook](tidy_cia_factbook.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(here)                 # Root Directory Management
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+library(cartogram)            # Cartogram maps in R
+library(sf)                   # Handling sf objects
+
+cia_factbook <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-22/cia_factbook.csv')
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Lato",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Oswald",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Background Colour
+bg_col <- "white"
+
+# Colour for the text
+text_col <- colorspace::darken("#3d545e", 0.2) 
+
+# Colour for highlighted text
+text_hil <- colorspace::darken("#3d545e", 0.2) 
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "..................."
+
+plot_caption <- paste0(
+  "**Data:** ..................", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+subtitle_text <- "............................."
+plot_subtitle <- str_wrap(subtitle_text, width = 95)
+plot_subtitle |> str_view()
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# Get world map data
+world_map <- rnaturalearth::ne_countries(scale = "small") |> 
+  select(name, geometry, iso_a3, pop_est) |> 
+  group_by(name) |> 
+  slice_max(order_by = pop_est, n = 1) |> 
+  ungroup()
+
+world_map |> 
+  ggplot() +
+  geom_sf()
+
+df1 <- cia_factbook |> 
+  mutate(
+    iso_a3 = countrycode::countrycode(
+      country,
+      origin = "country.name",
+      destination = "iso3c"
+    )
+  ) |> 
+  select(country, iso_a3, population) |> 
+  drop_na()
+
+plotdf <- world_map |> 
+  left_join(df1) |> 
+  st_transform(3857) |> 
+  cartogram_cont(
+    weight = "population"
+  )
+
+plotdf2 <- world_map |> 
+  left_join(df1) |> 
+  st_transform(3857) |> 
+  cartogram_ncont(
+    weight = "population"
+  )
+
+plotdf3 <- world_map |> 
+  left_join(df1) |> 
+  st_transform(3857) |>
+  filter(!is.na(population)) |> 
+  cartogram_dorling(
+    weight = "population"
+  )
+```
+
+The Base Plot [@ggmap]
+
+```{r}
+#| label: base-plot
+
+plotdf |> 
+  ggplot() +
+  geom_sf() +
+  geom_sf_text(
+    aes(label = name)
+  )
+
+plotdf2 |> 
+  ggplot() +
+  geom_sf()
+
+plotdf3 |> 
+  ggplot() +
+  geom_sf() +
+  geom_sf_text(aes(label = name, size = population)) +
+  coord_sf(crs = 3857)
+
+
+ggsave(
+  filename = here::here("data_vizs", 
+                        "tidy_cia_factbook.png"),
+  plot = g_full,
+  width = 400, 
+  height = 400,
+  units = "mm",
+  bg = "#99b3cc"
+)
+```
+
+Add-on maps, insets and annotations
+
+```{r}
+#| label: insets
+
+```
+
+Compiling Plots with `{patchwork}`[@patchwork]
+
+```{r}
+#| label: patchwork
+
+g_full <- g +
+  
+  # Add inset to the plot
+  inset_element(
+    p = g_month, 
+    left = 0, 
+    right = 0.2,
+    bottom = 0,
+    top = 0.5, 
+    align_to = "panel"
+  ) +
+  
+  # Basix Plot Annotations
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
+      ),
+      panel.background = element_rect(
+        fill = "transparent", 
+        colour = "transparent", 
+        linewidth = 0
+      )
+    )
+  )
+
+
+ggsave(
+  filename = here::here("data_vizs", 
+                        "tidy_cia_factbook.png"),
+  plot = g_full,
+  width = 400, 
+  height = 400,
+  units = "mm",
+  bg = "#99b3cc"
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_cia_factbook.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_cia_factbook.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(here)                 # Root Directory Management
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+library(ggmap)                # To get background map tiles
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
