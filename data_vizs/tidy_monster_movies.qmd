@@ -1,0 +1,353 @@
+---
+title: "Links between common Words in Monster Movies' titles"
+author: "Aditya Dahiya"
+date: "2024-10-29"
+subtitle: "'Monster' takes the spotlight as expected, but an eerie ensemble of connections—Loch Ness, Frankenstein, islands, madness, and party—reveals the intriguing, varied themes lurking within monster movie titles."
+categories:
+  - "#TidyTuesday"
+  - "Network Graph"
+  - "{ggraph}"
+image: "thumbnails/tidy_monster_movies.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+This week's dataset dives into the world of "monster" movies, focusing on films with the word "monster" in their title. The dataset, curated from the [Internet Movie Database (IMDb)](https://developer.imdb.com/non-commercial-datasets/), provides an exciting opportunity to analyze the genre combinations, titles, and trends surrounding monster-themed films. Questions arise: what are the most frequent genre pairings among these "monster" movies? And how do they compare with [summer movies](https://tidytues.day/2024/2024-07-30) or [holiday movies](https://tidytues.day/2023/2023-12-12)? For those interested in the psychology behind the appeal of horror, ["Why Do People Like Horror Films? A Statistical Analysis"](https://www.statsignificant.com/p/why-do-people-like-horror-films-a) offers insights into why audiences are drawn to these spine-chilling experiences. This dataset was prepared by [Jon Harmon](https://github.com/jonthegeek) and is accessible through the `tidytuesdayR` package or directly via GitHub.
+
+![This network graph highlights the 40 most common words in "monster" movie titles, with "monster" at the center. Notable links include "Loch Ness," "Frankenstein," and "madness," capturing the diverse and imaginative themes that define this genre.](tidy_monster_movies.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(here)                 # Root Directory Management
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+library(tidygraph)            # Using tidy functions with igraph 
+library(ggraph)               # igraph in R
+
+# Option 1: Loading data directly from GitHub
+monster_movie_genres <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-29/monster_movie_genres.csv')
+monster_movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-10-29/monster_movies.csv')
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Flavors",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Oswald",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+base_col <- "#6c25cf"
+
+# Colour for the text
+text_col <- colorspace::darken(base_col, 0.7) 
+
+# Colour for highlighted text
+text_hil <- colorspace::darken(base_col, 0.4) 
+
+link_col <- colorspace::lighten(base_col, 0.6)
+
+bg_col <- colorspace::lighten(base_col, 0.9)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "Monster Movies"
+
+plot_subtitle <- "Commonly occuring words in the titles of IMDb movies with the word \"monster\". Width of linkages reflect the times words occur together. Size of the word represents its frequency of occurence."
+
+plot_caption <- paste0(
+  "**Data:** IMDb Non-Commercial Datasets", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: data-wrangling
+
+# A tibble of words grouped by the movie title (i.e. a group for each movie)
+dfnet <- monster_movies |>  
+  select(tconst, original_title, simple_title, genres) |> 
+  group_by(original_title) |> 
+  separate_longer_delim(cols = simple_title,
+                        delim = " ") |> 
+  rename(word = simple_title) |> 
+  anti_join(stop_words) |> 
+  mutate(word = if_else(word == "monsters", "monster", word))
+  
+# Network graph for commonly occurring words, faceted by genre
+
+# A tibble of nodes
+dfnodes <- dfnet |> 
+  ungroup() |> 
+  count(word, sort = TRUE) |> 
+  rename(importance = n) |> 
+  filter(word != "")
+
+
+# Titles with 2 or more words  
+filter_title <- dfnet |>
+  group_by(tconst) |> 
+  count(sort = TRUE) |> 
+  filter(n > 1)
+
+# Computing the combinations of words within the titles
+# And, making a tibble of edges
+dfedges <- dfnet |> 
+  right_join(filter_title) |> 
+  group_by(original_title) |>
+  do(data.frame(t(combn(.$word, 2)))) |> 
+  count(X1, X2, sort = TRUE) |> 
+  rename(from = X1,
+         to = X2,
+         weightage = n,
+         group = original_title) |> 
+  ungroup() |> 
+  group_by(from, to) |> 
+  summarise(
+    weightage = sum(weightage)
+    ) |> 
+  filter(from != "" & to != "") |> 
+  arrange(desc(weightage)) |> 
+  filter(from != to) |> 
+  ungroup()
+  
+# Creating a tidygraph object
+
+movgraph <- tbl_graph(nodes = dfnodes,
+          edges = dfedges,
+          directed = FALSE,
+          node_key = "word")
+
+sel_nodes <- dfedges |> 
+  filter(weightage > 2) |> 
+  ungroup() |> 
+  select(from, to) |> 
+  pivot_longer(cols = everything()) |> 
+  pull(value) |> 
+  unique()
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+set.seed(3)
+
+g <- movgraph |>
+  activate(nodes) |>
+  slice_max(order_by = importance, n = 40) |> 
+  filter(!(word %in% c("2", "monsterland", "der"))) |> 
+  ggraph(layout = "kk") +
+  geom_edge_bend(
+    mapping = aes(
+      width = weightage, 
+      alpha = weightage
+    ),
+    color = link_col,
+    lineend = "round",
+    linejoin = "bevel",
+    strength = 0.2,
+    n = 100
+  ) +
+  geom_node_text(
+    aes(
+      label = word,
+      size = importance
+    ),
+    family = "title_font",
+    fontface = "bold",
+    alpha = 0.8,
+    colour = text_col
+  ) +
+
+  scale_size_continuous(range = c(40, 80)) +
+  scale_alpha_continuous(range = c(0.1, 0.4)) +
+  scale_edge_width(range = c(5, 25)) +
+
+  theme_void() +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = str_wrap(plot_subtitle, 100)
+  ) +
+  theme(
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      colour = text_col,
+      size = bts / 1.5,
+      margin = margin(0,0,10,0, "mm")
+    ),
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 4 * bts,
+      family = "title_font",
+      face = "bold",
+      colour = text_hil,
+      margin = margin(0,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = 1.2 * bts,
+      family = "caption_font",
+      colour = text_col,
+      lineheight = 0.3,
+      margin = margin(5,0,0,0, "mm")
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col,
+      linewidth = 1
+    ),
+    legend.position = "none",
+    plot.margin = margin(10,0,0,0, "mm"),
+    
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_monster_movies.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "tidy_monster_movies.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_monster_movies.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(janitor)              # Cleaning names etc.
+library(here)                 # Root Directory Management
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+library(tidygraph)            # Using tidy functions with igraph 
+library(ggraph)               # igraph in R
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
