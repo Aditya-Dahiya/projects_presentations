@@ -80,7 +80,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Saira",
+font_add_google("Bebas Neue",
   family = "title_font"
 ) 
 
@@ -90,7 +90,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Saira Condensed",
+font_add_google("Bowlby One",
   family = "body_font"
 ) 
 
@@ -148,10 +148,12 @@ Exploratory Data Analysis and Wrangling
 ```{r}
 #| label: data-wrangling
 
+sf_use_s2(FALSE)
+
 df <- rnaturalearth::ne_countries(
   returnclass = "sf",
   scale = "small"
-  ) |> 
+  ) |>
   select(admin, iso_a2, iso_a3, geometry) |> 
   left_join(
     countries |> 
@@ -160,16 +162,52 @@ df <- rnaturalearth::ne_countries(
         iso_a3 = alpha_3
       ) |> 
       select(iso_a2, iso_a3)
+  ) |> 
+  mutate(area = as.numeric(st_area(geometry))) |> 
+  mutate(
+    iso_a2 = case_when(
+      admin == "France" ~ "FR",
+      admin == "Norway" ~ "NO",
+      .default = iso_a2
+    )
+  ) |> 
+  mutate(
+    iso_a3 = case_when(
+      admin == "France" ~ "FRA",
+      admin == "Norway" ~ "NOR",
+      .default = iso_a3
+    )
   )
 
-ggplot(df) +
-  geom_sf() +
+
+spData::world |> 
+  select(iso_a2, area_km2, geom)
+
+
+df |> 
+  ggplot() +
+  geom_sf(
+    colour = alpha(text_hil, 0.05),
+    fill = "white"
+  ) +
   geom_sf_text(
     mapping = aes(
-      label = iso_a3
+      size = area,
+      label = iso_a2,
+      colour = iso_a2
     ),
-    size = 2
-  ) 
+    family = "title_font"
+  ) +
+  scale_size_continuous(
+    range = c(0.5, 10)
+  ) +
+  coord_sf(
+    crs = "ESRI:54030"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
 ```
 
 The Base Plot
