@@ -1,8 +1,8 @@
 ---
-title: "tidy_iso_country_codes"
+title: "World maps with ISO Alpha 2 & 3 codes for each country"
 author: "Aditya Dahiya"
-date: "2024-11-07"
-subtitle: "................................."
+date: "2024-11-15"
+subtitle: "A Simple world map, overlaid with ISO-3166 alpha-2 and alpha-3 codes for each country, sized by the geographical area of each country"
 categories:
   - "#TidyTuesday"
   - "Governance"
@@ -42,9 +42,9 @@ The dataset focuses on the ISO 3166 standard, which assigns codes to countries, 
 
 These tables facilitate the exploration of country and subdivision identifiers, such as 2- and 3-letter country codes, subdivision types (e.g., provinces or states), and details on formerly recognized countries and their withdrawal dates. By using functions like the `quick_map()` from the [{`countries`}](https://fbellelli.github.io/countries/reference/quick_map.html) package, one can visualize country codes and subdivisions on maps.
 
-The dataset offers a valuable resource for understanding global administrative regions, analyzing patterns in subdivisions, and historical changes in geopolitical entities (ISO, 2024; Wikipedia, n.d.)
+The dataset offers a valuable resource for understanding global administrative regions, analyzing patterns in subdivisions, and historical changes in geopolitical entities.
 
-![...................................................](tidy_iso_country_codes.png)
+![Simple world maps displaying ISO-3166 Alpha-2 and Alpha-3 codes for each country, sized by the geographical area of each country.](tidy_iso_country_codes.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -62,6 +62,7 @@ library(fontawesome)          # Icons display in ggplot2
 library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
 
 # Geocomputation
 library(sf)                   # Simple Features in R
@@ -94,19 +95,24 @@ font_add_google("Bowlby One",
   family = "body_font"
 ) 
 
+font_add_google(
+  "Bree Serif",
+  "slab_font"
+)
+
 showtext_auto()
 
 # A base Colour
-base_col <- "white"
-bg_col <- darken(base_col, 0.2)
+base_col <- "black"
+bg_col <- lighten(base_col, 0.2)
 seecolor::print_color(bg_col)
 
 # Colour for the text
-text_col <- darken(bg_col, 0.9)
+text_col <- lighten(bg_col, 0.8)
 seecolor::print_color(text_col)
 
 # Colour for highlighted text
-text_hil <- darken(bg_col, 0.7)
+text_hil <- lighten(bg_col, 0.9)
 seecolor::print_color(text_hil)
 
 # Define Base Text Size
@@ -125,13 +131,10 @@ social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- "......................."
-
-
-plot_subtitle <- str_wrap("............................", 130)
+plot_title <- "ISO-3166 Country Codes"
 
 plot_caption <- paste0(
-  "**Data:** ............................", 
+  "**Data:** {ISOcodes} by Christian Buchta & Kurt Hornik", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -179,35 +182,11 @@ df <- rnaturalearth::ne_countries(
     )
   )
 
+# Another easy method to fetch area 
+# (though not in this week's TidyTuesday)
+# spData::world |> 
+#   select(iso_a2, area_km2, geom)
 
-spData::world |> 
-  select(iso_a2, area_km2, geom)
-
-
-df |> 
-  ggplot() +
-  geom_sf(
-    colour = alpha(text_hil, 0.05),
-    fill = "white"
-  ) +
-  geom_sf_text(
-    mapping = aes(
-      size = area,
-      label = iso_a2,
-      colour = iso_a2
-    ),
-    family = "title_font"
-  ) +
-  scale_size_continuous(
-    range = c(0.5, 10)
-  ) +
-  coord_sf(
-    crs = "ESRI:54030"
-  ) +
-  theme_void() +
-  theme(
-    legend.position = "none"
-  )
 ```
 
 The Base Plot
@@ -216,6 +195,124 @@ The Base Plot
 #| label: base-plot
 
 
+g1 <- df |> 
+  ggplot() +
+  geom_sf(
+    colour = alpha(text_hil, 0.05),
+    fill = bg_col,
+    linewidth = 1
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      size = area,
+      label = iso_a2,
+      colour = iso_a2
+    ),
+    family = "slab_font"
+  ) +
+  scale_size_continuous(
+    range = c(10, 50)
+  ) +
+  coord_sf(
+    crs = "ESRI:54030"
+  ) +
+  labs(
+    subtitle = "Alpha-2 Codes"
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0,0,0,0, "mm"),
+    panel.border = element_blank(),
+    plot.subtitle = element_text(
+        margin = margin(0,0,-10,0, "mm"),
+        hjust = 0.1,
+        colour = text_col,
+        family = "title_font",
+        size = 1.5 * bts
+      )
+  )
+
+g2 <- df |> 
+  ggplot() +
+  geom_sf(
+    colour = alpha(text_hil, 0.05),
+    fill = bg_col,
+    linewidth = 1
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      size = area,
+      label = iso_a3,
+      colour = iso_a3
+    ),
+    family = "slab_font"
+  ) +
+  scale_size_continuous(
+    range = c(7, 40)
+  ) +
+  coord_sf(
+    crs = "ESRI:54030"
+  ) +
+  labs(
+    subtitle = "Alpha-3 Codes"
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0,0,-5,0, "mm"),
+    panel.border = element_blank(),
+    plot.subtitle = element_text(
+        margin = margin(0,0,-10,0, "mm"),
+        hjust = 0.1,
+        colour = text_col,
+        family = "title_font",
+        size = 1.5 * bts
+      )
+  )
+
+library(patchwork)
+
+g <- patchwork::wrap_plots(
+  g1, g2,
+  ncol = 1, nrow = 2
+  ) +
+  plot_annotation(
+    title = plot_title,
+    caption = plot_caption,
+    theme = theme(
+      plot.margin = margin(0,-15,0,-40, "mm"),
+      plot.title = element_text(
+        colour = text_col,
+        size = bts * 3.5,
+        hjust = 0.6,
+        margin = margin(10,0,10,0, "mm"),
+        family = "title_font",
+        face = "bold"
+      ),
+      plot.caption = element_textbox(
+        family = "caption_font",
+        hjust = 0.9,
+        margin = margin(0,0,10,0, "mm"),
+        colour = text_hil,
+        size = bts * 0.5
+      ),
+      plot.background = element_rect(
+        fill = bg_col,
+        colour = bg_col
+      ),
+      panel.background = element_rect(
+        fill = bg_col,
+        colour = bg_col
+      )
+    )
+  )
 
 ggsave(
   filename = here::here(
@@ -258,6 +355,21 @@ Session Info
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+# Geocomputation
+library(sf)                   # Simple Features in R
+
 
 
 sessioninfo::session_info()$packages |> 
