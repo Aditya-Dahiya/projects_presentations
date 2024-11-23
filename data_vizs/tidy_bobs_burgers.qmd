@@ -1,12 +1,11 @@
 ---
 title: "Bob's Burgers"
 author: "Aditya Dahiya"
-date: "2024-11-15"
-subtitle: "................."
+date: "2024-11-23"
+subtitle: "Exploring dialogue trends in Bob's Burgers with the power of {ggplot2} and {gghalves}, showcasing half-violin and haf-beeswarm scatter plots for storytelling."
 categories:
   - "#TidyTuesday"
-  - "Governance"
-  - "Geocomputation"
+  - "{gghalves}"
 image: "thumbnails/tidy_bobs_burgers.png"
 format:
   html:
@@ -34,11 +33,17 @@ comments:
 
 ## About the Data
 
-This dataset explores the dialogue metrics of episodes from the animated TV series *Bob's Burgers*. Compiled by [Steven Ponce](https://github.com/poncest), the data is made available through the [{bobsburgersR} R package](https://github.com/poncest/bobsburgersR), which includes episode transcripts and additional metadata. A [blog post by Steven Ponce](https://stevenponce.netlify.app/projects/standalone_visualizations/sa_2024-11-11.html) provides insights into visualizing this dataset. Curated for this week's Tidy Tuesday challenge by [Jon Harmon](https://github.com/jonthegeek), the dataset offers an opportunity to analyze dialogue trends and patterns across seasons. Key variables include dialogue density, average dialogue length, sentiment variance, unique word counts, and punctuation ratios (questions and exclamations). You can load the dataset using the `tidytuesdayR` package or directly from [GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-11-19/episode_metrics.csv). This dataset is ideal for practicing data tidying, visualization, and exploring nuanced relationships without inferring causation.
+This dataset explores the dialogue metrics of episodes from the animated TV series *Bob's Burgers*. Compiled by [Steven Ponce](https://github.com/poncest), the data is made available through the [{bobsburgersR} R package](https://github.com/poncest/bobsburgersR), which includes episode transcripts and additional metadata. A [blog post by Steven Ponce](https://stevenponce.netlify.app/projects/standalone_visualizations/sa_2024-11-11.html) provides insights into visualizing this dataset. Curated for this week's Tidy Tuesday challenge by [Jon Harmon](https://github.com/jonthegeek), the dataset offers an opportunity to analyze dialogue trends and patterns across seasons. Key variables include dialogue density, average dialogue length, sentiment variance, unique word counts, and punctuation ratios (questions and exclamations). You can load the dataset using the `tidytuesdayR` package or directly from [GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-11-19/episode_metrics.csv).
 
-![.......................](tidy_bobs_burgers.png){#fig-1}
+The visualization explores trends in dialogue punctuation in *Bob's Burgers* episodes across seasons, focusing on the proportion of dialogue lines containing question marks (`question_ratio`) and exclamation points (`exclamation_ratio`). The graphic features a split representation of data: a scatter plot highlighting individual episode ratios and a violin plot illustrating the overall distribution of these proportions by season. The analysis reveals a noticeable decline in both ratios over the latter seasons, suggesting a decrease in the use of questions and exclamatory expressions in dialogue. This shift could indicate changes in the show's tone, writing style, or character interactions as the series progresses.
+
+![This graphic explores how punctuation in Bob's Burgers dialogue has evolved across seasons, focusing on the proportion of lines containing question marks and exclamation points. Each dot represents an episode, while the violin plots show the distribution of these ratios within each season. The analysis highlights a clear decline in both questions and exclamations in later seasons, suggesting a subtle shift in the show's tone or dialogue style.](tidy_bobs_burgers.png){#fig-1}
 
 ### **How I made this graphic?**
+
+To create this graphic, I used the `{ggplot2}` package, a foundational tool for data visualization in R, in combination with the `{gghalves}` package authored by [Frederik Tiedemann](https://github.com/erocoar) and hosted on [GitHub](https://github.com/erocoar/gghalves). The `{gghalves}` package simplifies the creation of "half-half" plots by extending `{ggplot2}` with geoms such as `gghalves::geom_half_violin()` and `gghalves::geom_half_point()`. In this graphic, I used `geom_half_violin()` to represent the distribution of punctuation ratios across seasons and `geom_half_point()` to plot individual episode data points, combining them to show detailed insights. To highlight trends across seasons, I added smoothed lines using `ggplot2::geom_smooth()`. `{gghalves}` is a versatile package that makes it easy to compose compact visualizations by combining plot types, and more details can be found on its [GitHub repository](https://github.com/erocoar/gghalves).
+
+### Steps
 
 Loading required libraries, data import & creating custom functions.
 
@@ -56,10 +61,14 @@ library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Compiling Plots
 
+
+# devtools::install_github('erocoar/gghalves')
+
 # Geocomputation
-library(sf)                   # Simple Features in R
+library(gghalves)             # Half violin plot
 
 # Load the data
+episode_metrics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-11-19/episode_metrics.csv')
 
 ```
 
@@ -70,7 +79,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Bebas Neue",
+font_add_google("Rampart One",
   family = "title_font"
 ) 
 
@@ -80,29 +89,32 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Bowlby One",
+font_add_google("Atma",
   family = "body_font"
 ) 
 
-font_add_google(
-  "Bree Serif",
-  "slab_font"
-)
-
 showtext_auto()
 
+bobs_burgers_palette <- c(
+ "#f0262a", 
+ "#f172a9",	
+ "#95d244",
+ "#fcdd60",
+ "#9ac7e8"
+)
+ 
 # A base Colour
-base_col <- "black"
-bg_col <- lighten(base_col, 0.2)
+bg_col <- "#FEDD00FF"
 seecolor::print_color(bg_col)
 
+# Colour for highlighted text
+text_hil <- "#BA0C2FFF"
+seecolor::print_color(text_hil)
+
 # Colour for the text
-text_col <- lighten(bg_col, 0.8)
+text_col <- "#000000FF"
 seecolor::print_color(text_col)
 
-# Colour for highlighted text
-text_hil <- lighten(bg_col, 0.9)
-seecolor::print_color(text_hil)
 
 # Define Base Text Size
 bts <- 90 
@@ -116,16 +128,16 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
 
 # Add text to plot--------------------------------------------------------------
-plot_title <- "....................."
+plot_title <- "Fading Punctuation:\nThe Changing Voice of Bob's Burgers"
 
-plot_subtitle <- "........................."
+plot_subtitle <- "Each dot represents an Episode of Bob's Burgers. Over the seasons, there is a decline in the use of both questions and exclamations in its dialogue, suggesting a subtle shift in the show's tone: moving toward less dramatic and inquisitive interactions."
 
 plot_caption <- paste0(
-  "**Data:** ........................", 
+  "**Data:** {bobsburgersR} by Steven Ponce", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -142,12 +154,164 @@ Exploratory Data Analysis and Wrangling
 ```{r}
 #| label: data-wrangling
 
+# summarytools::dfSummary(episode_metrics) |> 
+#   summarytools::view()
+
+df <- episode_metrics |> 
+  select(season, episode, question_ratio, exclamation_ratio) |> 
+  pivot_longer(
+    cols = c(question_ratio, exclamation_ratio),
+    names_to = "facet_var",
+    values_to = "y_var"
+  )
 ```
 
 The Base Plot
 
 ```{r}
 #| label: base-plot
+
+facet_labeller <- c(
+  "% Dialogue ending in Questions (?)",
+  "% Dialogue ending in Exclamations (!)"
+)
+names(facet_labeller) <- unique(df$facet_var)
+
+g <- df |> 
+  ggplot(
+    mapping = aes(
+      y = y_var,
+      x = season,
+      group = season
+    )
+  ) +
+  
+  # Plotting the data
+  gghalves::geom_half_violin(
+    colour = text_col,
+    fill = alpha(text_col, 0.5),
+    trim = FALSE,
+    scale = "width",
+    width = 0.7
+  ) +
+  gghalves::geom_half_point(
+    size = 2,
+    alpha = 0.9,
+    colour = text_col
+  ) +
+  geom_smooth(
+    mapping = aes(
+      group = 1
+    ),
+    se = FALSE,
+    colour = alpha(text_hil, 0.4),
+    linewidth = 4
+  ) +
+  
+  # Scales
+  scale_x_continuous(
+    breaks = 1:14,
+    labels = 1:14,
+    name = "Season",
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent(),
+    name = NULL
+  ) +
+  # Facets
+  facet_wrap(
+    ~facet_var, 
+    ncol = 1,
+    scales = "free_y",
+    labeller = labeller(
+      facet_var = facet_labeller
+    )
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle |> str_wrap(90) |> str_view(),
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    
+    # Grid
+    panel.grid = element_line(
+      colour = alpha(text_hil, 0.7),
+      linewidth = 0.3,
+      linetype = 3
+    ),
+    panel.grid.minor = element_blank(),
+    
+    # Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      face = "bold"
+    ),
+    axis.title.x = element_text(
+      colour = text_col,
+      size = 1.5 * bts, 
+      face = "bold"
+    ),
+    
+    
+    # Labels
+    plot.title = element_text(
+      size = 2 * bts,
+      family = "title_font",
+      colour = text_hil,
+      lineheight = 0.3,
+      margin = margin(10,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_col,
+      size = 0.6 * bts,
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      colour = text_col,
+      hjust = 0.5,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    strip.text = element_text(
+      hjust = 0.5,
+      colour = text_hil,
+      family = "title_font",
+      size = 1.5 * bts,
+      face = "bold",
+      margin = margin(10,0,2,0, "mm")
+    )
+  )
+  
+
 
 ggsave(
   filename = here::here(
@@ -191,6 +355,22 @@ Session Info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
 
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+
+# devtools::install_github('erocoar/gghalves')
+
+# Geocomputation
+library(gghalves)             # Half violin plot
 
 sessioninfo::session_info()$packages |> 
   as_tibble() |> 
