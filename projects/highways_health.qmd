@@ -34,8 +34,23 @@ share:
 ```{r}
 #| label: setup
 
-library(sf)            # For spatial objects
-library(tidyverse)     # Data wrangling
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(here)                 # File locations and paths
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+
+# Mapping tools
+library(sf)                   # All spatial objects in R
+library(osmdata)              # Getting Open Street Maps data
+
+
 ```
 
 Ideas
@@ -44,7 +59,153 @@ Ideas
 
 -   In New Delhi, hospital locations and ...... nearby.
 
--   
+-   Add scales and north arrow with ggspatial
+
+Steps
+
+Getting Bounding Box
+
+```{r}
+hy_bbox <- osmdata::getbb("Haryana")
+
+del_bbox <- osmdata::getbb("Delhi")
+
+```
+
+Don't Run: Getting health facilities data once
+
+```{r}
+#| eval: false
+
+######## Haryana Health
+health_small <- opq(bbox = hy_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("clinic", "dentist", "doctors", "pharmacy")
+  ) |>
+  osmdata_sf()
+
+object.size(health_small) |> print(units = "Mb")
+
+health_large <- opq(bbox = hy_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("hospital", "nursing_home", "social_facility")
+  ) |>
+  osmdata_sf()
+
+object.size(health_large) |> print(units = "Mb")
+
+# Temporary Saving the Data for easy use in travel
+saveRDS(
+  object = health_large,
+  file = "haryana_health_large.rds"
+)
+
+saveRDS(
+  object = health_small,
+  file = "haryana_health_small.rds"
+)
+
+# Haryana Highways ---------------------
+roads_1 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("motorway", "trunk", "motorway_link", "trunk_link")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_1) |> print(units = "Mb")
+
+roads_2 <- opq(bbox = hy_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("primary", "secondary")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_2) |> print(units = "Mb")
+
+# Temporary Saving the Data for easy use in travel
+saveRDS(
+  object = roads_1,
+  file = "haryana_roads_1.rds"
+)
+
+saveRDS(
+  object = roads_2,
+  file = "haryana_roads_2.rds"
+)
+
+############ Delhi Health
+health_small <- opq(bbox = del_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("clinic", "dentist", "doctors", "pharmacy")
+  ) |>
+  osmdata_sf()
+
+object.size(health_small) |> print(units = "Mb")
+
+health_large <- opq(bbox = del_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("hospital", "nursing_home", "social_facility")
+  ) |>
+  osmdata_sf()
+
+object.size(health_large) |> print(units = "Mb")
+
+# Temporary Saving the Data for easy use in travel
+saveRDS(
+  object = health_large,
+  file = "delhi_health_large.rds"
+)
+
+saveRDS(
+  object = health_small,
+  file = "delhi_health_small.rds"
+)
+
+# Delhi Highways ---------------------
+roads_1 <- opq(bbox = del_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("motorway", "trunk", "motorway_link", "trunk_link")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_1) |> print(units = "Mb")
+
+roads_2 <- opq(bbox = del_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("primary", "secondary")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_2) |> print(units = "Mb")
+
+# Temporary Saving the Data for easy use in travel
+saveRDS(
+  object = roads_1,
+  file = "delhi_roads_1.rds"
+)
+
+saveRDS(
+  object = roads_2,
+  file = "delhi_roads_2.rds"
+)
+```
+
+Use Pre-Saved Data
+
+```{r}
+
+health_small <- readRDS(file = "haryana_health_small.rds")
+health_large <- readRDS(file = "haryana_health_large.rds")
+
+```
 
 Final Product
 
