@@ -39,13 +39,13 @@ This project visualizes the distribution of health facilities in Haryana, India,
 
 ### Process:
 
-1.   **Data Collection**: Using the [**`osmdata`**](https://cran.r-project.org/package=osmdata) package, bounding boxes for Haryana, Delhi and later India were defined. Data on highways and health facilities were downloaded, pre-processed, and saved for subsequent analysis.
+1.  **Data Collection**: Using the [**`osmdata`**](https://cran.r-project.org/package=osmdata) package, bounding boxes for Haryana, Delhi and later India were defined. Data on highways and health facilities were downloaded, pre-processed, and saved for subsequent analysis.
 
 2.  **Spatial Processing**: The [**`sf`**](https://cran.r-project.org/package=sf) package [@sf-2] facilitated spatial operations, such as clipping datasets to Delhi's, Haryana's and India's boundaries, transforming geometry types (e.g., polygons to points on the map using [`st_centroid()`](https://r-spatial.github.io/sf/articles/sf5.html)), and, Most importantly, calculating distances between health facilities and highways using [**`st_is_within_distance()`**](https://r-spatial.github.io/sf/articles/sf7.html#st_buffer-or-st_is_within_distance)with techniques from the book [Geocomputation with R](https://r.geocompx.org/) ([Chapter 4](https://r.geocompx.org/spatial-operations)).
 
 3.  **Visualization**: A detailed map was created with [**`ggplot2`**](https://ggplot2.tidyverse.org/), incorporating highways, health facilities, and annotations for scale and direction using [**`ggspatial`**](https://cran.r-project.org/package=ggspatial). Facilities were color-coded (near or far from highways) and differentiated by size and shape.
 
-4.   **Inset Charts**: Additional insights were provided through inset charts showing the number of health facilities by district in Haryana, and the percentage of facilities near highways, categorized by size, across India.
+4.  **Inset Charts**: Additional insights were provided through inset charts showing the number of health facilities by district in Haryana, and the percentage of facilities near highways, categorized by size, across India.
 
 ### Key Insights:
 
@@ -253,7 +253,7 @@ saveRDS(
 health_large <- opq(bbox = in_bbox) |>
   add_osm_feature(
     key = "amenity",
-    value = c("hospital", "nursing_home", "social_facility")
+    value = c("hospital", "nursing_home")
   ) |>
   osmdata_sf()
 
@@ -266,10 +266,12 @@ saveRDS(
 )
 
 ########### India Highways -----------------------------------
-roads_1 <- opq(bbox = in_bbox) |> 
+# Troubleshoot: Large data, hence need to increase time-out
+# Credits: https://github.com/ropensci/osmdata/issues/200
+roads_1 <- opq(bbox = in_bbox, timeout = 500) |> 
   add_osm_feature(
     key = "highway", 
-    value = c("motorway", "trunk", "motorway_link", "trunk_link")
+    value = c("motorway")
   ) |> 
   osmdata_sf()
 
@@ -278,6 +280,20 @@ object.size(roads_1) |> print(units = "Mb")
 saveRDS(
   object = roads_1,
   file = "india_roads_1.rds"
+)
+
+roads_1_5 <- opq(bbox = in_bbox, timeout = 100) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("trunk")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_1) |> print(units = "Mb")
+
+saveRDS(
+  object = roads_1_5,
+  file = "india_roads_1_5.rds"
 )
 # 
 # roads_2 <- opq(bbox = in_bbox) |> 
@@ -552,7 +568,7 @@ ggsave(
 
 ![A basic, raw and unpolished map of Delhi, India that shows the highways, other major roads and health facilities (simply colour-coded by proximity to highways)](images/highways_heath_1.png){#fig-a1}
 
-## Part 4: Similar analysis for Haryana state 
+## Part 4: Similar analysis for Haryana state
 
 This R code analyzes the proximity of health facilities to highways in Haryana. It loads pre-saved datasets for small and large health facilities and roads, filters them by Haryana's boundary, and converts all facilities into point geometries for simplicity. The proximity of facilities to highways is assessed using `st_is_within_distance` from the **{sf}** package. The code then generates summary tables categorizing facilities by type and proximity to highways. A map is created using **{ggplot2}** and **{ggspatial}**, showing highways and health facilities with annotations for scale and orientation. The final map is shown in @fig-a2.
 
@@ -1479,8 +1495,6 @@ ggsave(
 
 ```{r}
 
-
-
 # Basics of Final Visualization: Fonts
 font_add_google("Rouge Script", "title_font")
 font_add_google("El Messiri", "body_font")
@@ -1504,7 +1518,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color:{text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color:{text_hil}'>{xtwitter_username}</span>")
 
-plot_title <- "Haryana: Highways and Health-Care"
+plot_title <- "India: Health-Care Institutions"
 
 plot_caption <- paste0(
   "**Data:** Open Street Maps; Survey of India", 
@@ -1523,67 +1537,51 @@ rm(github, github_username, xtwitter,
 # Note: I have split downloading health facilties into larger and
 #       Smaller ones to save on downloading times, and prevent 
 #       breakage during downloading such large datasets
-health_small <- readRDS(file = "haryana_health_small.rds")
-health_large <- readRDS(file = "haryana_health_large.rds")
-roads_1 <- readRDS(file = "haryana_roads_1.rds")
-roads_2 <- readRDS(file = "haryana_roads_2.rds")
-
-# Get only the relevant sf object out of each downlaoded data-set
-# For roads, only "LINES" are relevant sf feature.
-roads_1 <- roads_1$osm_lines
-roads_2 <- roads_2$osm_lines
+health_small <- readRDS(file = "india_health_small.rds")
+health_large <- readRDS(file = "india_health_large.rds")
+# roads_1 <- readRDS(file = "india_roads_1.rds")
+# roads_2 <- readRDS(file = "haryana_roads_2.rds")
+# 
+# # Get only the relevant sf object out of each downlaoded data-set
+# # For roads, only "LINES" are relevant sf feature.
+# roads_1 <- roads_1$osm_lines
+# roads_2 <- roads_2$osm_lines
 
 # Get a Map of the State / City and keep only the highways and 
 # facilties within that State / City for plotting (instead of entire)
 # bounding box
 region_map <- sf::read_sf(
-  here::here("data", "india_map", "India_State_Boundary.shp")
+  here::here("data", "india_map", "India_Country_Boundary.shp")
 ) |> 
   janitor::clean_names() |> 
-  filter(state_name == "Haryana") |> 
-  st_transform(crs = st_crs(roads_1))
+  st_transform(crs = st_crs(health_large$osm_points))
 
-
-haryana_districts_map <- sf::read_sf(
-  here::here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")
-) |> 
-  janitor::clean_names() |> 
-  st_transform(crs = st_crs(roads_1))
-
-# Checking the results
-# ggplot() +
-#   geom_sf(data = region_map) +
-#   geom_sf(data = roads_1)
-# 
-# ggplot() +
-#   geom_sf(data = region_map) +
-#   geom_sf(data = roads_1 |> st_intersection(region_map))
-
-# Select Roads and Facilties that are within the selected region
-roads_1 <- roads_1 |> st_intersection(region_map)
-roads_2 <- roads_2 |> st_intersection(region_map)
+# # Select Roads and Facilties that are within the selected region
+# roads_1 <- roads_1 |> st_intersection(region_map)
+# roads_2 <- roads_2 |> st_intersection(region_map)
 
 # Health facilities are as points, polygons and multi-polygons. 
 # Lets convert them all into points, since on a large map 
 # like a city or state, all will anyways appear as a point
 
-# -------------------------------------------------------------------
+# ----------------------------------------------------------
 # Extracting the Larger Health Facilities in a nicely formatted clean
 # sf object, to make plotting easier subsequently--------------------
 temp1 <- health_large$osm_points |> 
-  select(name, geometry, "addr:district") |> 
+  select(name, geometry, "addr:state") |> 
   filter(!is.na(name)) |> 
   mutate(facility_type = "medium")
 
 temp2 <- health_large$osm_polygons |> 
   st_centroid() |> 
-  select(name, geometry, "addr:district") |> 
+  select(name, geometry, "addr:state") |> 
   filter(!is.na(name)) |> 
   mutate(facility_type = "large")
 
+sf_use_s2(FALSE)
 temp3 <- health_large$osm_multipolygons |> 
-  st_centroid() |> 
-  select(name, geometry, "addr:district") |> 
+  st_centroid(of_largest_polygon = TRUE) |> 
+  select(name, geometry, "addr:state") |> 
   filter(!is.na(name)) |> 
   mutate(facility_type = "large")
 
@@ -1594,61 +1592,47 @@ health_large <- bind_rows(
 )
 # Clean the workspace
 rm(temp1, temp2, temp3)
-
+sf_use_s2(TRUE)
 # Retain only the health facilities that are within our region
 health_large <- health_large |> 
   st_intersection(region_map)
 
 # Now the MAGIC of {sf}: mark the facilities that are near highways
-health_large <- health_large |> 
-  mutate(
-    near_highway = health_large |> 
-      
-      # Checking which points are within a specific distance of highway
-      # The awesome power & speed of sf::st_is_within_distance() 
-      st_is_within_distance(
-        y = roads_1,
-        dist = 200,
-        sparse = F
-      ) |> 
-      as_tibble() |> 
-      # Keep value TRUE if facility is near ANY highway
-      mutate(
-        any_true = rowSums(across(everything(), as.logical)) > 0
-      ) |> 
-      pull(any_true)
-  ) |> 
-  mutate(
-    near_highway = if_else(
-      near_highway,
-      "near_highway",
-      "far_from_highway"
-    )
-  )
-
-# An Output Table of near and away from highway facilties for 
-# Large and Medium Health Facilties
-table_large <- health_large |> 
-  st_drop_geometry() |> 
-  count(facility_type, near_highway) |> 
-  pivot_wider(
-    id_cols = facility_type,
-    names_from = near_highway,
-    values_from = n
-  ) |> 
-  mutate(
-    perc_on_highway = near_highway / (near_highway + far_from_highway)
-  )
+# health_large <- health_large |> 
+#   mutate(
+#     near_highway = health_large |> 
+#       
+#       # Checking which points are within a specific distance of highway
+#       # The awesome power & speed of sf::st_is_within_distance() 
+#       st_is_within_distance(
+#         y = roads_1,
+#         dist = 200,
+#         sparse = F
+#       ) |> 
+#       as_tibble() |> 
+#       # Keep value TRUE if facility is near ANY highway
+#       mutate(
+#         any_true = rowSums(across(everything(), as.logical)) > 0
+#       ) |> 
+#       pull(any_true)
+#   ) |> 
+#   mutate(
+#     near_highway = if_else(
+#       near_highway,
+#       "near_highway",
+#       "far_from_highway"
+#     )
+#   )
 
 # Do the same process for snmaller health facilities ----------------
 temp1 <- health_small$osm_points |> 
-  select(name, geometry, "addr:district") |> 
+  select(name, geometry, "addr:state") |> 
   filter(!is.na(name)) |> 
   mutate(facility_type = "small")
 
 temp2 <- health_small$osm_polygons |> 
   st_centroid() |> 
-  select(name, geometry, "addr:district") |> 
+  select(name, geometry, "addr:state") |> 
   filter(!is.na(name)) |> 
   mutate(facility_type = "medium")
 
@@ -1662,29 +1646,29 @@ rm(temp1, temp2)
 health_small <- health_small |> 
   st_intersection(region_map)
 
-health_small <- health_small |> 
-  mutate(
-    near_highway = health_small |> 
-      
-      # Checking which points are within a specific distance of highway
-      st_is_within_distance(
-        y = roads_1,
-        dist = 200,
-        sparse = F
-      ) |> 
-      as_tibble() |> 
-      mutate(
-        any_true = rowSums(across(everything(), as.logical)) > 0
-      ) |> 
-      pull(any_true)
-  ) |> 
-  mutate(
-    near_highway = if_else(
-      near_highway,
-      "near_highway",
-      "far_from_highway"
-    )
-  )
+# health_small <- health_small |> 
+#   mutate(
+#     near_highway = health_small |> 
+#       
+#       # Checking which points are within a specific distance of highway
+#       st_is_within_distance(
+#         y = roads_1,
+#         dist = 200,
+#         sparse = F
+#       ) |> 
+#       as_tibble() |> 
+#       mutate(
+#         any_true = rowSums(across(everything(), as.logical)) > 0
+#       ) |> 
+#       pull(any_true)
+#   ) |> 
+#   mutate(
+#     near_highway = if_else(
+#       near_highway,
+#       "near_highway",
+#       "far_from_highway"
+#     )
+#   )
 
 # Combining health_large and health_small to map shape to facility size
 health_combined <- bind_rows(
