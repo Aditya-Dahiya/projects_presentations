@@ -1,12 +1,16 @@
 ---
-title: "A Rayshader Map for India's Power Plants"
+title: "Visualizing Highways and Healthcare Facilities"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: ".........................."
+subtitle: "Analyzing the integration of healthcare facilities and transportation networks - using power of {osmdata}, {sf} and {ggspatial}"
 categories:
   - "Data Visualization"
-date: "2024-11-21"
-image: "highways_health.png"
+  - "Maps"
+  - "Public Health"
+  - "{gt}"
+  - "Gecomputation"
+date: "2024-11-24"
+image: "images/highways_health_haryana_thumbnail.png"
 format:
   html:
     code-fold: true
@@ -29,10 +33,35 @@ share:
   mastodon: true
 ---
 
+## Introduction
+
+This project visualizes the distribution of health facilities in Haryana, India, alongside the national highways, using data from [**OpenStreetMap**](https://www.openstreetmap.org/). The primary aim is to map health facilities categorized as small, medium, or large and assess their proximity to highways (within 200 meters or farther).
+
+### Process:
+
+1.   **Data Collection**: Using the [**`osmdata`**](https://cran.r-project.org/package=osmdata) package, bounding boxes for Haryana, Delhi and later India were defined. Data on highways and health facilities were downloaded, pre-processed, and saved for subsequent analysis.
+
+2.  **Spatial Processing**: The [**`sf`**](https://cran.r-project.org/package=sf) package [@sf-2] facilitated spatial operations, such as clipping datasets to Delhi's, Haryana's and India's boundaries, transforming geometry types (e.g., polygons to points on the map using [`st_centroid()`](https://r-spatial.github.io/sf/articles/sf5.html)), and, Most importantly, calculating distances between health facilities and highways using [**`st_is_within_distance()`**](https://r-spatial.github.io/sf/articles/sf7.html#st_buffer-or-st_is_within_distance)with techniques from the book [Geocomputation with R](https://r.geocompx.org/) ([Chapter 4](https://r.geocompx.org/spatial-operations)).
+
+3.  **Visualization**: A detailed map was created with [**`ggplot2`**](https://ggplot2.tidyverse.org/), incorporating highways, health facilities, and annotations for scale and direction using [**`ggspatial`**](https://cran.r-project.org/package=ggspatial). Facilities were color-coded (near or far from highways) and differentiated by size and shape.
+
+4.   **Inset Charts**: Additional insights were provided through inset charts showing the number of health facilities by district in Haryana, and the percentage of facilities near highways, categorized by size, across India.
+
+### Key Insights:
+
+-   **Proximity Analysis**: The project quantifies the percentage of health facilities near highways, highlighting disparities in accessibility.
+
+-   **Facility Distribution**: The data shows varying distributions of small, medium, and large facilities across districts, providing insights into healthcare accessibility.
+
+-   **Comprehensive Visualization**: The use of [**`patchwork`**](https://patchwork.data-imaginist.com/) to combine plots and [**`gt`**](https://gt.rstudio.com/) for tabular data enhances the project's visual and analytical depth.
+
+The final map, saved as an image using **`ggsave`**, effectively communicates the spatial relationship between health infrastructure and transportation networks. This visualization can inform infrastructure planning and policy decisions.
+
 ### Loading Libraries
 
 ```{r}
 #| label: setup
+#| code-fold: false
 
 # Data Import and Wrangling Tools
 library(tidyverse)            # All things tidy
@@ -52,17 +81,11 @@ library(sf)                   # All spatial objects in R
 library(osmdata)              # Getting Open Street Maps data
 ```
 
-Ideas
+## Part 1: Getting Raw Data
 
--   Highways in India and the health facilities within 100 m or away by more than 100 m
+This code demonstrates how to query and store OpenStreetMap (OSM) data for health amenities and highways in Haryana and Delhi using the **`osmdata`** package [@osmdata-2]. Initially, bounding boxes for Haryana (`hy_bbox`) and Delhi (`del_bbox`) are obtained using `osmdata::getbb()`. For each region, two categories of health facilities are retrieved: smaller establishments like clinics, dentists, and pharmacies (`health_small`) and larger institutions like hospitals and nursing homes (`health_large`). These datasets are fetched using the `opq()` function to create an Overpass API query, combined with `add_osm_feature()` to specify the type of amenities, and are then converted into simple feature (sf) objects via `osmdata_sf()`.
 
--   In New Delhi, hospital locations and then Haryana nearby.
-
--   Add scales and north arrow with `ggspatial`
-
-Steps
-
-Step 1: Getting bounding box for the Country / States, and then using Open Street Maps data {osmdata} to get data on highways and health facilities
+Similarly, highways are categorized into major roads (motorways and trunks) and secondary roads (primary and secondary), and their data is retrieved and converted into sf objects. To ensure efficient future use, all datasets are temporarily saved as RDS files using `saveRDS()`. This structured approach ensures the data is readily accessible for visualization or analysis. For more on querying OSM data, refer to the [osmdata package documentation](https://cran.r-project.org/package=osmdata).
 
 ```{r}
 #| eval: false
@@ -193,6 +216,10 @@ saveRDS(
 )
 ```
 
+## Part 2: Get massive data for India
+
+This code focuses on querying and saving OpenStreetMap (OSM) data for health amenities and highways across entire India. To ensure efficient handling of such a large geographical scope, the data retrieval process is divided into smaller datasets. Health facilities are then split into two categories: smaller facilities like clinics, dentists, and pharmacies (`health_small`) and larger institutions such as hospitals, nursing homes, and social facilities (`health_large`). For highways, the script retrieves major road types, including motorways and trunk roads (`roads_1`) only. While a placeholder for secondary roads exists (`roads_2`), it is commented out to optimize download times or avoid potential interruptions. To facilitate future use, all retrieved datasets are saved as RDS files using `saveRDS()`.
+
 ```{r}
 #| label: download-india-data
 
@@ -272,7 +299,19 @@ saveRDS(
 
 ```
 
-Use Pre-Saved Data: Trial Code for Delhi (before going on bigger states)
+## Part 3: Trial Code with Delhi's smaller dataset
+
+The process begins by loading the saved datasets for health facilities (`health_small` and `health_large`) and highways (`roads_1` and `roads_2`) using `readRDS()`. Each dataset is further refined to include only the relevant geographic data (`osm_lines` for highways and points or centroids for health facilities).
+
+A shapefile of Delhi's boundary is imported and cleaned, ensuring that the spatial coordinate reference systems match for all datasets. Highways and health facilities are filtered to include only those within Delhi's boundary using `st_intersection()`.
+
+For health facilities, geometries (e.g., polygons) are converted to centroids, ensuring consistency in spatial representation. Facilities are classified based on size (e.g., "small", "medium", or "large") and evaluated for their proximity to highways using `st_is_within_distance()`. A distance threshold of 200 meters is applied to categorize facilities as `"near_highway"` or `"far_from_highway"`.
+
+The results are summarized in tabular format for both small and large health facilities, showing the distribution of facilities based on proximity to highways. Finally, the data is visualized in @fig-a1 using **ggplot2**, with:
+
+-   Highways (`roads_1` and `roads_2`) displayed as lines of varying weights and colors.
+
+-   Health facilities plotted as points, styled by their proximity to highways.
 
 ```{r}
 #| label: trial-code-for-Delhi
@@ -511,9 +550,11 @@ ggsave(
 )
 ```
 
-![](images/highways_heath_1.png)
+![A basic, raw and unpolished map of Delhi, India that shows the highways, other major roads and health facilities (simply colour-coded by proximity to highways)](images/highways_heath_1.png){#fig-a1}
 
-Use Pre-Saved Data: Trial Code for Haryana (before going for India)
+## Part 4: Similar analysis for Haryana state 
+
+This R code analyzes the proximity of health facilities to highways in Haryana. It loads pre-saved datasets for small and large health facilities and roads, filters them by Haryana's boundary, and converts all facilities into point geometries for simplicity. The proximity of facilities to highways is assessed using `st_is_within_distance` from the **{sf}** package. The code then generates summary tables categorizing facilities by type and proximity to highways. A map is created using **{ggplot2}** and **{ggspatial}**, showing highways and health facilities with annotations for scale and orientation. The final map is shown in @fig-a2.
 
 ```{r}
 #| label: trial-code-for-haryana
@@ -798,9 +839,11 @@ ggsave(
 )
 ```
 
-![](images/highways_heath_2.png)
+![A similar, basic but slightly improved map for Haryana. The health-care facilities are now colour coded by distance to highways, but also their shape and size vary by the level and facility's size.](images/highways_heath_2.png){#fig-a2}
 
-Next Step: Combine a GT table and a ggplot2 object
+## Part 5: Try code for a {gt} table and an inset plot
+
+This R code generates a table and a plot to analyze the proximity of health facilities to highways in Haryana. First, a summary table is created using **{gt}** with bar plots showing the percentage of health facilities located near highways. The table is formatted using `gtExtras::gt_theme_538()` for styling. Then, a plot is created with **{ggplot2}**, visualizing the percentage of health facilities located near highways by facility type (small, medium, large) and state. The data is transformed using **{tidyverse}** functions such as `pivot_wider` and `count`, and the plot is faceted by facility type for clarity.
 
 ```{r}
 
@@ -822,8 +865,6 @@ insert_gt_table <- show_table |>
     scale_type = "percent"
   ) |> 
   gtExtras::gt_theme_538()
-
-insert_gt_table
 
 plot_data_df <- health_combined |> 
   st_drop_geometry() |> 
@@ -895,13 +936,550 @@ inset_plot <- plot_data_df |>
     base_size = 10
   ) +
   theme()
-
-inset_plot
 ```
 
-Final Product for Haryana: Data Split by districts
+## Part 6: A final product map for Haryana
+
+The code creates a detailed @fig-a3 for Haryana, showcasing highways and healthcare facilities. The map displays highways in different colours and health facilities marked by size and shape based on their type (small, medium, large) and proximity to highways (within 200 meters). The final map includes district boundaries, highways, and health facilities, with color indicating proximity to highways. A secondary plot summarizes healthcare facilities by district and type.
 
 ```{r}
+
+# Basics of Final Visualization: Fonts
+font_add_google("Rouge Script", "title_font")
+font_add_google("El Messiri", "body_font")
+font_add_google("Saira Extra Condensed", "caption_font")
+showtext_auto()
+
+text_col <- "grey10"
+text_hil <- "grey20"
+bts <- 150
+bg_col <- "white"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color:{text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color:{text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Haryana: Highways and Health-Care"
+
+plot_subtitle <- "The purple lines depict highways in Haryana. Each dot represents a Health-Care Facility, with shape & size  depicting facility's level, and colour depicting proximity to a National Highway (within 200 metres)"
+
+plot_caption <- paste0(
+  "**Data:** Open Street Maps; Survey of India", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Get pre-saved data (Trial Phase - use pre-saved data to 
+# save laoding times)
+# Note: I have split downloading health facilties into larger and
+#       Smaller ones to save on downloading times, and prevent 
+#       breakage during downloading such large datasets
+health_small <- readRDS(file = "haryana_health_small.rds")
+health_large <- readRDS(file = "haryana_health_large.rds")
+roads_1 <- readRDS(file = "haryana_roads_1.rds")
+roads_2 <- readRDS(file = "haryana_roads_2.rds")
+
+# Get only the relevant sf object out of each downlaoded data-set
+# For roads, only "LINES" are relevant sf feature.
+roads_1 <- roads_1$osm_lines
+roads_2 <- roads_2$osm_lines
+
+# Get a Map of the State / City and keep only the highways and 
+# facilties within that State / City for plotting (instead of entire)
+# bounding box
+region_map <- sf::read_sf(
+  here::here("data", "india_map", "India_State_Boundary.shp")
+) |> 
+  janitor::clean_names() |> 
+  filter(state_name == "Haryana") |> 
+  st_transform(crs = st_crs(roads_1))
+
+
+haryana_districts_map <- sf::read_sf(
+  here::here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")
+) |> 
+  janitor::clean_names() |> 
+  st_transform(crs = st_crs(roads_1))
+
+# Checking the results
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1)
+# 
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1 |> st_intersection(region_map))
+
+# Select Roads and Facilties that are within the selected region
+roads_1 <- roads_1 |> st_intersection(region_map)
+roads_2 <- roads_2 |> st_intersection(region_map)
+
+# Health facilities are as points, polygons and multi-polygons. 
+# Lets convert them all into points, since on a large map 
+# like a city or state, all will anyways appear as a point
+
+# -------------------------------------------------------------------
+# Extracting the Larger Health Facilities in a nicely formatted clean
+# sf object, to make plotting easier subsequently--------------------
+temp1 <- health_large$osm_points |> 
+  select(name, geometry, "addr:district") |> 
+  # filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+temp2 <- health_large$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  # filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+temp3 <- health_large$osm_multipolygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  # filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+health_large <- bind_rows(
+  temp1,
+  temp2,
+  temp3
+)
+# Clean the workspace
+rm(temp1, temp2, temp3)
+
+# Retain only the health facilities that are within our region
+health_large <- health_large |> 
+  st_intersection(region_map)
+
+# Now the MAGIC of {sf}: mark the facilities that are near highways
+health_large <- health_large |> 
+  mutate(
+    near_highway = health_large |> 
+      
+      # Checking which points are within a specific distance of highway
+      # The awesome power & speed of sf::st_is_within_distance() 
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      # Keep value TRUE if facility is near ANY highway
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# Do the same process for snmaller health facilities ----------------
+temp1 <- health_small$osm_points |> 
+  select(name, geometry, "addr:district") |> 
+  # filter(!is.na(name)) |> 
+  mutate(facility_type = "small")
+
+temp2 <- health_small$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  # filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+health_small <- bind_rows(
+  temp1,
+  temp2
+)
+
+rm(temp1, temp2)
+
+health_small <- health_small |> 
+  st_intersection(region_map)
+
+health_small <- health_small |> 
+  mutate(
+    near_highway = health_small |> 
+      
+      # Checking which points are within a specific distance of highway
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# Combining health_large and health_small to map shape to facility size
+health_combined <- bind_rows(
+  health_large,
+  health_small
+  ) |> 
+  mutate(
+    facility_type = fct(
+      facility_type,
+      levels = c("small", "medium", "large")
+    )
+  ) |> 
+  rename(district = addr.district) |> 
+  filter(!is.na(district)) |> 
+  mutate(
+    facility_type = str_to_title(facility_type),
+    near_highway = snakecase::to_title_case(near_highway)
+  )
+
+
+rm(health_large, health_small)
+
+# The plot
+g <- ggplot() +
+  
+  # Background map of districts
+  geom_sf(
+    data = haryana_districts_map,
+    linewidth  = 2,
+    colour = "grey90",
+    alpha = 0.1,
+    fill = "transparent"
+  ) +
+  
+  # Background overall map of Haryana
+  geom_sf(
+    data = region_map,
+    linewidth  = 2,
+    colour = "grey10",
+    fill = "transparent"
+  ) +
+  
+  # Plotting the Highways and other major roads
+  geom_sf(
+    data = roads_1, 
+    linewidth = 0.9, 
+    alpha = 1,
+    colour = "#702F8AFF" 
+  ) +
+  geom_sf(
+    data = roads_2,
+    linewidth = 0.5,
+    alpha = 0.8,
+    colour = "#9063CDFF"
+  ) +
+  
+  # Plotting the Health Facilties
+  geom_sf(
+    data = health_combined,
+    mapping = aes(
+      colour = near_highway,
+      size = facility_type,
+      shape = facility_type
+    ),
+    alpha = 0.5
+  ) +
+  
+  scale_size_manual(
+    values = c(14, 8, 4)
+  ) +
+  scale_shape_manual(
+    values = c(0, 2, 1)
+  ) +
+  scale_colour_manual(
+    values = c("#FFA400FF", "#862633FF")
+  ) +
+  
+  # Add North-Arrow and Scale
+  ggspatial::annotation_north_arrow(
+    style = ggspatial::north_arrow_orienteering(
+      line_col = "grey20",
+      fill = c("grey90", "grey20"),
+      text_size = bts,
+      text_family = "body_font"
+    ),
+    location = "tr",
+    height = unit(5, "cm"),
+    width = unit(5, "cm")
+  ) +
+  ggspatial::annotation_scale(
+    bar_cols = c("grey30", bg_col),
+    location = "bl",
+    height = unit(0.75, "cm"),
+    text_cex = 10,
+    text_family = "body_font"
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 70),
+    caption = plot_caption,
+    shape = NULL,
+    size = NULL,
+    colour = NULL
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 10
+      )
+    )
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0
+    ),
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0, 0.8),
+    legend.direction = "vertical",
+    legend.text = element_text(
+      margin = margin(5,5,5,5, "mm")
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box = "horizontal",
+    legend.box.just = "top",
+    legend.key.spacing = unit(10, "mm"),
+    
+    # Labels
+    plot.title = element_text(
+      size = 3 * bts,
+      hjust = 0.5,
+      colour = text_hil,
+      margin = margin(30,0,10,0, "mm"),
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      size = 0.8 * bts,
+      hjust = 0,
+      colour = text_hil,
+      margin = margin(10,0,-50,0, "mm"),
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(10,0,10,0, "mm"),
+      colour = text_hil,
+      size = 0.5 * bts
+    )
+  )
+
+###### Computing Data for Table
+plot_data_df <- health_combined |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  filter(!(district %in% c("Chandigarh", "Gautam Buddha Nagar",
+                         "Haryana", "", " ",
+                         "Sahibzada Ajit Singh Nagar"))) |> 
+  mutate(
+    district = case_when(
+      district == "Gurgaon" ~ "Gurugram",
+      district == "Nuh" ~ "Mewat",
+      .default = district
+    )
+  ) |> 
+  count(district, facility_type, near_highway) |> 
+  group_by(district, facility_type) |> 
+  mutate(total = sum(n)) |> 
+  ungroup()
+  # pivot_wider(
+  #   id_cols = c(district, facility_type),
+  #   names_from = near_highway,
+  #   values_from = n,
+  #   values_fill = 0
+  # ) |> 
+  # mutate(
+  #   total = `Far from Highway` + `Near Highway`,
+  #   perc_on_hwy = `Near Highway` / total,
+  #   district = as.character(district),
+  #   .keep = "unused"
+  # )
+
+strip_labels <- c(
+      "Small: Dentists, Pharmacies",
+      "Medium: Hospitals & Clinics",
+      "Large Institutions"
+    ) |> 
+  str_wrap(30)
+names(strip_labels) <- c("Small", "Medium", "Large")
+
+# Deciding order of district (preference is for descending order)
+order_districts <- plot_data_df |> 
+  group_by(district) |> 
+  summarise(n = sum(n)) |> 
+  arrange(n) |> 
+  pull(district)
+
+inset_plot <- plot_data_df |> 
+  mutate(district = fct(district, levels = order_districts)) |> 
+  ggplot(
+    mapping = aes(
+      y = district,
+      x = n
+    )
+  ) +
+  geom_col(
+    mapping = aes(
+      fill = near_highway
+    ),
+    alpha = 0.7,
+    position = position_stack()
+  ) +
+  geom_text(
+    mapping = aes(
+      label = n,
+      colour = near_highway
+    ),
+    hjust = 1.4,
+    family = "caption_font",
+    size = bts / 20,
+    position = position_stack()
+  ) +
+  geom_text(
+    mapping = aes(
+      label = total,
+      x = total
+    ),
+    hjust = -0.2,
+    family = "body_font",
+    size = bts / 12,
+    colour = text_col,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(
+    values = c("#FFA400FF", "#862633FF")
+  ) +
+  scale_colour_manual(
+    values = darken(c("#FFA400FF", "#862633FF"), 0.5)
+  ) +
+  scale_y_discrete(
+    expand = expansion(0)
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0, 0.25))
+  ) +
+  labs(
+    y = NULL,
+    x = "Number of Health-Care facilties"
+  ) +
+  facet_wrap(
+    ~ facility_type,
+    labeller = labeller(
+      facility_type = strip_labels
+    ),
+    scales = "free_x"
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(
+    base_size = bts / 3,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0,0,0,0, "mm"),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = alpha(text_col, 0.2),
+      linetype = 1,
+      linewidth = 0.3
+    ),
+    axis.line.x = element_line(
+      colour = text_hil,
+      linewidth = 0.3
+    ),
+    axis.text.x = element_text(
+      margin = margin(5,0,0,0, "mm")
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,5,0,0, "mm")
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm")
+  )
+
+# Temporary Code to check the output of inset plot
+# ggsave(
+#   plot = inset_plot,
+#   filename = here("projects", "images", 
+#                   "highways_health_temp1.png"),
+#   height = 8,
+#   width = 8,
+#   units = "in",
+#   bg = bg_col
+# )
+
+# Compose the final plot
+
+g2 <- g +
+  inset_element(
+    p = inset_plot,
+    left = 0, right = 0.4,
+    bottom = 0.1 , top = 0.3,
+    align_to = "full",
+    on_top = TRUE,
+    clip = FALSE
+  )
+
+ggsave(
+  plot = g2,
+  filename = here("projects", "images", 
+                  "highways_health_haryana.png"),
+  height = 36,
+  width = 24,
+  units = "in",
+  bg = bg_col
+)
+```
+
+![The map of Haryana, and its 22 districts, showing the National Highways, and other state highways. Also shown are health facilities (Large Institutions, Medium-sized hospitals, and small sized clinics and pharmacies. They are colour coded by their proximity to National Highways (defined as a distance of less than 200 metres). The inset bar-graph shows the number of health-facilities of each size in each district.](images/highways_health_haryana.png){#fig-a3}
+
+## Part 7: Final Product for India (in-progress)
+
+```{r}
+
+
 
 # Basics of Final Visualization: Fonts
 font_add_google("Rouge Script", "title_font")
@@ -1261,22 +1839,33 @@ g <- ggplot() +
     )
   )
 
-
+###### Computing Data for Table
 plot_data_df <- health_combined |> 
   st_drop_geometry() |> 
   as_tibble() |> 
-  count(state_name, facility_type, near_highway) |> 
+  count(district, facility_type, near_highway) |> 
   pivot_wider(
-    id_cols = c(state_name, facility_type),
+    id_cols = c(district, facility_type),
     names_from = near_highway,
-    values_from = n
+    values_from = n,
+    values_fill = 0
   ) |> 
   mutate(
-    total = far_from_highway + near_highway,
-    perc_on_hwy = near_highway / total,
+    total = `Far from Highway` + `Near Highway`,
+    perc_on_hwy = `Near Highway` / total,
+    district = as.character(district),
     .keep = "unused"
+  ) |> 
+  filter(!(district %in% c("Chandigarh", "Gautam Buddha Nagar",
+                         "Haryana", "", " ",
+                         "Sahibzada Ajit Singh Nagar"))) |> 
+  mutate(
+    district = case_when(
+      district == "Gurgaon" ~ "Gurugram",
+      district == "Nuh" ~ "Mewat",
+      .default = district
+    )
   )
-
 
 strip_labels <- c(
       "Small facilties: Dentists, Pharmacies",
@@ -1284,13 +1873,13 @@ strip_labels <- c(
       "Large: Hospitals, Nursing Homes, Institutions"
     ) |> 
   str_wrap(30)
-names(strip_labels) <- c("small", "medium", "large")
+names(strip_labels) <- c("Small", "Medium", "Large")
 
 inset_plot <- plot_data_df |> 
   ggplot(
     mapping = aes(
-      y = state_name,
-      x = perc_on_hwy
+      y = district,
+      x = total
     )
   ) +
   geom_col(
@@ -1298,11 +1887,8 @@ inset_plot <- plot_data_df |>
   ) +
   geom_text(
     mapping = aes(
-      label = paste0("(", number(total, 
-                                 scale = 1, 
-                                 accuracy = 1,
-                                 big.mark = ","),
-                     ")"),
+      label = paste0("(", round(perc_on_hwy * 100, 2), 
+                     "% )"),
       x = 0
     ),
     nudge_x = 0.01,
@@ -1310,7 +1896,7 @@ inset_plot <- plot_data_df |>
   ) +
   geom_text(
     mapping = aes(
-      label = paste0(round(perc_on_hwy * 100, 2), "%")
+      label = paste0(total)
     ),
     nudge_x = 0.005,
     hjust = 0
@@ -1323,16 +1909,17 @@ inset_plot <- plot_data_df |>
     ~ facility_type,
     labeller = labeller(
       facility_type = strip_labels
-    )
+    ),
+    scales = "free_x"
   ) +
   scale_x_continuous(
-    expand = expansion(c(0, 0.25)),
-    labels = scales::label_percent()
+    expand = expansion(c(0, 0.25))
   ) +
   theme_minimal(
     base_size = 10
   ) +
   theme()
+
 
 inset_plot
 
@@ -1347,10 +1934,58 @@ ggsave(
 )
 ```
 
-Final Product for India
+## Part 8 : Thumbnail for webpage, and list of packages used
 
 ```{r}
 
+# Saving a thumbnail
 
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("projects", "images", 
+                      "highways_health_haryana.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "projects", 
+      "images", 
+      "highways_health_haryana_thumbnail.png"
+    )
+  )
+```
 
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+library(here)                 # File locations and paths
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Combining plots
+library(gt)                   # Beautiful Tables in R
+
+# Mapping tools
+library(sf)                   # All spatial objects in R
+library(osmdata)              # Getting Open Street Maps data
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  )
 ```
