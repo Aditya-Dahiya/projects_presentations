@@ -45,37 +45,32 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Combining plots
+library(gt)                   # Beautiful Tables in R
 
 # Mapping tools
 library(sf)                   # All spatial objects in R
 library(osmdata)              # Getting Open Street Maps data
-
-
 ```
 
 Ideas
 
 -   Highways in India and the health facilities within 100 m or away by more than 100 m
 
--   In New Delhi, hospital locations and ...... nearby.
+-   In New Delhi, hospital locations and then Haryana nearby.
 
--   Add scales and north arrow with ggspatial
+-   Add scales and north arrow with `ggspatial`
 
 Steps
 
-Getting Bounding Box
-
-```{r}
-hy_bbox <- osmdata::getbb("Haryana")
-
-del_bbox <- osmdata::getbb("Delhi")
-
-```
-
-Don't Run: Getting health facilities data once
+Step 1: Getting bounding box for the Country / States, and then using Open Street Maps data {osmdata} to get data on highways and health facilities
 
 ```{r}
 #| eval: false
+#| label: data-download-code-dont-run
+
+hy_bbox <- osmdata::getbb("Haryana")
+
+del_bbox <- osmdata::getbb("Delhi")
 
 ######## Haryana Health
 health_small <- opq(bbox = hy_bbox) |>
@@ -198,20 +193,1164 @@ saveRDS(
 )
 ```
 
-Use Pre-Saved Data
-
 ```{r}
+#| label: download-india-data
 
-health_small <- readRDS(file = "haryana_health_small.rds")
-health_large <- readRDS(file = "haryana_health_large.rds")
+###########################################################
+###############           India           #################
+###########################################################
+
+in_bbox <- osmdata::getbb("India")
+
+######## India Health -----------------------------------------
+
+# Note: I have split downloading health facilties into larger and
+#       Smaller ones to save on downloading times, and prevent 
+#       breakage during downloading such large datasets
+
+health_small <- opq(bbox = in_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("clinic", "dentist", "doctors", "pharmacy")
+  ) |>
+  osmdata_sf()
+
+object.size(health_small) |> print(units = "Mb")
+
+# Temporarily Saving the Data for easy use in travel / reload
+saveRDS(
+  object = health_small,
+  file = "india_health_small.rds"
+)
+
+health_large <- opq(bbox = in_bbox) |>
+  add_osm_feature(
+    key = "amenity",
+    value = c("hospital", "nursing_home", "social_facility")
+  ) |>
+  osmdata_sf()
+
+object.size(health_large) |> print(units = "Mb")
+
+# Temporarily Saving the Data for easy use in travel / reload
+saveRDS(
+  object = health_large,
+  file = "india_health_large.rds"
+)
+
+########### India Highways -----------------------------------
+roads_1 <- opq(bbox = in_bbox) |> 
+  add_osm_feature(
+    key = "highway", 
+    value = c("motorway", "trunk", "motorway_link", "trunk_link")
+  ) |> 
+  osmdata_sf()
+
+object.size(roads_1) |> print(units = "Mb")
+
+saveRDS(
+  object = roads_1,
+  file = "india_roads_1.rds"
+)
+# 
+# roads_2 <- opq(bbox = in_bbox) |> 
+#   add_osm_feature(
+#     key = "highway", 
+#     value = c("primary", "secondary")
+#   ) |> 
+#   osmdata_sf()
+# 
+# object.size(roads_2) |> print(units = "Mb")
+# 
+# # Temporary Saving the Data for easy use in travel
+# 
+# saveRDS(
+#   object = roads_2,
+#   file = "india_roads_2.rds"
+# )
+
 
 ```
 
-Final Product
+Use Pre-Saved Data: Trial Code for Delhi (before going on bigger states)
 
 ```{r}
-library(showtext)       # Using Fonts More Easily in R Graphs
-library(ggimage)        # Using Images in ggplot2
-library(fontawesome)    # Social Media icons
-library(ggtext)         # Markdown Text in ggplot2
+#| label: trial-code-for-Delhi
+
+# Get pre-saved data (Trial Phase)
+health_small <- readRDS(file = "delhi_health_small.rds")
+health_large <- readRDS(file = "delhi_health_large.rds")
+roads_1 <- readRDS(file = "delhi_roads_1.rds")
+roads_2 <- readRDS(file = "delhi_roads_2.rds")
+
+# Get only the relevant sf obejct out of each
+roads_1 <- roads_1$osm_lines
+roads_2 <- roads_2$osm_lines
+
+# Get a Map of the State / City and keep only the highways and facilties within that State / City
+region_map <- sf::read_sf(
+  here::here("data", "india_map", "India_State_Boundary.shp")
+) |> 
+  janitor::clean_names() |> 
+  filter(state_name == "Delhi") |> 
+  st_transform(crs = st_crs(roads_1))
+
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1)
+# 
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1 |> st_intersection(region_map))
+
+# Select Roads and Facilties that are within the selected region
+roads_1 <- roads_1 |> st_intersection(region_map)
+roads_2 <- roads_2 |> st_intersection(region_map)
+
+# Health facilities are as points, polygons and multi-polygons. 
+# Lets convert them all into points, since on a large map 
+# like a city or state, all will anyways appear as a point
+
+# Exploration of data available in the health facilities
+# health_large$osm_points |> 
+#   st_drop_geometry() |> 
+#   select(name, beds, building, `building:levels`,highway, short_name) |> 
+#   visdat::vis_miss()
+#   names()
+
+# Do for health_large -------------------------------------------
+temp1 <- health_large$osm_points |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+temp2 <- health_large$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+temp3 <- health_large$osm_multipolygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+health_large <- bind_rows(
+  temp1,
+  temp2,
+  temp3
+)
+
+rm(temp1, temp2, temp3)
+
+health_large <- health_large |> 
+  st_intersection(region_map)
+
+health_large <- health_large |> 
+  mutate(
+    near_highway = health_large |> 
+      
+      # Checking which points are within a specific distance of highway
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# A Table of near and away from highway facilties for 
+# Large and Medium Health Facilties
+table_large <- health_large |> 
+  st_drop_geometry() |> 
+  count(facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = facility_type,
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+# Do for health_small --------------------------------------------
+temp1 <- health_small$osm_points |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "small")
+
+temp2 <- health_small$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+# temp3 <- health_small$osm_multipolygons |> 
+#   st_centroid() |> 
+#   select(name, geometry) |> 
+#   mutate(facility_type = "medium")
+
+health_small <- bind_rows(
+  temp1,
+  temp2
+)
+
+rm(temp1, temp2)
+
+health_small <- health_small |> 
+  st_intersection(region_map)
+
+health_small <- health_small |> 
+  mutate(
+    near_highway = health_small |> 
+      
+      # Checking which points are within a specific distance of highway
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+
+# A Table of near and away from highway facilties for 
+# Large and Medium Health Facilties
+table_small <- health_small |> 
+  st_drop_geometry() |> 
+  count(facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = facility_type,
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+# The final table product -------------------------------------------
+show_table <- bind_rows(table_large, table_small) |> 
+  group_by(facility_type) |> 
+  summarise(
+    far_from_highway = sum(far_from_highway),
+    near_highway = sum(near_highway)
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+# The plot
+
+g <- ggplot() +
+  geom_sf(
+    data = region_map,
+    linewidth  = 0.5,
+    colour = "grey20",
+    fill = "transparent"
+  ) +
+  geom_sf(
+    data = roads_1, 
+    linewidth = 0.5, 
+    alpha = 0.8,
+    colour = "darkgrey"
+  ) +
+  geom_sf(
+    data = roads_2, 
+    linewidth = 0.3, 
+    alpha = 0.4,
+    colour = "lightgrey"
+  ) +
+  geom_sf(
+    data = health_large,
+    mapping = aes(
+      colour = near_highway,
+      size = near_highway
+    ),
+    alpha = 0.8
+  ) +
+  scale_size_manual(
+    values = c(0.5, 1.5)
+  ) +
+  labs(
+    title = "Delhi: Highways and Health Facilties"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom"
+  )
+  
+ggsave(
+  plot = g,
+  filename = here("projects", "images", "highways_heath_1.png"),
+  height = 1500,
+  width = 1500,
+  units = "px"
+)
+```
+
+![](images/highways_heath_1.png)
+
+Use Pre-Saved Data: Trial Code for Haryana (before going for India)
+
+```{r}
+#| label: trial-code-for-haryana
+
+# Get pre-saved data (Trial Phase - use pre-saved data to 
+# save laoding times)
+# Note: I have split downloading health facilties into larger and
+#       Smaller ones to save on downloading times, and prevent 
+#       breakage during downloading such large datasets
+health_small <- readRDS(file = "haryana_health_small.rds")
+health_large <- readRDS(file = "haryana_health_large.rds")
+roads_1 <- readRDS(file = "haryana_roads_1.rds")
+roads_2 <- readRDS(file = "haryana_roads_2.rds")
+
+# Get only the relevant sf object out of each downlaoded data-set
+# For roads, only "LINES" are relevant sf feature.
+roads_1 <- roads_1$osm_lines
+roads_2 <- roads_2$osm_lines
+
+# Get a Map of the State / City and keep only the highways and 
+# facilties within that State / City for plotting (instead of entire)
+# bounding box
+region_map <- sf::read_sf(
+  here::here("data", "india_map", "India_State_Boundary.shp")
+) |> 
+  janitor::clean_names() |> 
+  filter(state_name == "Haryana") |> 
+  st_transform(crs = st_crs(roads_1))
+
+# Checking the results
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1)
+# 
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1 |> st_intersection(region_map))
+
+# Select Roads and Facilties that are within the selected region
+roads_1 <- roads_1 |> st_intersection(region_map)
+roads_2 <- roads_2 |> st_intersection(region_map)
+
+# Health facilities are as points, polygons and multi-polygons. 
+# Lets convert them all into points, since on a large map 
+# like a city or state, all will anyways appear as a point
+
+# -------------------------------------------------------------------
+# Extracting the Larger Health Facilities in a nicely formatted clean
+# sf object, to make plotting easier subsequently--------------------
+temp1 <- health_large$osm_points |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+temp2 <- health_large$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+temp3 <- health_large$osm_multipolygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+health_large <- bind_rows(
+  temp1,
+  temp2,
+  temp3
+)
+# Clean the workspace
+rm(temp1, temp2, temp3)
+
+# Retain only the health facilities that are within our region
+health_large <- health_large |> 
+  st_intersection(region_map)
+
+# Now the MAGIC of {sf}: mark the facilities that are near highways
+health_large <- health_large |> 
+  mutate(
+    near_highway = health_large |> 
+      
+      # Checking which points are within a specific distance of highway
+      # The awesome power & speed of sf::st_is_within_distance() 
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      # Keep value TRUE if facility is near ANY highway
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# An Output Table of near and away from highway facilties for 
+# Large and Medium Health Facilties
+table_large <- health_large |> 
+  st_drop_geometry() |> 
+  count(facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = facility_type,
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+# Do the same process for snmaller health facilities ----------------
+temp1 <- health_small$osm_points |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "small")
+
+temp2 <- health_small$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry) |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+health_small <- bind_rows(
+  temp1,
+  temp2
+)
+
+rm(temp1, temp2)
+
+health_small <- health_small |> 
+  st_intersection(region_map)
+
+health_small <- health_small |> 
+  mutate(
+    near_highway = health_small |> 
+      
+      # Checking which points are within a specific distance of highway
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# An output Table of near and away from highway facilties for 
+# Large and Medium Health Facilties
+table_small <- health_small |> 
+  st_drop_geometry() |> 
+  count(facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = facility_type,
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+
+# The final table product -------------------------------------------
+show_table <- bind_rows(table_large, table_small) |> 
+  group_by(facility_type) |> 
+  summarise(
+    far_from_highway = sum(far_from_highway),
+    near_highway = sum(near_highway)
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  ) |> 
+  mutate(
+    facility_type = case_when(
+      facility_type == "large" ~ "Large establishments: Hospitals, Nursing Homes, Institutions",
+      facility_type == "medium" ~ "Medium: Clinics, Doctors's Practices",
+      facility_type == "small" ~ "Small facilties: Dentists, Pharmacies",
+      .default = NA
+    )
+  )
+
+# Combining health_large and health_small to map shape to facility size
+health_combined <- bind_rows(
+  health_large,
+  health_small
+  ) |> 
+  mutate(
+    facility_type = fct(
+      facility_type,
+      levels = c("small", "medium", "large")
+    )
+  )
+
+rm(health_large, health_small)
+
+# The plot
+g <- ggplot() +
+  geom_sf(
+    data = region_map,
+    linewidth  = 0.5,
+    colour = "grey20",
+    fill = "transparent"
+  ) +
+  geom_sf(
+    data = roads_1, 
+    linewidth = 0.5, 
+    alpha = 0.8,
+    colour = "darkgrey"
+  ) +
+  geom_sf(
+    data = roads_2,
+    linewidth = 0.3,
+    alpha = 0.4,
+    colour = "lightgrey"
+  ) +
+  geom_sf(
+    data = health_combined,
+    mapping = aes(
+      colour = near_highway,
+      size = facility_type,
+      shape = facility_type
+    ),
+    alpha = 0.7
+  ) +
+  scale_size_manual(
+    values = c(0.2, 1, 2)
+  ) +
+  scale_shape_manual(
+    values = c(20, 2, 0)
+  ) +
+  scale_colour_manual(
+    values = c("lightblue", "red")
+  ) +
+  # Add North-Arrow and Scale
+  ggspatial::annotation_north_arrow(
+    style = ggspatial::north_arrow_orienteering(
+      line_col = "grey20",
+      fill = c("grey90", "grey10")
+    ),
+    location = "tl"
+  ) +
+  ggspatial::annotation_scale(
+    bar_cols = c("grey10", "white"),
+    location = "bl"
+  ) +
+  labs(
+    title = "Haryana: Highways and Health Facilties",
+    shape = NULL,
+    size = NULL,
+    colour = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )
+
+ggsave(
+  plot = g,
+  filename = here("projects", "images", "highways_heath_2.png"),
+  height = 2500,
+  width = 2000,
+  units = "px"
+)
+```
+
+![](images/highways_heath_2.png)
+
+Next Step: Combine a GT table and a ggplot2 object
+
+```{r}
+
+insert_gt_table <- show_table |> 
+  mutate(facility_type = str_to_title(facility_type)) |> 
+  rename(percentage_on_highway = perc_on_highway) |> 
+  gt() |> 
+  cols_label_with(fn = snakecase::to_title_case) |> 
+  # cols_width(
+  #   facility_type ~ px(100),
+  #   far_from_highway ~ px(20),
+  #   near_highway ~ px(20),
+  #   percentage_on_highway ~ px(50)
+  # ) |> 
+  gtExtras::gt_plt_bar(
+    percentage_on_highway,
+    labels = TRUE,
+    color = "darkgreen",
+    scale_type = "percent"
+  ) |> 
+  gtExtras::gt_theme_538()
+
+insert_gt_table
+
+plot_data_df <- health_combined |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  count(state_name, facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = c(state_name, facility_type),
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    total = far_from_highway + near_highway,
+    perc_on_hwy = near_highway / total,
+    .keep = "unused"
+  )
+
+strip_labels <- c(
+      "Small facilties: Dentists, Pharmacies",
+      "Medium: Clinics, Doctors's Practices",
+      "Large: Hospitals, Nursing Homes, Institutions"
+    ) |> 
+  str_wrap(30)
+names(strip_labels) <- c("small", "medium", "large")
+
+inset_plot <- plot_data_df |> 
+  ggplot(
+    mapping = aes(
+      y = state_name,
+      x = perc_on_hwy
+    )
+  ) +
+  geom_col(
+    alpha = 0.5
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0("(", number(total, 
+                                 scale = 1, 
+                                 accuracy = 1,
+                                 big.mark = ","),
+                     ")"),
+      x = 0
+    ),
+    nudge_x = 0.01,
+    hjust = 0
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(round(perc_on_hwy * 100, 2), "%")
+    ),
+    nudge_x = 0.005,
+    hjust = 0
+  ) +
+  labs(
+    y = NULL,
+    x = "Health facilities located on the Highway"
+  ) +
+  facet_wrap(
+    ~ facility_type,
+    labeller = labeller(
+      facility_type = strip_labels
+    )
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0, 0.25)),
+    labels = scales::label_percent()
+  ) +
+  theme_minimal(
+    base_size = 10
+  ) +
+  theme()
+
+inset_plot
+```
+
+Final Product for Haryana: Data Split by districts
+
+```{r}
+
+# Basics of Final Visualization: Fonts
+font_add_google("Rouge Script", "title_font")
+font_add_google("El Messiri", "body_font")
+font_add_google("Saira Extra Condensed", "caption_font")
+showtext_auto()
+
+text_col <- "grey10"
+text_hil <- "grey20"
+bts <- 150
+bg_col <- "white"
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color:{text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color:{text_hil}'>{xtwitter_username}</span>")
+
+plot_title <- "Haryana: Highways and Health-Care"
+
+plot_caption <- paste0(
+  "**Data:** Open Street Maps; Survey of India", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Get pre-saved data (Trial Phase - use pre-saved data to 
+# save laoding times)
+# Note: I have split downloading health facilties into larger and
+#       Smaller ones to save on downloading times, and prevent 
+#       breakage during downloading such large datasets
+health_small <- readRDS(file = "haryana_health_small.rds")
+health_large <- readRDS(file = "haryana_health_large.rds")
+roads_1 <- readRDS(file = "haryana_roads_1.rds")
+roads_2 <- readRDS(file = "haryana_roads_2.rds")
+
+# Get only the relevant sf object out of each downlaoded data-set
+# For roads, only "LINES" are relevant sf feature.
+roads_1 <- roads_1$osm_lines
+roads_2 <- roads_2$osm_lines
+
+# Get a Map of the State / City and keep only the highways and 
+# facilties within that State / City for plotting (instead of entire)
+# bounding box
+region_map <- sf::read_sf(
+  here::here("data", "india_map", "India_State_Boundary.shp")
+) |> 
+  janitor::clean_names() |> 
+  filter(state_name == "Haryana") |> 
+  st_transform(crs = st_crs(roads_1))
+
+
+haryana_districts_map <- sf::read_sf(
+  here::here("data", "haryana_map", "HARYANA_DISTRICT_BDY.shp")
+) |> 
+  janitor::clean_names() |> 
+  st_transform(crs = st_crs(roads_1))
+
+# Checking the results
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1)
+# 
+# ggplot() +
+#   geom_sf(data = region_map) +
+#   geom_sf(data = roads_1 |> st_intersection(region_map))
+
+# Select Roads and Facilties that are within the selected region
+roads_1 <- roads_1 |> st_intersection(region_map)
+roads_2 <- roads_2 |> st_intersection(region_map)
+
+# Health facilities are as points, polygons and multi-polygons. 
+# Lets convert them all into points, since on a large map 
+# like a city or state, all will anyways appear as a point
+
+# -------------------------------------------------------------------
+# Extracting the Larger Health Facilities in a nicely formatted clean
+# sf object, to make plotting easier subsequently--------------------
+temp1 <- health_large$osm_points |> 
+  select(name, geometry, "addr:district") |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+temp2 <- health_large$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+temp3 <- health_large$osm_multipolygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "large")
+
+health_large <- bind_rows(
+  temp1,
+  temp2,
+  temp3
+)
+# Clean the workspace
+rm(temp1, temp2, temp3)
+
+# Retain only the health facilities that are within our region
+health_large <- health_large |> 
+  st_intersection(region_map)
+
+# Now the MAGIC of {sf}: mark the facilities that are near highways
+health_large <- health_large |> 
+  mutate(
+    near_highway = health_large |> 
+      
+      # Checking which points are within a specific distance of highway
+      # The awesome power & speed of sf::st_is_within_distance() 
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      # Keep value TRUE if facility is near ANY highway
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# An Output Table of near and away from highway facilties for 
+# Large and Medium Health Facilties
+table_large <- health_large |> 
+  st_drop_geometry() |> 
+  count(facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = facility_type,
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    perc_on_highway = near_highway / (near_highway + far_from_highway)
+  )
+
+# Do the same process for snmaller health facilities ----------------
+temp1 <- health_small$osm_points |> 
+  select(name, geometry, "addr:district") |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "small")
+
+temp2 <- health_small$osm_polygons |> 
+  st_centroid() |> 
+  select(name, geometry, "addr:district") |> 
+  filter(!is.na(name)) |> 
+  mutate(facility_type = "medium")
+
+health_small <- bind_rows(
+  temp1,
+  temp2
+)
+
+rm(temp1, temp2)
+
+health_small <- health_small |> 
+  st_intersection(region_map)
+
+health_small <- health_small |> 
+  mutate(
+    near_highway = health_small |> 
+      
+      # Checking which points are within a specific distance of highway
+      st_is_within_distance(
+        y = roads_1,
+        dist = 200,
+        sparse = F
+      ) |> 
+      as_tibble() |> 
+      mutate(
+        any_true = rowSums(across(everything(), as.logical)) > 0
+      ) |> 
+      pull(any_true)
+  ) |> 
+  mutate(
+    near_highway = if_else(
+      near_highway,
+      "near_highway",
+      "far_from_highway"
+    )
+  )
+
+# Combining health_large and health_small to map shape to facility size
+health_combined <- bind_rows(
+  health_large,
+  health_small
+  ) |> 
+  mutate(
+    facility_type = fct(
+      facility_type,
+      levels = c("small", "medium", "large")
+    )
+  ) |> 
+  rename(district = addr.district) |> 
+  filter(!is.na(district)) |> 
+  mutate(
+    facility_type = str_to_title(facility_type),
+    near_highway = snakecase::to_title_case(near_highway)
+  )
+
+
+rm(health_large, health_small)
+
+# The plot
+g <- ggplot() +
+  
+  # Background map of districts
+  geom_sf(
+    data = haryana_districts_map,
+    linewidth  = 2,
+    colour = "grey90",
+    alpha = 0.1,
+    fill = "transparent"
+  ) +
+  
+  # Background overall map of Haryana
+  geom_sf(
+    data = region_map,
+    linewidth  = 2,
+    colour = "grey10",
+    fill = "transparent"
+  ) +
+  
+  # Plotting the Highways and other major roads
+  geom_sf(
+    data = roads_1, 
+    linewidth = 0.9, 
+    alpha = 0.8,
+    colour = "#702F8AFF" 
+  ) +
+  geom_sf(
+    data = roads_2,
+    linewidth = 0.5,
+    alpha = 0.5,
+    colour = "#9063CDFF"
+  ) +
+  
+  # Plotting the Health Facilties
+  geom_sf(
+    data = health_combined,
+    mapping = aes(
+      colour = near_highway,
+      size = facility_type,
+      shape = facility_type
+    ),
+    alpha = 0.5
+  ) +
+  
+  scale_size_manual(
+    values = c(10, 7, 3)
+  ) +
+  scale_shape_manual(
+    values = c(0, 2, 20)
+  ) +
+  scale_colour_manual(
+    values = c("#FFA400FF", "#862633FF")
+  ) +
+  
+  # Add North-Arrow and Scale
+  ggspatial::annotation_north_arrow(
+    style = ggspatial::north_arrow_orienteering(
+      line_col = "grey20",
+      fill = c("grey90", "grey20"),
+      text_size = bts,
+      text_family = "body_font"
+    ),
+    location = "tr",
+    height = unit(5, "cm"),
+    width = unit(5, "cm")
+  ) +
+  ggspatial::annotation_scale(
+    bar_cols = c("grey30", bg_col),
+    location = "bl",
+    height = unit(0.75, "cm"),
+    text_cex = 10,
+    text_family = "body_font"
+  ) +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    shape = NULL,
+    size = NULL,
+    colour = NULL
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 10
+      )
+    )
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(10,10,10,10, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0
+    ),
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0, 0.8),
+    legend.direction = "vertical",
+    legend.text = element_text(
+      margin = margin(5,5,5,5, "mm")
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box = "horizontal",
+    legend.box.just = "top",
+    legend.key.spacing = unit(10, "mm"),
+    
+    # Labels
+    plot.title = element_text(
+      size = 3 * bts,
+      hjust = 0.5,
+      colour = text_hil,
+      margin = margin(30,0,30,0, "mm"),
+      family = "title_font"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(10,0,10,0, "mm"),
+      colour = text_hil,
+      size = 0.75 * bts
+    )
+  )
+
+
+plot_data_df <- health_combined |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  count(state_name, facility_type, near_highway) |> 
+  pivot_wider(
+    id_cols = c(state_name, facility_type),
+    names_from = near_highway,
+    values_from = n
+  ) |> 
+  mutate(
+    total = far_from_highway + near_highway,
+    perc_on_hwy = near_highway / total,
+    .keep = "unused"
+  )
+
+
+strip_labels <- c(
+      "Small facilties: Dentists, Pharmacies",
+      "Medium: Clinics, Doctors's Practices",
+      "Large: Hospitals, Nursing Homes, Institutions"
+    ) |> 
+  str_wrap(30)
+names(strip_labels) <- c("small", "medium", "large")
+
+inset_plot <- plot_data_df |> 
+  ggplot(
+    mapping = aes(
+      y = state_name,
+      x = perc_on_hwy
+    )
+  ) +
+  geom_col(
+    alpha = 0.5
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0("(", number(total, 
+                                 scale = 1, 
+                                 accuracy = 1,
+                                 big.mark = ","),
+                     ")"),
+      x = 0
+    ),
+    nudge_x = 0.01,
+    hjust = 0
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(round(perc_on_hwy * 100, 2), "%")
+    ),
+    nudge_x = 0.005,
+    hjust = 0
+  ) +
+  labs(
+    y = NULL,
+    x = "Health facilities located on the Highway"
+  ) +
+  facet_wrap(
+    ~ facility_type,
+    labeller = labeller(
+      facility_type = strip_labels
+    )
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0, 0.25)),
+    labels = scales::label_percent()
+  ) +
+  theme_minimal(
+    base_size = 10
+  ) +
+  theme()
+
+inset_plot
+
+ggsave(
+  plot = g,
+  filename = here("projects", "images", 
+                  "highways_health_haryana.png"),
+  height = 36,
+  width = 24,
+  units = "in",
+  bg = bg_col
+)
+```
+
+Final Product for India
+
+```{r}
+
+
+
 ```
