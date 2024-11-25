@@ -1,0 +1,530 @@
+---
+title: "Encounters at U.S. Borders: A Seasonal Shift in Data"
+author: "Aditya Dahiya"
+date: "2024-11-25"
+subtitle: "Visualization, created using {ggbraid}, compares monthly U.S. border encounters from 2020 to 2024, highlighting the dominant type of encounter with a color-coded ribbon (red for illegal crossings, blue for official port denials)."
+categories:
+  - "#TidyTuesday"
+  - "{ggbraid}"
+  - "Time Series"
+image: "thumbnails/tidy_us_border_data.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+The **U.S. Customs and Border Protection (CBP) Encounter Data** provides a comprehensive overview of border enforcement activity in the United States from fiscal year 2020 onwards. The dataset includes information on encounters processed under **Title 8** (standard immigration law) and **Title 42** (a public health directive used during the COVID-19 pandemic to expedite expulsions), as well as data on apprehensions and inadmissibles across the Northern and Southwest Land Borders and Nationwide operations. Curated by [Tony Galván](https://www.linkedin.com/in/anthony-raul-galvan/), this dataset allows for the exploration of trends in migration and enforcement, such as seasonal and year-over-year patterns, and the impact of shifting policies like the potential end of Title 42. It provides valuable context for analyzing demographic breakdowns, citizenship information, and regional variations in encounters. More details, including a thorough exploration, are available in Tony’s [blog post](https://gdatascience.github.io/us_border_patrol_encounters/us_border_patrol_encounters.html). Users should note that these data are subject to ongoing corrections and updates as part of live CBP system extractions..
+
+![Monthly U.S. Border Encounters by Type (Jan 2020 – Nov 2024): This graph compares two types of U.S. border encounters—\*\*USBP apprehensions\*\* (red, individuals caught crossing illegally between ports) and \*\*OFO inadmissibles\*\* (blue, individuals denied entry at official ports)—over the past five years. The x-axis represents time (months), while the y-axis shows the number of encounters. The ribbon between the lines highlights which type of encounter dominates each month, with the ribbon shaded red or blue accordingly. While encounters at official ports (blue) typically outnumber illegal crossings (red) during winter months, a notable reversal occurred in October–November 2024, with a surge in apprehensions between ports.](tidy_us_border_data.png){#fig-1}
+
+### **How I made this graphic?**
+
+The `{ggbraid}` package, created by Neal Grantham, is a versatile tool in the R ecosystem, extending the capabilities of ggplot2. It allows users to create "braided ribbons" between two line plots, visually highlighting which of the two values dominates at different points. This is achieved through the `geom_braid()` function, which adds a ribbon layer that dynamically fills based on conditional aesthetics (e.g., which line is higher). For more details, you can explore the official documentation [here](https://nsgrantham.github.io/ggbraid/)
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+library(ggbraid)              # For improved ribbon (braid) plots
+
+# A helper function for geom_richtext
+str_wrap_html <- function(string, width = 40) {
+  str_wrap(string, width = width) %>% 
+    str_replace_all("\n", "<br>")
+}
+
+cbp_resp <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-11-26/cbp_resp.csv')
+# cbp_state <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-11-26/cbp_state.csv')
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Maiden Orange",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Fauna One",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Official USA Flag colours
+mypal <- c("#0A3161", "#B31942")
+
+# A base Colour
+bg_col <- "#FFFFFF"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- darken(mypal[2], 0.2)
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- darken(mypal[1], 0.2)
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_col}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_col}'>{xtwitter_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "Shifting Trends in U.S. Border Encounters\n(2020–2024)"
+
+plot_subtitle <- "Comparing two types of U.S. border encounters: people caught crossing illegally between ports vs. those denied entry at official ports. While official port denials mildly outnumber illegal crossings in winter months, the pattern reversed dramatically in late 2024, with a sharp rise in out-in-the-wilderness crossings, bypassing official ports of entry."
+
+plot_caption <- paste0(
+  "**Data:** Tony Galván, U.S. Customs and Border Patrol", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+# cbp_resp |>
+#   summarytools::dfSummary() |>
+#   summarytools::view()
+
+dim(cbp_resp)
+# dim(cbp_state)
+names(cbp_resp)
+
+labels_month <- c("JAN", "FEB", "MAR", "APR",
+                  "MAY", "JUN", "JUL", "AUG",
+                  "SEP", "OCT", "NOV", "DEC")
+
+# Number of encounters per month for last 5 years
+# cbp_resp |> 
+#   count(fiscal_year, month_abbv) |> 
+#   mutate(
+#     month_abbv = fct(month_abbv, levels = labels_month),
+#     fiscal_year = as.character(fiscal_year)
+#   ) |> 
+#   ggplot(
+#     mapping = aes(
+#       x = month_abbv,
+#       y = n, 
+#       group = fiscal_year,
+#       colour = fiscal_year
+#     )
+#   ) +
+#   geom_point() +
+#   geom_line()
+
+
+# # Number of encounters per month for last 5 years
+# cbp_resp |> 
+#   
+#   # Remove a few abberrant sounding observations
+#   filter(encounter_count < 10000) |> 
+#   
+#   count(fiscal_year, month_abbv, wt = encounter_count) |> 
+#   mutate(
+#     month_abbv = fct(month_abbv, levels = labels_month),
+#     fiscal_year = as.character(fiscal_year)
+#   ) |> 
+#   ggplot(
+#     mapping = aes(
+#       x = month_abbv,
+#       y = n, 
+#       group = fiscal_year,
+#       colour = fiscal_year
+#     )
+#   ) +
+#   geom_point() +
+#   geom_line()
+
+df <- cbp_resp |> 
+  mutate(
+    
+    # Parse month abbreviations to numbers
+    month_num = match(month_abbv, str_to_upper(month.abb)), 
+    
+    # Combine year and month into a date
+    data_date = make_date(year = fiscal_year, month = month_num, day = 1)
+  ) |> 
+  count(data_date, citizenship, wt = encounter_count) |> 
+  mutate(
+    country = countrycode::countryname(citizenship),
+    country = if_else(is.na(country), "Others", country)
+  )
+
+#### Attempt 1: A Stream Graph
+# df |> 
+#   ggplot(
+#     mapping = aes(
+#       x = data_date,
+#       y = n,
+#       group = country,
+#       fill = country
+#     )
+#   ) +
+#   ggstream::geom_stream(
+#     colour = "white",
+#     bw = 0.5, 
+#     sorting = "inside_out"
+#   ) +
+#   ggstream::geom_stream_label(
+#     mapping = aes(
+#       label = country
+#     ),
+#     bw = 0.5, 
+#     sorting = "inside_out"
+#   ) +
+#   theme(legend.position = "none")
+
+
+df2 <- cbp_resp |> 
+  mutate(
+    
+    # Parse month abbreviations to numbers
+    month_num = match(month_abbv, str_to_upper(month.abb)), 
+    
+    # Combine year and month into a date
+    data_date = make_date(year = fiscal_year, month = month_num, day = 1)
+  ) |> 
+  
+  # Remove data that seems most likely an aberration
+  filter(encounter_count < 10000) |> 
+  
+  count(
+    data_date, 
+    encounter_type, 
+    wt = encounter_count
+  ) |> 
+  filter(encounter_type != "Expulsions")
+
+# Pivot data wider for use with geom_ribbon and geom_braid
+df2_wide <- df2 |> 
+  pivot_wider(
+    id_cols = data_date,
+    names_from = encounter_type,
+    values_from = n
+  )
+
+df2_labels <- df2 |> 
+  group_by(encounter_type) |> 
+  slice_max(order_by = data_date, n = 1) |> 
+  ungroup() |> 
+  mutate(
+    description = c(
+      "USBP Apprehensions: Caught crossing illegally between ports.",
+      "OFO Inadmissibles: Denied entry at official ports."
+    )
+  )
+
+text_annotation_1 <- str_wrap_html(
+  "**USBP: Apprehensions** refer to individuals who are intercepted by the U.S. Border Patrol while *attempting to cross the border illegally between designated ports of entry*. These encounters are processed under Title 8 of the Immigration and Nationality Act, subjecting individuals to immigration proceedings, detention, or removal.",
+  40
+)
+
+str_view(text_annotation_1)
+
+text_annotation_2 <- str_wrap_html(
+  "**OFO: Inadmissibles** involve *individuals who present themselves at official ports of entry* but are deemed inadmissible under U.S. immigration laws. These decisions, also governed by Title 8, are based on factors like lack of documentation, criminal history, or prior immigration violations, distinguishing them from those apprehended in unauthorized border crossings.",
+  45
+)
+
+str_view(text_annotation_2)
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+g <- ggplot() +
+  
+  # The line plot
+  geom_line(
+    data = df2,
+    mapping = aes(
+      x = data_date,
+      y = n, 
+      group = encounter_type,
+      colour = encounter_type
+    )
+  ) +
+  
+  # Very little points for beautification
+  geom_point(
+    data = df2,
+    mapping = aes(
+      x = data_date,
+      y = n, 
+      colour = encounter_type
+    ),
+    alpha = 0.8,
+    size = 0.9
+  ) +
+  
+  # The actual braided graph: an improvement over geom_ribbon()
+  ggbraid::geom_braid(
+    data = df2_wide,
+    mapping = aes(
+      x = data_date,
+      ymin = Apprehensions,
+      ymax = Inadmissibles, 
+      fill = Apprehensions < Inadmissibles
+    ),
+    alpha = 0.2
+  ) +
+  
+  # Adding labels
+  geom_text(
+    data = df2_labels,
+    mapping = aes(
+      x = data_date,
+      y = n,
+      colour = encounter_type,
+      label = str_wrap(description, 25)
+    ),
+    hjust = 0,
+    nudge_x = 10,
+    family = "caption_font",
+    size = bts / 2.5,
+    lineheight = 0.25
+  ) +
+  
+  # Text Annotations for explanations
+  annotate(
+    geom = "richtext",
+    x = make_date(2020, 3),
+    y = 180000,
+    label = text_annotation_1,
+    colour = mypal[1],
+    hjust = 0,
+    vjust = 1,
+    fill = "transparent",
+    label.size = 0,
+    family = "body_font",
+    size = bts / 4,
+    lineheight = 0.25
+  ) +
+  annotate(
+    geom = "richtext",
+    x = make_date(2026, 5),
+    y = 5000,
+    label = text_annotation_2,
+    colour = mypal[2],
+    hjust = 1,
+    vjust = 0,
+    fill = "transparent",
+    label.size = 0,
+    family = "body_font",
+    size = bts / 4,
+    lineheight = 0.25
+  ) +
+  
+  # Scales and Coordinates
+  scale_x_date(
+    expand = expansion(c(0, 0))
+  ) +
+  scale_y_continuous(
+    labels = scales::label_number(
+      scale_cut = cut_short_scale()
+    ),
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  coord_cartesian(clip = "off") +
+  
+  # Labels and Themes
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 100),
+    caption = plot_caption,
+    x = NULL,
+    y = "Number of persons"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    legend.position = "none",
+    plot.margin = margin(5,5,10,5, "mm"),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    panel.grid = element_line(
+      colour = alpha(mypal[1], 0.5),
+      linewidth = 0.2,
+      linetype = 3
+    ),
+    plot.title.position = "plot",
+    
+    # Axes
+    axis.line = element_line(
+      colour = text_col,
+      linewidth = 0.5,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      size = 2.5 * bts,
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      family = "title_font",
+      size = 1.1 * bts,
+      margin = margin(0,0,10,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(10,0,0,0, "mm")
+    )
+  )
+
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_us_border_data.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_us_border_data.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_us_border_data.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+library(ggbraid)              # For improved ribbon (braid) plots
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
