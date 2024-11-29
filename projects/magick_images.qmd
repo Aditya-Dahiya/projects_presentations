@@ -2,11 +2,11 @@
 title: "Harnessing the power of {magick} in R for images' modifications"
 author: "Aditya Dahiya"
 date: "2024-11-25"
-subtitle: "........................"
+subtitle: "Example codes for handling images in R using various userful functions of the {magick} package"
 categories:
   - "#TidyTuesday"
   - "{magick}"
-mage: "thumbnails/tidy_us_border_data.png"
+mage: "images/magick_images_logo.png"
 format:
   html:
     code-fold: true
@@ -16,7 +16,6 @@ execute:
   error: false
   message: false
   warning: false
-  eval: false
 filters:
   - social-share
 share:
@@ -31,7 +30,7 @@ comments:
     repo: Aditya-Dahiya/projects_presentations
 ---
 
-Harnessing the power of {magick} [@magick] for working with images in `R`.
+Harnessing the power of *`{magick}`* for working with images in `R`.
 
 ```{r}
 #| label: setup
@@ -40,14 +39,106 @@ Harnessing the power of {magick} [@magick] for working with images in `R`.
 library(tidyverse)          # Data Wrangling
 library(magick)             # For handling images
 library(scales)             # Scales in the ggplot2
+
+# Thumbnail for this webpage
+image_read("https://repository-images.githubusercontent.com/35780977/1ee2143f-0707-42b5-8839-d5bb5339d03c") |> 
+  image_resize("x500") |> 
+  image_crop("500x500+250") |> 
+  image_write(here::here("projects", "images", "magick_images_logo.png"))
 ```
 
 ## Part 1: Transparent Overlays on images
 
-The "Magick Overlay" [post](https://x.ai/grok/themockup.blog/posts/2022-06-22-magick-overlay/) on [The Mockup](https://themockup.blog/) blog by [Tom Mock](https://x.com/thomas_mock), dated June 22, 2022, explores the creation of dynamic, semi-transparent overlays using the `magick` package [@magick] in `R`, which interfaces with ImageMagick's powerful image processing capabilities. The technique involves **defining a custom overlay function, `create_overlay()`, which applies a coloured rectangle over an image with adjustable transparency**, enhancing the visual presentation for text overlays or focal points in images. This method leverages R's capabilities for image manipulation, offering flexibility beyond traditional CSS or HTML solutions by directly manipulating image layers. The process includes reading an image, applying color effects like `image_colorize()`, and compositing images with precise control over placement and transparency.
+The "Magick Overlay" [post](https://themockup.blog/posts/2022-06-22-magick-overlay/) about adding a semi-transparent overlay to an image, hosted on [The Mockup](https://themockup.blog/) blog by [Tom Mock](https://x.com/thomas_mock), dated June 22, 2022, explores the creation of dynamic, semi-transparent overlays using the `magick` package in `R`, which interfaces with ImageMagick's powerful image processing capabilities.
+
+The technique involves **defining a custom overlay function, `create_overlay()`, which applies a coloured rectangle over an image with adjustable transparency**, enhancing the visual presentation for text overlays or focal points in images. The process includes reading an image, applying color effects like `image_colorize()`, and compositing images with precise control over placement and transparency.
 
 ```{r}
+#| label: fig-1
+#| fig-cap: "The base ggplot2 logo"
 # Load a temporary image to work with
 
-url <- "https://upload.wikimedia.org/wikipedia/commons/f/ff/Tidyverse_hex_logo.png"
+ggplot2_logo <- image_read("https://upload.wikimedia.org/wikipedia/commons/5/5a/Ggplot2_hex_logo.png")
+
+ggplot2_logo |> 
+  image_resize("x400")
+```
+
+### 1.1 Using the `image_colorize()` option
+
+```{r}
+#| label: fig-2
+#| fig-cap: "Colourizing the image with image_colorize() adding a opacity index and colour"
+#| fig-subcap: 
+#|   - "Colour black"
+#|   - "Colour lightblue"
+#| layout-ncol: 2
+
+ggplot2_logo |> 
+  image_resize("x400") |> 
+  image_colorize(opacity = 50, "black")
+
+ggplot2_logo |> 
+  image_resize("x400") |> 
+  image_colorize(opacity = 50, "lightblue")
+```
+
+### 1.2 Creating a custom function create_overlay() to complete overlay the image, including transparent areas
+
+::: callout-tip
+Using hex codes to apply colours: standard hex codes are 6 digits (e.g., `#000000` for black). Adding two digits at the end adjusts transparency (e.g., `#00000050` for 50% transparency).
+:::
+
+```{r}
+#| code-fold: true
+#| label: fig-3
+#| fig-cap: "Using the custom crate_overlay() function"
+#| fig-subcap: 
+#|   - "Black overlay"
+#|   - "Light Blue overlay"
+#| layout-ncol: 2
+
+# Credits: https://themockup.blog/posts/2022-06-22-magick-overlay/
+#          By, Tom Mock.
+
+create_overlay <- function(img, overlay_color = "#00000060", out_file = NULL){
+  if(!("magick-image" %in% class(img))){
+    raw_img <- image_read(img)
+  } else if ("magick-image" %in% class(img)){
+    raw_img <- img
+  }
+  
+  # get image dimensions
+  img_info <- image_info(raw_img)
+  
+  # draw the raw image
+  img_overlay <- image_draw(raw_img)
+  # draw a rectangle of equal proportion to the raw image
+  rect(0, 0, img_info$width, img_info$height, col = overlay_color, border = NA)
+  # save the results
+  dev.off()
+  
+  # return it or return + save out
+  if(!is.null(out_file)){
+    image_write(img_overlay, path = out_file)
+    message(paste("Image saved as", out_file))
+    return(img_overlay)
+  } else {
+    return(img_overlay)
+  }
+}
+
+ggplot2_logo |> 
+  image_resize("x400") |> 
+  create_overlay(overlay_color = "#00000050") |> 
+  image_annotate("Amended image", 
+                 size = 20,
+                 location = "+100+70")
+
+ggplot2_logo |> 
+  image_resize("x400") |> 
+  create_overlay(overlay_color = "#76c9de50") |> 
+  image_annotate("Amended image", 
+                 size = 20,
+                 location = "+100+70")
 ```
