@@ -6,7 +6,7 @@ subtitle: "Example codes for handling images in R using various userful function
 categories:
   - "#TidyTuesday"
   - "{magick}"
-mage: "images/magick_images_logo.png"
+image: "images/magick_images_logo.png"
 format:
   html:
     code-fold: true
@@ -41,9 +41,9 @@ library(magick)             # For handling images
 library(scales)             # Scales in the ggplot2
 
 # Thumbnail for this webpage
-image_read("https://repository-images.githubusercontent.com/35780977/1ee2143f-0707-42b5-8839-d5bb5339d03c") |> 
-  image_resize("x500") |> 
-  image_crop("500x500+250") |> 
+image_read("https://repository-images.githubusercontent.com/35780977/1ee2143f-0707-42b5-8839-d5bb5339d03c") |>
+  image_resize("x500") |>
+  image_crop("500x500+250") |>
   image_write(here::here("projects", "images", "magick_images_logo.png"))
 ```
 
@@ -142,3 +142,64 @@ ggplot2_logo |>
                  size = 20,
                  location = "+100+70")
 ```
+
+## Part 2: Understanding `geometry` argument in {`magick`} functions
+
+The `geometry` argument in the **{magick}** package is a powerful syntax used to specify dimensions and coordinates for transformations such as cropping, resizing, or adjusting images. The format of the `geometry` string is `AxB+C+D`. Each part of the string is optional and serves a specific purpose: —
+
+| **Component** | **Meaning** | **Example** |
+|----|----|----|
+| **A** | Width (pixels) | `200x` (width: 200px) |
+| **B** | Height (pixels) | `x300` (height: 300px) |
+| **C** | Horizontal offset (pixels), positive or negative | `+50` or `-50` |
+| **D** | Vertical offset (pixels), positive or negative | `+100` or `-100` |
+
+1.  **Resizing**: **When specifying only `A` or `B`, the image is resized while maintaining its aspect ratio.**
+
+    -   Example: `200x300` resizes the image to exactly 200px wide and 300px high.
+
+    -   Example: `200x` resizes the image to 200px wide, maintaining the aspect ratio.
+
+2.  **Cropping**: **When `C` and `D` are used, they specify the top-left corner of the cropping rectangle.**
+
+    -   Example: `200x300+50+100` crops the image to 200x300 pixels starting 50px right and 100px down.
+
+3.  **Offsets**: **`+C+D` can adjust the positioning without altering size.**
+
+    -   Example: `+20+30` shifts the image 20px to the right and 30px down.
+
+4.  **Aspect Ratio**: **Using `!` after dimensions forces exact resizing, ignoring the aspect ratio.**
+
+    -   Example: `200x300!` forces the image to 200x300 pixels, potentially distorting it.
+
+### Table of Variations
+
+| **Syntax** | **Action** | **Example Description** |
+|----|----|----|
+| `200x300` | Resize to 200px wide and 300px high | Scales the image to these dimensions. |
+| `200x` | Resize to 200px wide, maintain aspect ratio | Height is calculated to keep proportions. |
+| `x300` | Resize to 300px high, maintain aspect ratio | Width is calculated to keep proportions. |
+| `200x300+50+100` | Crop 200x300 pixels starting at (50, 100) | Region selection for cropping. |
+| `+50-30` | Move image 50px right, 30px up | Image shifts by specified offset. |
+| `200x300!` | Resize to exactly 200x300, ignoring ratio | Forces exact dimensions, may stretch or compress image. |
+| `200x300>` | Resize to fit within 200x300 (no upscaling) | Image shrinks if larger but won't enlarge smaller images. |
+| `200x300<` | Resize to fill 200x300, upscaling if needed | Enlarges or shrinks to fill dimensions. |
+
+```{r}
+#| label: fig-4
+#| layout-ncol: 3
+
+ggplot2_logo |> 
+  image_resize("x200") |> 
+  image_scale("100x300!")
+
+ggplot2_logo |> 
+  image_resize("x200") |> 
+  image_scale("100x300>")
+
+ggplot2_logo |> 
+  image_resize("x200") |> 
+  image_scale("100x300<")
+```
+
+\
