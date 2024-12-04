@@ -1,10 +1,11 @@
 ---
-title: "National Highways Traffic Flow"
+title: "Traffic Through Time: Weekday Routines, Weekend Variations"
 author: "Aditya Dahiya"
 date: "2024-11-25"
-subtitle: "............."
+subtitle: "Exploring traffic dynamics on the A64 road, this analysis reveals stark contrasts between weekday rush hour plateaus and weekend midday peaks, highlighting how traffic volume shifts with daily routines and leisure patterns."
 categories:
   - "#TidyTuesday"
+  - "Time Series"
 image: "thumbnails/tidy_nh_uk_traffic.png"
 format:
   html:
@@ -146,9 +147,9 @@ temp_names <- a64_traffic$Name |> unique()
 rawdf <- a64_traffic |> 
   janitor::clean_names() |> 
   mutate(
-    report_day = wday(report_date, label = T, abbr = T),
+    report_day = wday(report_date, label = T, abbr = F),
     weekend = if_else(
-      report_day %in% c("Sat", "Sun"),
+      report_day %in% c("Saturday", "Sunday"),
       "Weekend",
       "Weekdays"
     )
@@ -159,8 +160,18 @@ rawdf <- a64_traffic |>
       name == temp_names[2] ~ "Between B1249 and A1039",
       name == temp_names[3] ~ "Near York (north)",
       name == temp_names[4] ~ "Between B1261 and Filey",
+    ),
+    name = fct(
+      name,
+      levels = c(
+        "Norton-on-Derwent (east)",
+        
+      )
     )
-  )
+  ) |> 
+  select(total_volume, time_period_ending, report_date,
+         weekend, report_day, name) |> 
+  mutate(name = str_wrap(name, 20))
 
 ```
 
@@ -193,12 +204,21 @@ g <- rawdf |>
     linewidth = 1,
     alpha = 0.5
   ) +
+  paletteer::scale_color_paletteer_d("nbapalettes::sixers_retro") +
+  scale_x_time(
+    breaks = c(
+      hms("08:00:00"),
+      hms("14:00:00"),
+      hms("20:00:00")
+    ),
+    labels = label_time(format = "%I %p")
+  ) +
   coord_cartesian(
     clip = "off"
   ) +
   labs(
     title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 100),
+    subtitle = str_wrap(plot_subtitle, 120),
     caption = plot_caption,
     y = "Number of vehicles in each 15 min. interval",
     x = "Time of the day"
@@ -211,12 +231,75 @@ g <- rawdf |>
     base_size = bts
   ) +
   theme(
+    # Overall
     text = element_text(
       colour = text_col,
       lineheight = 0.3,
       hjust = 0.5
     ),
-    legend.position = "none"
+    legend.position = "none",
+    plot.title.position = "plot",
+    
+    # Facet
+    strip.text.x = element_text(
+      family = "caption_font",
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    strip.text.y = element_text(
+      family = "caption_font",
+      colour = text_col,
+      size = 1 * bts,
+      margin = margin(0,0,0,5, "mm")
+    ),
+    
+    # Axes
+    axis.text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      size = 0.5 * bts
+    ),
+    axis.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    
+    # Panels
+    panel.grid = element_line(
+      colour = "grey80",
+      linewidth = 0.2
+    ),
+    panel.grid.minor = element_blank(),
+    panel.spacing.x = unit(5, "mm"),
+    panel.spacing.y = unit(2, "mm"),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      size = 2 * bts,
+      colour = text_hil,
+      face = "bold",
+      hjust = 0.5,
+      family = "title_font",
+      margin = margin(0,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      size = bts,
+      hjust = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,5,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      colour = text_hil,
+      family = "caption_font",
+      margin = margin(3,0,-10,0, "mm")
+    )
   )
 
 ggsave(
@@ -260,6 +343,17 @@ Session Info
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
 
 
 sessioninfo::session_info()$packages |> 
