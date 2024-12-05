@@ -1,0 +1,254 @@
+---
+title: "The year 2024 in my habits"
+author: "Aditya Dahiya"
+date: "2024-12-31"
+subtitle: "..............................."
+categories:
+  - "Data Visualization"
+image: "images/my_year_2024.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+Analysing my achievements for the year 2024 in my different habits.
+
+```{r}
+#| label: setup
+
+# Loading the relevant packages
+library(tidyverse)          # Data Wrangling
+library(gt)                 # Displaying beautiful tables
+library(ggiraph)            # Interactive Graphics
+library(showtext)           # Display fancy text in ggplot2
+library(fontawesome)        # Icons and Fonts 
+ 
+# Setting font defaults
+font_add_google("Monda", "body_font")
+showtext_auto()
+
+# Set the default theme with a custom font family
+theme_set(theme_minimal(base_family = "body_font"))
+
+# Setting default options for the interactive graphics
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "fill:yellow;stroke:black;stroke-width:1px"
+    ),
+  opts_tooltip = opts_tooltip(
+    css = "padding:3px;color:black;background-color:white;"
+    )
+)
+```
+
+Loading the data, studying and understanding it. Cleaning the names.
+
+```{r}
+
+# Set the working directory (I didnt want to host raw data on GitHub)
+list.files("loop_habits")
+
+# Define the directory containing the CSV files
+directory <- "loop_habits"
+
+# List all CSV files in the directory
+csv_files <- list.files(
+  path = directory, 
+  pattern = "\\.csv$", 
+  full.names = TRUE
+  )
+
+# Extract base names (without file extension) to use as object names
+file_names <- tools::file_path_sans_ext(basename(csv_files)) |>
+  tolower()
+
+# Read each CSV file and assign it to an object with the corresponding name
+purrr::walk2(
+  csv_files, 
+  file_names, 
+  ~ assign(.y, read_csv(.x), 
+           envir = .GlobalEnv)
+  )
+
+library(janitor)
+# Apply janitor::clean_names() to all created objects
+purrr::walk(
+  file_names, ~
+    {
+      cleaned_data <- get(.x) |>  clean_names() 
+      # Retrieve object, clean names
+      
+      assign(.x, cleaned_data, envir = .GlobalEnv) 
+      # Reassign cleaned data back to the same object
+    }
+  )
+
+# Remove the temporary files
+rm(csv_files, directory, file_names)
+
+
+```
+
+Exploring the raw data in the root folder - the overall habits - to make a beautiful table in {gt} tables
+
+```{r}
+
+habits <- habits |> 
+  select(
+    position,
+    name,
+    question,
+    num_repetitions,
+    interval
+  ) |> 
+  mutate(
+    position = as.numeric(position),
+    interval = case_when(
+      interval == 1 ~ "Daily",
+      interval == 7 ~ "Weekly",
+      .default = NA
+    )
+  ) |> 
+  rename(description = question)
+
+
+checkmarks <- checkmarks |> 
+  mutate(
+    day_of_week = fct_rev(wday(date, label = T, abbr = F)),
+    day_number = yday(date),
+    week_number = week(date),
+    month_year = month(date, label = TRUE),
+    walk_cycle = walk_cycle / 1000,
+    date = format(date, "%d %B"),
+    id = row_number()
+  )
+```
+
+```{r}
+#| label: tbl-root1
+#| tbl-cap: "The different habits that I tracked"
+
+habits |> 
+  gt() |> 
+  cols_label(
+    position = "S. No.",
+    name = "Name of the Habit",
+    description = "Description / Question",
+    num_repetitions = "Target number of repetitions",
+    interval = "Frequency"
+  ) |> 
+  tab_header(
+    title = "My Atomic Habits (2024)",
+    subtitle = "The list of habits I tracked for myself in the year 2024",
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
+
+Next, exploring the habits - walking/cycling habits
+
+```{r}
+
+plot1 <- checkmarks |> 
+  ggplot(
+    mapping = aes(
+      x = week_number,
+      y = day_of_week, 
+      fill = walk_cycle,
+      data_id = id,
+      tooltip = paste0(date, "\n", 
+                       day_of_week, "\n",
+                       round(walk_cycle, 2), 
+                       " hours")
+    )
+  ) +
+  geom_tile_interactive(
+    colour = "white",
+    linewidth = 1
+  ) +
+  scale_x_continuous(
+    limits = c(0, 52),
+    breaks = seq(from = 0, to = 52, length.out = 5),
+    labels = c("Jan", "Mar", "Jun", "Sep", "Dec")
+  ) +
+  coord_fixed() +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Blues 3", 
+    direction = -1
+  ) +
+  labs(
+    title = "Walking (number of hours per day)",
+    y = NULL, x = NULL,
+    fill = "Hours (per day)"
+  ) +
+  theme(
+    legend.title = element_text(vjust = 0.5, hjust = 0.5),
+    panel.grid = element_blank(),
+    legend.position = "bottom",
+    legend.title.position = "top"
+  )
+
+girafe(
+  ggobj = plot1
+)
+```
+
+```{r}
+
+facet_labels <- c("Number of days walked during the month", "Average duration walked per day")
+names(facet_labels) <- c("walk_days", "walk_mean")
+checkmarks |> 
+  group_by(month_year) |> 
+  summarize(
+    walk_mean = round(mean(walk_cycle), 1),
+    walk_days = sum(walk_cycle > 0)
+  ) |> 
+  pivot_longer(
+    cols = -month_year,
+    names_to = "facet_var",
+    values_to = "value"
+  ) |> 
+  ggplot(
+    mapping = aes(
+      x = value,
+      y = month_year
+    )
+  ) +
+  geom_col(
+    alpha = 0.5
+  ) +
+  geom_text(
+    mapping = aes(
+      label = value
+    ),
+    hjust = -0.1
+  ) +
+  facet_wrap(
+    ~facet_var, 
+    scales = "free_x",
+    labeller = labeller(facet_var = facet_labels)
+  ) +
+  labs(
+    x = NULL, y = NULL
+  ) +
+  theme(
+    panel.grid = element_blank()
+  )
+```
