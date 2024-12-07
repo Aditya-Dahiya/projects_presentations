@@ -1,0 +1,281 @@
+---
+title: "tidy_perfumes_data"
+author: "Aditya Dahiya"
+date: "2024-12-08"
+subtitle: ""
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_perfumes_data.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+The Parfumo Fragrance Dataset, curated for TidyTuesday, offers a deep dive into the world of perfumes, drawing on data sourced from [Parfumo](https://www.parfumo.com/), a platform for fragrance enthusiasts. Webscraped by [Olga G.](https://www.kaggle.com/olgagmiufana1), the dataset provides a detailed exploration of perfumes, including user ratings, olfactory notes (top, middle, and base), perfumers, and year of release.
+
+Key features include variables such as the fragrance’s **brand**, **release year**, and **concentration** (e.g., Eau de Parfum or Eau de Toilette). Additionally, the dataset captures user interactions, with **rating values** and **rating counts**, and delves into the artistic composition of scents, highlighting the **main accords** and distinct olfactory layers (top, middle, and base notes). It also credits the **perfumers** behind these creations and provides direct [links](https://www.parfumo.com/) to Parfumo’s product pages.
+
+![.....................................](tidy_perfumes_data.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+parfumo_data_clean <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-10/parfumo_data_clean.csv') |> 
+  janitor::clean_names()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Offside",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Rajdhani",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c("#418FDEFF", "#003DA5FF", "#D50032FF")
+
+# A base Colour
+bg_col <- "#FFFFFF"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[2]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- darken(mypal[2], 0.4)
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+
+# Add text to plot--------------------------------------------------------------
+plot_title <- "......................."
+
+plot_subtitle <- "........................"
+
+plot_caption <- paste0(
+  "**Data:** ...............................", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+# parfumo_data_clean |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+
+
+df1 <- parfumo_data_clean |> 
+  # The relevant variables
+  select(rating_value, top_notes, middle_notes, base_notes) |> 
+  # Drop the missing values
+  drop_na()
+
+df2 <- df1 |> 
+  pivot_longer(
+    cols = -rating_value,
+    values_to = "fragnance",
+    names_to = "note"
+  ) |> 
+  mutate(
+    note = str_remove_all(note, "_notes")
+  ) |> 
+  separate_longer_delim(
+    cols = fragnance,
+    delim = ", "
+  ) |> 
+  mutate(
+    rating_cat = ntile(rating_value, 3)
+  )
+
+df3 <- df2 |> 
+  group_by(rating_cat, note) |> 
+  count(fragnance, sort = T) |> 
+  mutate(n_prop = n / sum(n)) |> 
+  slice_max(order_by = n, n = 20) |> 
+  ungroup() |> 
+  mutate(
+    note = fct(
+      note, 
+      levels = c(
+        "base",
+        "middle",
+        "top"
+      )
+    )
+  )
+
+note_labels <- str_wrap(c(
+  "Initial scent notes perceived after application",
+  "Heart or middle notes that emerge after the top notes fade",
+  "The lasting, final scent notes that linger after the fragrance has dried"
+  ), 30)
+names(note_labels) <- c("top", "middle", "base")
+
+
+rating_cat_labels <- c(
+  "Bottom (33%) rated perfumes",
+  "Middle (33%) rated perfumes",
+  "Top (33%) rated perfumes"
+)
+names(rating_cat_labels) <- c(1, 2, 3)
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+g <- df3 |> 
+  ggplot(
+    mapping = aes(
+      label = fragnance,
+      colour = note,
+      size = n_prop
+    )
+  ) +
+  ggwordcloud::geom_text_wordcloud(rm_outside = TRUE) +
+  facet_grid(
+    rating_cat ~ note,
+    labeller = labeller(
+      rating_cat = rating_cat_labels,
+      note = note_labels
+    )
+  ) +
+  scale_y_reverse()
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_perfumes_data.png"
+  ),
+  plot = g,
+  width = 400 * 0.5,
+  height = 500 * 0.5,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_perfumes_data.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_perfumes_data.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
