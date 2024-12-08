@@ -32,7 +32,7 @@ comments:
 
 ## About the Data
 
-The Parfumo Fragrance Dataset, curated for TidyTuesday, offers a deep dive into the world of perfumes, drawing on data sourced from [Parfumo](https://www.parfumo.com/), a platform for fragrance enthusiasts. Webscraped by [Olga G.](https://www.kaggle.com/olgagmiufana1), the dataset provides a detailed exploration of perfumes, including user ratings, olfactory notes (top, middle, and base), perfumers, and year of release.
+The Parfumo Fragrance Dataset, curated for TidyTuesday, offers a deep dive into the world of perfumes, drawing on data sourced from [Parfumo](https://www.parfumo.com/), a platform for fragrance enthusiasts. Webscraped by [Olga G.](https://www.kaggle.com/olgagmiufana1), the dataset [she](https://olgagavrik.github.io/) provides a detailed exploration of perfumes, including user ratings, olfactory notes (top, middle, and base), perfumers, and year of release.
 
 Key features include variables such as the fragrance’s **brand**, **release year**, and **concentration** (e.g., Eau de Parfum or Eau de Toilette). Additionally, the dataset captures user interactions, with **rating values** and **rating counts**, and delves into the artistic composition of scents, highlighting the **main accords** and distinct olfactory layers (top, middle, and base notes). It also credits the **perfumers** behind these creations and provides direct [links](https://www.parfumo.com/) to Parfumo’s product pages.
 
@@ -77,24 +77,32 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Pathway Gothic One",
+font_add_google("Saira Semi Condensed",
   family = "body_font"
 ) 
 
+# Font for Wordcloud
+font_add_google("Cookie",
+  family = "wordcloud_font"
+) 
+
+mypal <- c("#990099", "#009900")
 showtext_auto()
 
-mypal <- c("#418FDEFF", "#003DA5FF", "#D50032FF")
 
 # A base Colour
 bg_col <- "#FFFFFF"
 seecolor::print_color(bg_col)
 
+panel_col <- lighten(mypal, 0.8)
+seecolor::print_color(panel_col)
+
 # Colour for highlighted text
-text_hil <- mypal[2]
+text_hil <- darken(mypal[1], 0.6)
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- darken(mypal[2], 0.4)
+text_col <- darken(mypal[1], 0.8)
 seecolor::print_color(text_col)
 
 
@@ -112,23 +120,76 @@ xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
-
-# Add text to plot--------------------------------------------------------------
-plot_title <- "Decoding Scent Preferences"
-
-plot_subtitle <- "Musk, Sandalwood, and Vanilla dominate the lasting base notes across all perfume ratings. Jasmine and Rose define the heart, while Bergamot, Mandarin, and Orange prevail in the initial top notes, showcasing universal preferences in fragrance layers."
-
 plot_caption <- paste0(
-  "**Data:** www.parfumo.com | Olga Gavrik", 
+  "**Data:** parfumo.com, Olga Gavrik", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
   )
-
 rm(github, github_username, xtwitter, 
    xtwitter_username, social_caption_1, 
    social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Decoding Scent Preferences"
+
+plot_subtitle <- "Musk, Sandalwood, and Vanilla dominate the lasting base notes across all perfume ratings. Jasmine and Rose define the heart, while Bergamot, Mandarin, and Orange prevail in the initial top notes, showcasing universal preferences in fragrance layers."
+```
+
+New learning: Creating a combination of 2 colour gradients
+
+```{r}
+
+library(colorspace)
+
+mixcolor(0.5, mypal[1], mypal[2])
+
+
+# 
+# color1 <- mypal[1]
+# color2 <- mypal[2]
+# n = 3
+# 
+# seecolor::print_color(colorRampPalette(c(lighten(color1, 0.7), darken(color1, 0.2)))(n))
+# 
+# seecolor::print_color(colorRampPalette(
+#     c(lighten(color2, 0.7), 
+#       darken(color2, 0.2))
+#     )(n))
+# 
+# 
+# 
+# generate_color <- function(n, color1, color2) {
+#   red_grad <- colorRampPalette(
+#     c(lighten(color1, 0.7), 
+#       darken(color1, 0.2))
+#     )(n)
+#   blue_grad <- colorRampPalette(
+#     c(lighten(color2, 0.7), 
+#       darken(color2, 0.2))
+#     )(n)
+#   
+#    # Combine gradients into a grid
+#   color_grid <- expand.grid(red = red_grad, blue = blue_grad)
+#   
+#   # Combine the two colors into a single gradient using alpha blending
+#   color_grid <- color_grid |> 
+#     mutate(
+#       combined_color = rgb(
+#         (col2rgb(red)[1, ] + col2rgb(blue)[1, ]) / (2 * 255), # Red component
+#         (col2rgb(red)[2, ] + col2rgb(blue)[2, ]) / (2 * 255), # Green component
+#         (col2rgb(red)[3, ] + col2rgb(blue)[3, ]) / (2 * 255)  # Blue component
+#       )
+#     )
+#   
+#   # Return the combined colors
+#   return(color_grid$combined_color)
+# }
+# 
+# # Generate colors for 3x3 grid
+# facet_colors <- generate_color(3, mypal[1], mypal[2])
+# seecolor::print_color(facet_colors)
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -168,7 +229,7 @@ df3 <- df2 |>
   group_by(rating_cat, note) |> 
   count(fragnance, sort = T) |> 
   mutate(n_prop = n / sum(n)) |> 
-  slice_max(order_by = n, n = 20) |> 
+  slice_max(order_by = n, n = 10) |> 
   ungroup() |> 
   mutate(
     note = fct(
@@ -204,11 +265,16 @@ g <- df3 |>
   ggplot(
     mapping = aes(
       label = fragnance,
-      colour = note,
+      colour = interaction(rating_cat, note),
       size = n_prop
     )
   ) +
-  ggwordcloud::geom_text_wordcloud(rm_outside = TRUE) +
+  ggwordcloud::geom_text_wordcloud(
+    eccentricity = 1,
+    family = "body_font",
+    shape = "square"
+    ) +
+  scale_size_area(max_size = bts * 0.8) +
   facet_grid(
     rating_cat ~ note,
     labeller = labeller(
@@ -216,9 +282,10 @@ g <- df3 |>
       note = note_labels
     )
   ) +
+  coord_cartesian(clip = "off") +
   labs(
     title = plot_title,
-    subtitle = plot_subtitle,
+    subtitle = str_wrap(plot_subtitle, 125),
     caption = plot_caption
   ) +
   theme_minimal(
@@ -226,7 +293,55 @@ g <- df3 |>
     base_size = bts
   ) +
   theme(
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3, 
+      hjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.title.position = "plot",
     
+    # Strip Facet Labels
+    panel.spacing = unit(5, "mm"),
+    strip.text = element_text(
+      colour = text_col,
+      hjust = 0.5,
+      vjust = 0.5,
+      lineheight = 0.25,
+      margin = margin(3,3,3,3, "mm")
+    ),
+    strip.background = element_rect(
+      fill = panel_col,
+      colour = "transparent"
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      family = "title_font",
+      colour = text_hil,
+      hjust = 0.5,
+      size = 4 * bts,
+      face = "bold",
+      margin = margin(5,0,5,0, "mm")
+    ),
+    plot.subtitle = element_text(
+      size = 0.9 * bts,
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(0,0,7,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(10,0,0,0, "mm")
+    )
   )
 
 ggsave(
@@ -235,8 +350,8 @@ ggsave(
     "tidy_perfumes_data.png"
   ),
   plot = g,
-  width = 400 * 0.5,
-  height = 500 * 0.5,
+  width = 400,
+  height = 500,
   units = "mm",
   bg = bg_col
 )
