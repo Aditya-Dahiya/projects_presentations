@@ -36,6 +36,8 @@ The Parfumo Fragrance Dataset, curated for TidyTuesday, offers a deep dive into 
 
 Key features include variables such as the fragrance’s **brand**, **release year**, and **concentration** (e.g., Eau de Parfum or Eau de Toilette). Additionally, the dataset captures user interactions, with **rating values** and **rating counts**, and delves into the artistic composition of scents, highlighting the **main accords** and distinct olfactory layers (top, middle, and base notes). It also credits the **perfumers** behind these creations and provides direct [links](https://www.parfumo.com/) to Parfumo’s product pages.
 
+During this process, I also learnt a new technique: This technique involves creating a visually appealing matrix of two-color gradients using R. It generates interpolated color transitions in horizontal and vertical directions, filling a matrix with blended colors. The gradient matrix is visualized using the `image()` function, and specific rows and columns are extracted for further visualization.
+
 ![This word cloud visualization highlights the most popular scent notes in perfumes, categorized by user ratings (Top, Middle, and Bottom 33%) and scent layers (Top, Middle, and Base notes). Larger words represent notes that appear more frequently in each category. Horizontal facets show scent layers: initial notes, heart notes, and lasting base notes. Vertical facets group perfumes by rating tiers, revealing patterns in olfactory preferences across different rating levels.](tidy_perfumes_data.png){#fig-1}
 
 ### **How I made this graphic?**
@@ -55,6 +57,7 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 library(patchwork)            # Compiling Plots
+library(grDevices)            # Creating Colour Palettes
 
 parfumo_data_clean <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-10/parfumo_data_clean.csv') |> 
   janitor::clean_names()
@@ -91,18 +94,18 @@ showtext_auto()
 
 
 # A base Colour
-bg_col <- "#FFFFFF"
+bg_col <- lighten("#FCAADEFF", 0.9)
 seecolor::print_color(bg_col)
 
-panel_col <- lighten(mypal, 0.8)
+panel_col <- lighten("#FCAADEFF", 0.7)
 seecolor::print_color(panel_col)
 
 # Colour for highlighted text
-text_hil <- darken(mypal[1], 0.6)
+text_hil <- "#7F0038FF"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- darken(mypal[1], 0.8)
+text_col <- darken("#7F0038FF", 0.5)
 seecolor::print_color(text_col)
 
 
@@ -140,56 +143,58 @@ plot_subtitle <- "Musk, Sandalwood, and Vanilla dominate the lasting base notes 
 New learning: Creating a combination of 2 colour gradients
 
 ```{r}
+#| label: Learning-2d-colour-matrix
 
-library(colorspace)
+# Credits: Multiple attempts at ChatGPT, too (!)
 
-mixcolor(0.5, mypal[1], mypal[2])
+# Load necessary library
+library(grDevices)
 
+# Define the start and end colors for horizontal and vertical gradients
+color_horizontal <- c("#FCAADEFF", "#C31E6EFF")  # Horizontal gradient colors
+color_vertical <- c("#6DCFCFFF", "#00393AFF")  # Vertical gradient colors
 
-# 
-# color1 <- mypal[1]
-# color2 <- mypal[2]
-# n = 3
-# 
-# seecolor::print_color(colorRampPalette(c(lighten(color1, 0.7), darken(color1, 0.2)))(n))
-# 
-# seecolor::print_color(colorRampPalette(
-#     c(lighten(color2, 0.7), 
-#       darken(color2, 0.2))
-#     )(n))
-# 
-# 
-# 
-# generate_color <- function(n, color1, color2) {
-#   red_grad <- colorRampPalette(
-#     c(lighten(color1, 0.7), 
-#       darken(color1, 0.2))
-#     )(n)
-#   blue_grad <- colorRampPalette(
-#     c(lighten(color2, 0.7), 
-#       darken(color2, 0.2))
-#     )(n)
-#   
-#    # Combine gradients into a grid
-#   color_grid <- expand.grid(red = red_grad, blue = blue_grad)
-#   
-#   # Combine the two colors into a single gradient using alpha blending
-#   color_grid <- color_grid |> 
-#     mutate(
-#       combined_color = rgb(
-#         (col2rgb(red)[1, ] + col2rgb(blue)[1, ]) / (2 * 255), # Red component
-#         (col2rgb(red)[2, ] + col2rgb(blue)[2, ]) / (2 * 255), # Green component
-#         (col2rgb(red)[3, ] + col2rgb(blue)[3, ]) / (2 * 255)  # Blue component
-#       )
-#     )
-#   
-#   # Return the combined colors
-#   return(color_grid$combined_color)
-# }
-# 
-# # Generate colors for 3x3 grid
-# facet_colors <- generate_color(3, mypal[1], mypal[2])
-# seecolor::print_color(facet_colors)
+# Create color palettes for horizontal and vertical directions
+horizontal_palette <- colorRampPalette(color_horizontal)
+vertical_palette <- colorRampPalette(color_vertical)
+
+# Define the dimensions of the matrix
+n_rows <- 4
+n_cols <- 4
+
+# Create a blank matrix to store colors
+color_matrix <- matrix("", nrow = n_rows, ncol = n_cols)
+
+# Populate the matrix with interpolated colors
+for (i in 1:n_rows) {
+  vertical_color <- vertical_palette(n_rows)[i]  # Interpolated vertical color
+  horizontal_gradient <- colorRampPalette(c(vertical_color, color_horizontal[2]))(n_cols)
+  color_matrix[i, ] <- horizontal_gradient
+}
+
+# Visualize the matrix of colors
+image(1:n_cols, 1:n_rows, t(matrix(1:(n_rows * n_cols), ncol = n_cols)),
+      col = as.vector(t(color_matrix)), axes = FALSE, xlab = "", ylab = "")
+
+# Extract the bottom rows and first three columns
+bottom_rows <- 2:4  # Indices of the bottom two rows
+first_three_cols <- 1:3  # Indices of the first three columns
+
+# Subset the matrix for the desired rows and columns
+subset_colors <- color_matrix[bottom_rows, first_three_cols]
+
+# Create an image to visualize the subsetted colors
+image(1:ncol(subset_colors), 1:nrow(subset_colors), t(matrix(1:length(subset_colors), 
+                                                             nrow = nrow(subset_colors))), col = as.vector(subset_colors), axes = FALSE, 
+      xlab = "", ylab = "")
+
+# Convert the subset into a vector
+color_vector <- as.vector(subset_colors)
+
+# Display the extracted vector
+seecolor::print_color(color_vector)
+
+rm(color_horizontal, color_vertical, horizontal_palette, vertical_palette, bottom_rows, first_three_cols, subset_colors)
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -262,19 +267,20 @@ The Base Plot
 #| label: base-plot
 
 g <- df3 |> 
-  ggplot(
+  ggplot() +
+  
+  ggwordcloud::geom_text_wordcloud(
     mapping = aes(
       label = fragnance,
-      colour = interaction(rating_cat, note),
-      size = n_prop
-    )
-  ) +
-  ggwordcloud::geom_text_wordcloud(
-    eccentricity = 1,
-    family = "body_font",
-    shape = "square"
+      size = n_prop,
+      colour = interaction(rating_cat, note)
+    ),
+    eccentricity = 1.4,
+    shape = "square",
+    family = "wordcloud_font"
     ) +
-  scale_size_area(max_size = bts * 0.8) +
+  scale_size_area(max_size = bts * 0.7) +
+  scale_colour_manual(values = color_vector) +
   facet_grid(
     rating_cat ~ note,
     labeller = labeller(
@@ -385,6 +391,18 @@ Session Info
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+library(grDevices)            # Creating Colour Palettes
 
 
 
