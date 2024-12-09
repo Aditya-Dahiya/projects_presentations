@@ -1,10 +1,12 @@
 ---
-title: "tidy_perfumes_data"
+title: "Faceted Word Clouds with {ggwordcloud}: Exploring Perfume Notes with Gradient Colors"
 author: "Aditya Dahiya"
 date: "2024-12-08"
-subtitle: ""
+subtitle: "Using {ggplot2} and {ggwordcloud}, this visualization combines faceted grids and a two-gradient color matrix to highlight scent note frequencies across perfume ratings and layers."
 categories:
   - "#TidyTuesday"
+  - "{ggwordcloud}"
+  - "colours"
 image: "thumbnails/tidy_perfumes_data.png"
 format:
   html:
@@ -97,7 +99,7 @@ showtext_auto()
 bg_col <- lighten("#FCAADEFF", 0.9)
 seecolor::print_color(bg_col)
 
-panel_col <- lighten("#FCAADEFF", 0.7)
+panel_col <- lighten("#FCAADEFF", 0.8)
 seecolor::print_color(panel_col)
 
 # Colour for highlighted text
@@ -137,10 +139,10 @@ rm(github, github_username, xtwitter,
 # Add text to plot-------------------------------------------------
 plot_title <- "Decoding Scent Preferences"
 
-plot_subtitle <- "Musk, Sandalwood, and Vanilla dominate the lasting base notes across all perfume ratings. Jasmine and Rose define the heart, while Bergamot, Mandarin, and Orange prevail in the initial top notes, showcasing universal preferences in fragrance layers."
+plot_subtitle <- "Each panel shows the most commonly occuring notes in perfumes - from bottom rated to top rates, and from initial notes to the lasting ones. The most popular and highest rated are Saffrom (initial scent), Ylang-ylang (middle note) and Oakmoss (lasting fragnance)."
 ```
 
-New learning: Creating a combination of 2 colour gradients
+**New learning: Creating a combination of 2 colour gradients**
 
 ```{r}
 #| label: Learning-2d-colour-matrix
@@ -194,7 +196,8 @@ color_vector <- as.vector(subset_colors)
 # Display the extracted vector
 seecolor::print_color(color_vector)
 
-rm(color_horizontal, color_vertical, horizontal_palette, vertical_palette, bottom_rows, first_three_cols, subset_colors)
+rm(color_horizontal, color_vertical, horizontal_palette, vertical_palette, bottom_rows, first_three_cols, subset_colors,
+   n_cols, n_rows)
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -231,19 +234,33 @@ df2 <- df1 |>
   )
 
 df3 <- df2 |> 
-  group_by(rating_cat, note) |> 
-  count(fragnance, sort = T) |> 
-  mutate(n_prop = n / sum(n)) |> 
-  slice_max(order_by = n, n = 10) |> 
-  ungroup() |> 
+  group_by(note, fragnance) |> 
+  summarise(rating_value = mean(rating_value, na.rm = T)) |> 
+  arrange(desc(rating_value)) |> 
+  mutate(rating_cat = as.character(ntile(rating_value, 3))) |> 
+  left_join(
+    df2 |> 
+      count(note, fragnance)
+  ) |> 
+  filter(n > 100) |> 
+  group_by(note, rating_cat) |> 
+  mutate(
+    n_prop = n / sum(n)
+  ) |> 
+  ungroup() |>
   mutate(
     note = fct(
-      note, 
+      note,
       levels = c("top", "middle", "base")
     ),
     rating_cat = as.character(rating_cat),
-    rating_cat = fct(rating_cat, levels = c("1", "2", "3"))
-  )
+    rating_cat = fct(rating_cat, levels = c("1", "2", "3")),
+    rating_cat = fct_rev(rating_cat)
+  ) |> 
+  group_by(note, rating_cat) |> 
+  slice_max(order_by = n_prop, n = 10) |> 
+  arrange(desc(n_prop)) |> 
+  ungroup()
 
 note_labels <- str_wrap(c(
   "Initial scent notes perceived after application",
@@ -252,11 +269,10 @@ note_labels <- str_wrap(c(
   ), 30)
 names(note_labels) <- c("top", "middle", "base")
 
-
 rating_cat_labels <- c(
-  "Bottom (33%) rated perfumes",
-  "Middle (33%) rated perfumes",
-  "Top (33%) rated perfumes"
+  "Bottom (33%) rated notes",
+  "Middle (33%) rated notes",
+  "Top (33%) rated notes"
 )
 names(rating_cat_labels) <- c(1, 2, 3)
 ```
@@ -275,23 +291,35 @@ g <- df3 |>
       size = n_prop,
       colour = interaction(rating_cat, note)
     ),
-    eccentricity = 1.4,
+    eccentricity = 1.5,
+    rstep = 0.04,
+    tstep = 0.04,
+    perc_step = 0.02,
     shape = "square",
-    family = "wordcloud_font"
+    family = "body_font",
+    rm_outside = TRUE,
+    lineheight = 0.2,
+    hjust = 0.5,
+    vjust = 0.5,
+    seed = 3
     ) +
-  scale_size_area(max_size = bts * 0.7) +
+  scale_size(
+    range = c(bts * 0.2, bts * 0.7)
+    ) +
   scale_colour_manual(values = color_vector) +
   facet_grid(
     rating_cat ~ note,
     labeller = labeller(
       rating_cat = rating_cat_labels,
       note = note_labels
-    )
+    ),
+    scales = "free",
+    switch = "y"
   ) +
   coord_cartesian(clip = "off") +
   labs(
     title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 125),
+    subtitle = str_wrap(plot_subtitle, 135),
     caption = plot_caption
   ) +
   theme_minimal(
