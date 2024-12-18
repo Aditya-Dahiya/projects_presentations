@@ -1,0 +1,277 @@
+---
+title: "Exploring schools and names of magical spells from the Dungeons and Dragons Free Rules (2024 edition)"
+author: "Aditya Dahiya"
+date: "2024-12-17"
+subtitle: "......................................."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_dungeons_dragons.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The **Dungeons and Dragons Spells (2024)** dataset explores magical spells from the *Dungeons and Dragons Free Rules (2024 edition)*. Curated by [Jon Harmon](https://github.com/jonthegeek), it provides details on each spell, including level, school of magic, casting requirements, duration, and more.
+
+The dataset is accessible via the [`tidytuesdayR`](https://github.com/thebioengineer/tidytuesdayR) package or directly from the [TidyTuesday GitHub repository](https://github.com/rfordatascience/tidytuesday). It offers opportunities to analyze class-specific spellcasting options, concentration requirements, and patterns in descriptions, while encouraging practice with tools like [Shiny](https://shiny.posit.co/) or the [`tidyverse`](https://www.tidyverse.org/).
+
+![..............................................................](tidy_dungeons_dragons.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+spells <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-17/spells.csv') |> 
+  janitor::clean_names()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Imperial Script",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Semi Condensed",
+  family = "body_font"
+) 
+
+# Font for Wordcloud
+font_add_google("Cookie",
+  family = "wordcloud_font"
+) 
+
+mypal <- c("#990099", "#009900")
+showtext_auto()
+
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+panel_col <- lighten("#FCAADEFF", 0.8)
+seecolor::print_color(panel_col)
+
+# Colour for highlighted text
+text_hil <- "#7F0038FF"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- darken("#7F0038FF", 0.5)
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** parfumo.com, Olga Gavrik", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "......................."
+
+plot_subtitle <- "................................."
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+# spells |>
+#   summarytools::dfSummary() |>
+#   summarytools::view()
+
+df <- spells |> 
+  pivot_longer(
+    cols = 4:11,
+    names_to = "character",
+    values_to = "value"
+  ) |> 
+  filter(value) |> 
+  select(name, level, school, character, value) |> 
+  group_by(character) |> 
+  distinct(name, level) |> 
+  arrange(character)
+
+
+
+spells |> 
+  group_by(school) |> 
+  summarise(
+    verbal_component = mean(verbal_component),
+    somatic_component = mean(somatic_component),
+    material_component = mean(material_component)
+  )
+
+# df |> 
+#   filter(character == "bard") |> 
+#   arrange(character, desc(level)) |> 
+#   ggplot() +
+#   ggwordcloud::geom_text_wordcloud(
+#     mapping = aes(
+#       label = name,
+#       size = level
+#     )
+#   )
+
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+
+g <- spells |> 
+  group_by(school) |> 
+  arrange(desc(level)) |> 
+  mutate(y_var = row_number()) |> 
+  ggplot(
+    mapping = aes(
+      x = school, 
+      y = level,
+      label = name
+    )
+  ) +
+  ggfx::with_outer_glow(
+    ggrepel::geom_text_repel(
+      direction = "y",
+      min.segment.length = unit(10, "cm")
+    ),
+    colour = alpha("red", 0.5),
+    sigma = 10, 
+    expand = 10
+  ) +
+  with_blend(
+    x = ,
+    bg_layer = "text",
+    blend_type = "over",
+    flip_order = FALSE,
+    alpha = NA
+  ) +
+  scale_y_reverse()
+
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_dungeons_dragons.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_dungeons_dragons.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_dungeons_dragons.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
