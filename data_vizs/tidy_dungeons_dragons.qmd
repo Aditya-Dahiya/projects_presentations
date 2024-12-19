@@ -67,7 +67,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("Imperial Script",
+font_add_google("Eagle Lake",
   family = "title_font"
 ) 
 
@@ -77,13 +77,8 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Saira Semi Condensed",
+font_add_google("Nova Oval",
   family = "body_font"
-) 
-
-# Font for Wordcloud
-font_add_google("Cookie",
-  family = "wordcloud_font"
 ) 
 
 mypal <- c("#990099", "#009900")
@@ -91,18 +86,18 @@ showtext_auto()
 
 
 # A base Colour
-bg_col <- "white"
+bg_col <- "black"
 seecolor::print_color(bg_col)
 
-panel_col <- lighten("#FCAADEFF", 0.8)
+panel_col <- lighten(bg_col, 0.2)
 seecolor::print_color(panel_col)
 
 # Colour for highlighted text
-text_hil <- "#7F0038FF"
+text_hil <- "white"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- darken("#7F0038FF", 0.5)
+text_col <- darken("white", 0.1)
 seecolor::print_color(text_col)
 
 
@@ -121,7 +116,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** parfumo.com, Olga Gavrik", 
+  "**Data:** Jon Harmon, Dungeons and Dragons Free Rules (2024 edition)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -132,9 +127,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "......................."
+plot_title <- "Dungeons and Dragons Spells (2024)"
 
-plot_subtitle <- "................................."
+plot_subtitle <- ""
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -158,26 +153,25 @@ df <- spells |>
   distinct(name, level) |> 
   arrange(character)
 
-
-
-spells |> 
-  group_by(school) |> 
-  summarise(
-    verbal_component = mean(verbal_component),
-    somatic_component = mean(somatic_component),
-    material_component = mean(material_component)
+df1 <- spells |> 
+  select(school, name, level) |> 
+  mutate(level = as_factor(level)) |> 
+  arrange(desc(level)) |> 
+  group_by(school, level) |>
+  slice_head(n = 5) |>
+  mutate(
+    school = str_to_title(school),
+    nudge_var = row_number(),
+    level = as.numeric(level),
+    nudge_var = case_when(
+      nudge_var == 1 ~ level,
+      nudge_var == 2 ~ level + 0.2,
+      nudge_var == 3 ~ level - 0.2,
+      nudge_var == 4 ~ level + 0.4,
+      nudge_var == 5 ~ level - 0.4,
+      .default = level
+    )
   )
-
-# df |> 
-#   filter(character == "bard") |> 
-#   arrange(character, desc(level)) |> 
-#   ggplot() +
-#   ggwordcloud::geom_text_wordcloud(
-#     mapping = aes(
-#       label = name,
-#       size = level
-#     )
-#   )
 
 ```
 
@@ -186,36 +180,94 @@ The Base Plot
 ```{r}
 #| label: base-plot
 
-
-g <- spells |> 
-  group_by(school) |> 
-  arrange(desc(level)) |> 
-  mutate(y_var = row_number()) |> 
+g <- df1 |> 
   ggplot(
     mapping = aes(
       x = school, 
-      y = level,
-      label = name
+      y = nudge_var,
+      label = name,
+      colour = school
     )
   ) +
-  ggfx::with_outer_glow(
-    ggrepel::geom_text_repel(
-      direction = "y",
-      min.segment.length = unit(10, "cm")
+  geom_text(
+    family = "caption_font",
+    size = bts / 4,
+    check_overlap = TRUE
+  ) +
+  scale_y_continuous(
+    breaks = 1:10,
+    labels = 1:10
+  ) +
+  scale_x_discrete(
+    position = "top"
+  ) +
+  paletteer::scale_colour_paletteer_d("vapoRwave::vapoRwave") +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    y = "Strength / Level of the Spell",
+    x = "Schools"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
     ),
-    colour = alpha("red", 0.5),
-    sigma = 10, 
-    expand = 10
-  ) +
-  with_blend(
-    x = ,
-    bg_layer = "text",
-    blend_type = "over",
-    flip_order = FALSE,
-    alpha = NA
-  ) +
-  scale_y_reverse()
-
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.title.position = "plot",
+    legend.position = "none",
+    plot.margin = margin(5,5,5,5, "mm"),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5,
+      vjust = 0.5,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    panel.grid = element_blank(),
+    
+    # Labels
+    plot.title = element_text(
+      colour = text_hil,
+      size = 2 * bts,
+      margin = margin(10,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,10,0, "mm"),
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      size = bts * 0.6
+    ),
+    
+    # Axes
+    axis.ticks.length = unit(0, "mm"),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(
+      family = "caption_font",
+      colour = text_col,
+      size = 1 * bts
+    ),
+    axis.text.y = element_text(
+      size = 2 * bts,
+      colour = text_col,
+      family = "body_font"
+    )
+  )
 
 ggsave(
   filename = here::here(
