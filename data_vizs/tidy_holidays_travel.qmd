@@ -1,0 +1,606 @@
+---
+title: "Global Holidays and Travel Data (2010-2019)"
+author: "Aditya Dahiya"
+date: "2024-12-26"
+subtitle: "A comparative heatmap of number of holidays per month, and percentage of annual flight passenger traffic that month."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_holidays_travel.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The dataset provides insights into the impact of global holidays on **seasonal human mobility** and **population dynamics**, offering a comprehensive resource for understanding **spatiotemporal trends**. It consists of two primary components:
+
+1.  **Public and school holidays data (2010–2019)**, organized at daily, weekly, and monthly timescales, and
+
+2.  **Airline passenger volumes** from 90 countries between 2010 and 2018, segmented into domestic and international categories.
+
+This open-access archive, funded by [The Bill and Melinda Gates Foundation](https://www.gatesfoundation.org/), was developed to address the lack of unified, multi-temporal datasets on holidays. It supports analyses like mapping population movements and examining the seasonality of infectious diseases, including **COVID-19**. For more details, refer to the original article by Shengjie Lai et al., ["Global holiday datasets for understanding seasonal human mobility and population dynamics"](https://www.nature.com/articles/s41597-022-01120-z). The dataset includes a **global holidays dataset** and a **monthly airline passengers dataset**, both available via the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday).
+
+![A comparative heatmap of number of holidays per month, and percentage of annual flight passenger traffic that month.](tidy_holidays_travel.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+# Option 2: Read directly from GitHub
+
+global_holidays <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-24/global_holidays.csv') |> 
+  janitor::clean_names()
+monthly_passengers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-24/monthly_passengers.csv') |> 
+  janitor::clean_names()
+```
+
+Additional sorting Data: Obtained using [Grok2](https://x.com/i/grok) by [x.ai](https://x.ai/)
+
+```{r}
+# Please list the ISO-3 country codes of all the countries in the world, but sort them in the order from North to South of the latitude their capitals.
+# Give the output in form of a tibble, with three columns: rank, iso3, hemisphere. (where hemispehere is either north or south)
+
+# Then filter it with an additional prompt from distinct values in our EDA dataset
+
+# Perfect. Now can you reorder these, instead of north to south, now by promxity to each other, i.e. starting with North America, then Europe, East Asia, South Asia, South East Asia, Africa, then South America and then Oceania.
+# Within each group also, keep nearby countries together.
+# Perfect. And add a column of Continent as well.
+ranking_df <- tibble::tibble(
+  rank = 1:134,
+  iso3 = c(
+    # North America
+    "USA", "CAN", "MEX", "GTM", "SLV", "CRI", "PAN", "JAM", "DOM", "BRB", "LCA",
+    
+    # Europe
+    "ISL", "NOR", "SWE", "DNK", "FRO", "GBR", "IRL", "NLD", "BEL", "LUX", "DEU", "POL", "CZE", "SVK", "AUT", "CHE", "FRA", "GIB", "ESP", "PRT", "ITA", "MLT", "HRV", "SVN", "HUN", "BIH", "SRB", "MNE", "ALB", "GRC", "MKD", "BGR", "ROU", "MDA", "UKR", "BLR", "LTU", "LVA", "EST", "FIN", "RUS",
+    
+    # East Asia
+    "KOR", "PRK", "JPN", "CHN", "TWN", "HKG", "MAC",
+    
+    # South Asia
+    "IND", "PAK", "BGD", "LKA", 
+    
+    # Southeast Asia
+    "THA", "KHM", "MYS", "SGP", "PHL", "VNM", 
+    
+    # Africa
+    "EGY", "MAR", "TUN", "LBY", "DZA", "NGA", "SEN", "GHA", "CIV", "MLI", "BFA", "NER", "TCD", "CMR", "GAB", "GNQ", "COG", "COD", "AGO", "ZAF", "NAM", "BWA", "ZWE", "ZMB", "MWI", "MOZ", "TZA", "KEN", "UGA", "RWA", "BDI", "ETH", "SSD", "SDN", "DJI", "SOM", "ERI", "CAF",
+    
+    # South America
+    "COL", "VEN", "GUY", "SUR", "ECU", "PER", "BOL", "BRA", "CHL", "ARG", "URY", "PRY", 
+    
+    # Oceania
+    "AUS", "NZL", "PNG", "FSM", "MHL", "NRU", "PLW", "CYM", "FJI", "SLB", "KIR", "TUV", "WSM", "TON", "MTQ"
+  ),
+  hemisphere = c(
+    rep("north", 11), 
+    rep("north", 41), 
+    rep("north", 7), 
+    rep("north", 4), 
+    rep("north", 6), 
+    rep("north", 39), 
+    rep("south", 12),
+    rep("south", 14)
+  )
+)
+
+levels_iso3 <- c(
+    # North America
+    "USA", "CAN", "MEX", "GTM", "SLV", "CRI", "PAN", "JAM", "DOM", "BRB", "LCA",
+    
+    # Europe
+    "ISL", "NOR", "SWE", "DNK", "FRO", "GBR", "IRL", "NLD", "BEL", "LUX", "DEU", "POL", "CZE", "SVK", "AUT", "CHE", "FRA", "GIB", "ESP", "PRT", "ITA", "MLT", "HRV", "SVN", "HUN", "BIH", "SRB", "MNE", "ALB", "GRC", "MKD", "BGR", "ROU", "MDA", "UKR", "BLR", "LTU", "LVA", "EST", "FIN", "RUS",
+    
+    "MAR", "TUN", "LBY", "DZA", "NGA", "SEN", "GHA", "CIV", "MLI", "BFA", "NER", "TCD", "CMR", "GAB", "GNQ", "COG", "COD", "AGO", "ZAF", "NAM", "BWA", "ZWE", "ZMB", "MWI", "MOZ", "TZA", "KEN", "UGA", "RWA", "BDI", "ETH", "SSD", "SDN", "DJI", "SOM", "ERI", "CAF",
+    
+    # South America
+    "COL", "VEN", "GUY", "SUR", "ECU", "PER", "BOL", "BRA", "CHL", "ARG", "URY", "PRY", 
+    
+    # Oceania
+    "AUS", "NZL", "PNG", "FSM", "MHL", "NRU", "PLW", "CYM", "FJI", "SLB", "KIR", "TUV", "WSM", "TON", "MTQ"
+  )
+
+levels_iso2 <- levels_iso3 |> 
+  countrycode::countrycode(
+    origin = "iso3c",
+    destination = "iso2c"
+  ) |> 
+  str_to_lower()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Cabin Condensed",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Cabin Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey15"
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 60 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Global Holiday Datasets by Shengjie Lai (et al) ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Global Holidays and flight passenger numbers"
+
+plot_subtitle <- "A heat map shows close correlation between the two. Further, northern hemisphere has its peaks during June - Aug, while southern hemisphere countries peak during Dec-Jan"
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+# 
+# global_holidays |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+# 
+# monthly_passengers |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+
+holidays <- global_holidays |> 
+  filter(type == "Public holiday") |> 
+  mutate(
+    year = year(date),
+    month = month(date)
+  ) |> 
+  group_by(iso3, year, month) |> 
+  count(name = "holidays")
+
+airlines <- monthly_passengers |> 
+  filter(year < 2018) |> 
+  group_by(iso3, year) |> 
+  mutate(
+    # total = total / sum(total, na.rm = T),
+    # domestic = domestic / sum(domestic, na.rm = T),
+    # international = international / sum(international, na.rm = TRUE),
+    passengers = total_os / sum(total_os, na.rm = T)
+  ) |> 
+  select(iso3, year, month, passengers)
+
+df <- full_join(
+  holidays,
+  airlines
+) |>
+  ungroup() |> 
+  left_join(ranking_df) |> 
+  arrange(rank) |> 
+  filter(year < 2018) |> 
+  mutate(
+    date_month = make_date(year = year, month = month),
+    iso2 = countrycode::countrycode(
+      iso3, 
+      origin = "iso3c",
+      destination = "iso2c"
+    ),
+    iso2 = str_to_lower(iso2)
+  ) |> 
+  filter(iso2 %in% levels_iso2) |>
+  filter(!(iso2 %in% c("ar", "by", "me", "rs", "ba",
+                       "lc", "bb", "jm", "cr",
+                       "fo", "gt", "pg", "fm", "mh",
+                       "nr", "pw", "ky", "fj", "sb",
+                       "ki", "tv", "ws", "to",
+                       "tn", "ly", "dz", "ng", "sn",
+                       "gh", "ci", "ml", "bf", "ne",
+                       "td", "cm", "ga", "gq", "cg",
+                       "cd", "ao", "za", "na", "bw",
+                       "zw", "zm", "mw", "mz", "tz",
+                       "ke", "ug", "rw", "bi", "et",
+                       "ss", "sd", "dj", "so", "er",
+                       "cf", "ve", "gy", "sr", "bo"
+                       ))) |> 
+  mutate(
+    iso2 = fct(iso2, levels = levels_iso2),
+    iso2 = fct_rev(iso2)
+  )
+
+iso2df <- df |> 
+  distinct(iso2)
+
+# Generally checking missingness before plotting
+# df |> 
+#   visdat::vis_miss()
+
+# Getting distinct ISO3 codes to use in Grok2 prompt
+# inner_join(
+#   holidays,
+#   airlines
+# ) |>
+#   ungroup() |>
+#   distinct(iso3) |>
+#   pull(iso3) |>
+#   paste0(collapse = ", ")
+
+
+# # Getting Month rank on number of passengers
+# df |> 
+#   group_by(iso2, year) |>
+#   arrange(desc(passengers)) |> 
+#   mutate(passengers_rank = row_number())
+
+date_lines <- tibble(
+  date_month = make_date(2010:2018,1,1)
+)
+
+
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+g1 <- ggplot(
+  data = df,
+  mapping = aes(
+    y = iso2,
+    x = date_month
+  )
+) +
+  geom_tile(
+    mapping = aes(
+      fill = passengers
+    )
+  ) +
+  # geom_text(
+  #   data = iso2df,
+  #   mapping = aes(
+  #     x = make_date(2009, 10, 1),
+  #     label = iso2
+  #   )
+  # ) +
+  # geom_text(
+  #   data = iso2df,
+  #   mapping = aes(
+  #     x = make_date(2018, 2, 1),
+  #     label = iso2
+  #   )
+  # ) +
+  ggflags::geom_flag(
+    data = iso2df,
+    mapping = aes(
+      x = make_date(2009, 10, 1),
+      country = iso2
+    ),
+    size = 8
+  ) +
+  # ggflags::geom_flag(
+  #   data = iso2df,
+  #   mapping = aes(
+  #     x = make_date(2018, 2, 1),
+  #     country = iso2
+  #   )
+  # ) +
+  geom_vline(
+    data = date_lines,
+    mapping = aes(
+      xintercept = date_month
+    ),
+    linewidth = 1.5,
+    colour = text_col,
+    alpha = 0.3
+  ) +
+  scale_x_date(
+    date_breaks = "1 year",         
+    date_labels = "Jan\n%Y",
+    expand = expansion(c(0.02, 0))
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Purple-Blue",
+    # "grDevices::Red-Purple",
+    # "grDevices::Purples 3",
+    direction = -1,
+    na.value = "white", 
+    limits = c(0, 0.15),
+    oob = scales::squish,
+    labels = scales::label_percent()
+  ) +
+  labs(
+    y = "Countries",
+    fill = "Percentage of annual passengers flying that month (%)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(0,5,0,2, "mm"),
+    legend.position = "bottom",
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    legend.title.position = "top",
+    axis.title.y = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      size = 2 * bts
+    ),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      colour = text_col,
+      margin = margin(1,0,0,0, "mm")
+    ),
+    legend.key.width = unit(20, "mm"),
+    legend.margin = margin(-15,0,0,0, "mm")
+  )
+
+g2 <- ggplot(
+  data = df,
+  mapping = aes(
+    y = iso2,
+    x = date_month
+  )
+) +
+  geom_tile(
+    mapping = aes(
+      fill = holidays
+    )
+  ) +
+  ggflags::geom_flag(
+    data = iso2df,
+    mapping = aes(
+      x = make_date(2018, 4, 1),
+      country = iso2
+    ),
+    size = 8
+  ) +
+  geom_vline(
+    data = date_lines,
+    mapping = aes(
+      xintercept = date_month
+    ),
+    linewidth = 1.5,
+    colour = text_col,
+    alpha = 0.3
+  ) +
+  scale_x_date(
+    date_breaks = "1 year",         
+    date_labels = "Jan\n%Y",
+    expand = expansion(c(0, 0.04))
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Red-Purple",
+    direction = -1,
+    na.value = "#F2F0F6FF", 
+    limits = c(0, 8),
+    breaks = seq(2, 7, 2),
+    oob = scales::squish
+  ) +
+  labs(
+    y = NULL,
+    fill = "Number of holidays during the month"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(0,5,0,2, "mm"),
+    legend.position = "bottom",
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    legend.title.position = "top",
+    axis.title.y = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    panel.grid = element_blank(),
+    axis.text.x = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
+    ),
+    legend.title = element_text(
+      colour = text_col,
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      colour = text_col,
+      margin = margin(1,0,0,0, "mm")
+    ),
+    legend.key.width = unit(20, "mm"),
+    legend.margin = margin(-15,0,0,0, "mm")
+  )
+
+g <- g1 + g2 +
+  plot_layout(
+    ncol = 2
+  ) +
+  plot_annotation(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 90),
+    caption = plot_caption,
+    theme = theme(
+      plot.title = element_text(
+        family = "body_font",
+        size = bts * 3,
+        hjust = 0.5,
+        margin = margin(15,0,10,0),
+        colour = text_hil
+      ),
+      plot.subtitle = element_text(
+        family = "body_font",
+        size = bts * 1.5,
+        hjust = 0.5,
+        margin = margin(5,0,10,0),
+        colour = text_hil,
+        lineheight = 0.3
+      ),
+      plot.caption = element_textbox(
+        family = "caption_font",
+        colour = text_hil,
+        hjust = 0.5,
+        margin = margin(5,0,2,0, "mm"),
+        size = bts
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_holidays_travel.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_holidays_travel.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_holidays_travel.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
