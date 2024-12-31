@@ -267,6 +267,7 @@ habits |>
 Next, exploring any one habit - an attempt at Github Contributions style chart
 
 ```{r}
+#| label: geom_rtile()-custom-function
 # Custom functions: creating a geom_rtile()
 # Credits: https://stackoverflow.com/questions/64355877/round-corners-in-ggplots-geom-tile-possible
 
@@ -305,7 +306,6 @@ geom_rtile <- function(mapping = NULL, data = NULL,
                        stat = "identity", position = "identity",
                        radius = grid::unit(6, "pt"), # 2) add radius argument
                        ...,
-                       linejoin = "mitre",
                        na.rm = FALSE,
                        show.legend = NA,
                        inherit.aes = TRUE) {
@@ -319,7 +319,6 @@ geom_rtile <- function(mapping = NULL, data = NULL,
     inherit.aes = inherit.aes,
     params = rlang::list2(
       radius = radius,
-      linejoin = linejoin,
       na.rm = na.rm,
       ...
     )
@@ -328,57 +327,111 @@ geom_rtile <- function(mapping = NULL, data = NULL,
 ```
 
 ```{r}
+#| label: plot_custom-function
 
-checkmarks |> 
+plot_custom <- function(
+    var_name, 
+    facet_title = "", 
+    legend_title = "",
+    cut_off_val = 1){
   
-  # Temp Code during trial phase, can remove later
-  select(date, day_of_week, day_number, week_number, month_year, id,
-         walk_cycle) |> 
-  drop_na() |> 
-  
-  # Start the plot
-  ggplot(
-    mapping = aes(
-      group = id,
-      x = week_number,
-      # x_min = week_number - 0.4,
-      # x_max = week_number + 0.4,
+  checkmarks |> 
+    rename(fill_var = var_name) |> 
+    # Start the plot
+    ggplot(
+      mapping = aes(
+        group = id,
+        x = week_number,
+        # x_min = week_number - 0.4,
+        # x_max = week_number + 0.4,
+        
+        y = day_of_week,
+        # y_min = as.numeric(day_of_week) - 0.4,
+        # y_max = as.numeric(day_of_week) + 0.4,
+        fill = fill_var
+      )
+    ) +
+    # ggchicklet::geom_chicklet() +
+    geom_rtile(
+      radius = unit(bts / 20, "pt"),
+      colour = "white"
+    ) +
+    # geom_tile(colour = "white") +
+    coord_fixed(
+      clip = "off"
+    ) +
+    scale_x_continuous(
+      limits = c(14, 52),
+      expand = expansion(0),
+      breaks = c(15, 25, 35, 45, 52)
+    ) +
+    scale_y_discrete(
+      breaks = checkmarks$day_of_week |> levels(),
+      limits = checkmarks$day_of_week |> levels(),
+      labels = checkmarks$day_of_week |> levels(),
+      expand = expansion(0)
+    ) +
+    scale_fill_gradient2(
+      low = "white", high = "red",
+      na.value = "transparent"
+    ) +
+    labs(
+      x = NULL, y = NULL,
+      fill = legend_title,
+      title = facet_title
+    ) +
+    theme(
+      # Overall Plot
+      legend.position = "bottom",
+      legend.key.height = unit(bts / 80, "mm"),
+      panel.grid = element_blank(),
+      plot.margin = margin(0,0,0,0, "mm"),
+      legend.margin = margin(0,0,0,0, "mm"),
+      legend.title.position = "top",
+      legend.title = element_text(
+        margin = margin(0,0,0,0, "mm"),
+        hjust = 0.5
+      ),
+      text = element_text(
+        colour = text_col,
+        margin = margin(0,0,0,0, "mm"),
+        hjust = 0.5, vjust = 0.5
+      ),
       
-      y = day_of_week,
-      # y_min = as.numeric(day_of_week) - 0.4,
-      # y_max = as.numeric(day_of_week) + 0.4,
-      fill = walk_cycle
+      plot.title = element_text(
+        margin = margin(0,0,0,0, "mm"),
+        hjust = 0.5
+      ),
+      plot.subtitle = element_text(
+        margin = margin(0,0,0,0, "mm")
+      ),
+      axis.text = element_text(
+        margin = margin(0,0,0,0, "mm")
+      ),
+      axis.title = element_text(
+        margin = margin(0,0,0,0, "mm")
+      )
     )
-  ) +
-  # ggchicklet::geom_chicklet() +
-  geom_rtile(
-    radius = unit(3, "pt"),
-    colour = "white"
-  ) +
-  # geom_tile(colour = "white") +
-  coord_fixed() +
-  scale_x_continuous(
-    limits = c(15, 52),
-    expand = expansion(0),
-    breaks = c(15, 25, 35, 45, 52)
-  ) +
-  scale_y_discrete(
-    breaks = checkmarks$day_of_week |> levels(),
-    limits = checkmarks$day_of_week |> levels(),
-    labels = checkmarks$day_of_week |> levels(),
-    expand = expansion(0)
-  ) +
-  scale_fill_gradient2(
-    low = "white", high = "red",
-    na.value = bg_col
-  ) +
-  labs(
-    x = NULL, y = NULL,
-    fill = NULL
-  ) +
-  theme(
-    legend.position = "bottom"
-  )
+  
+}
+```
+
+```{r}
+
+names(checkmarks)
+
+g1 <- plot_custom(
+  var_name = "walk_cycle",
+  facet_title = "Number of hours walked during the day",
+  legend_title = "Hours"
+)
+
+plot_custom(
+  var_name = "strength_training",
+  facet_title = "Whether strength training done?",
+  legend_title = "Yes"
+)
+
 ```
 
 Attempt at an interactive Chart
