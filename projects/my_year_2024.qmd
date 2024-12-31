@@ -1,8 +1,8 @@
 ---
-title: "The year 2024 in my habits"
+title: "Year-end review: 2024"
 author: "Aditya Dahiya"
 date: "2024-12-31"
-subtitle: "..............................."
+subtitle: "Graphing out the habits I tried to form, and the daily tasks I aimed at completing during 2024."
 categories:
   - "Data Visualization"
 image: "images/my_year_2024.png"
@@ -41,6 +41,8 @@ library(gt)                 # Displaying beautiful tables
 library(ggiraph)            # Interactive Graphics
 library(showtext)           # Display fancy text in ggplot2
 library(fontawesome)        # Icons and Fonts 
+library(janitor)            # Cleaning tidying raw data
+
  
 # Setting font defaults
 font_add_google("Monda", "body_font")
@@ -58,6 +60,94 @@ set_girafe_defaults(
     css = "padding:3px;color:black;background-color:white;"
     )
 )
+```
+
+Visualization Parameters
+
+```{r}
+#| eval: false
+
+# Font for titles
+font_add_google("Roboto Condensed",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Jost",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Extract a colour palette from the Cover of Book: 
+# Can't Hurt Me  by David Goggins
+# url <- "https://m.media-amazon.com/images/I/81gTRv2HXrL._UF1000,1000_QL80_.jpg"
+# logo1 <- magick::image_read(url)
+# set.seed(42)
+# magick::image_write(
+#   logo1,
+#   path = here::here("data", "temp_my_year_2024.jpg")
+# )
+# mypal <- imgpalr::image_pal(
+#   file = here::here("data", "temp_my_year_2024.jpg"),
+#   type = "qual",
+#   n = 10
+# )
+# mypal |> seecolor::print_color()
+# unlink(here::here("data", "temp_my_year_2024.jpg"))
+# Manually write it down to avoid randomness and re-run time
+mypal <- c(
+  "#E2E3E9", "#7A8162", "#75555C", "#3D302A",
+  "#292326", "#B98E2D", "#7A6981", "#7C8C66",
+  "#ACA2BB", "#BED0CF"
+)
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[6]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- colorspace::darken(mypal[3], 0.3)
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 50 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "My Year 2024 - targets and habits"
+
+plot_subtitle <- "........................."
 ```
 
 Loading the data, studying and understanding it. Cleaning the names.
@@ -89,7 +179,6 @@ purrr::walk2(
            envir = .GlobalEnv)
   )
 
-library(janitor)
 # Apply janitor::clean_names() to all created objects
 purrr::walk(
   file_names, ~
@@ -108,7 +197,7 @@ rm(csv_files, directory, file_names)
 
 ```
 
-Exploring the raw data in the root folder - the overall habits - to make a beautiful table in {gt} tables
+Cleaning up the data and keeping only the relevant variables, adding date, day of week, week number, month and year for each row separately to aid in GitHub style plot
 
 ```{r}
 
@@ -128,7 +217,17 @@ habits <- habits |>
       .default = NA
     )
   ) |> 
-  rename(description = question)
+  rename(description = question) |> 
+  mutate(
+    description = case_when(
+      name == "Office Goals" ~ "Did you work towards your long term office goals today?",
+      name == "Walk/Cycle" ~ "Did you do strength training today?",
+      name == "Slept 8 hr?" ~ "Did you sleep early / enough last night?",
+      name == "Aryan Studies" ~ "How much time did you spend studying with kids today?",
+      name == "Aryan Junk Food" ~ "Did you give junk food to kids today?",
+      .default = description
+    )
+  )
 
 
 checkmarks <- checkmarks |> 
@@ -142,6 +241,8 @@ checkmarks <- checkmarks |>
     id = row_number()
   )
 ```
+
+Exploring the raw data in the root folder - the overall habits - to make a beautiful table in {gt} tables
 
 ```{r}
 #| label: tbl-root1
@@ -163,7 +264,124 @@ habits |>
   gtExtras::gt_theme_espn()
 ```
 
-Next, exploring the habits - walking/cycling habits
+Next, exploring any one habit - an attempt at Github Contributions style chart
+
+```{r}
+# Custom functions: creating a geom_rtile()
+# Credits: https://stackoverflow.com/questions/64355877/round-corners-in-ggplots-geom-tile-possible
+
+
+`%||%` <- function(a, b) {
+  if(is.null(a)) b else a
+}
+
+GeomRtile <- ggproto("GeomRtile", 
+                     statebins:::GeomRrect, # 1) only change compared to ggplot2:::GeomTile
+                     
+  extra_params = c("na.rm"),
+  setup_data = function(data, params) {
+    data$width <- data$width %||% params$width %||% resolution(data$x, FALSE)
+    data$height <- data$height %||% params$height %||% resolution(data$y, FALSE)
+
+    transform(data,
+      xmin = x - width / 2,  xmax = x + width / 2,  width = NULL,
+      ymin = y - height / 2, ymax = y + height / 2, height = NULL
+    )
+  },
+  default_aes = aes(
+    fill = "grey20", colour = NA, size = 0.1, linetype = 1,
+    alpha = NA, width = NA, height = NA
+  ),
+  required_aes = c("x", "y"),
+
+  # These aes columns are created by setup_data(). They need to be listed here so
+  # that GeomRect$handle_na() properly removes any bars that fall outside the defined
+  # limits, not just those for which x and y are outside the limits
+  non_missing_aes = c("xmin", "xmax", "ymin", "ymax"),
+  draw_key = draw_key_polygon
+)
+
+geom_rtile <- function(mapping = NULL, data = NULL,
+                       stat = "identity", position = "identity",
+                       radius = grid::unit(6, "pt"), # 2) add radius argument
+                       ...,
+                       linejoin = "mitre",
+                       na.rm = FALSE,
+                       show.legend = NA,
+                       inherit.aes = TRUE) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomRtile, # 3) use ggproto object here
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = rlang::list2(
+      radius = radius,
+      linejoin = linejoin,
+      na.rm = na.rm,
+      ...
+    )
+  )
+}
+```
+
+```{r}
+
+checkmarks |> 
+  
+  # Temp Code during trial phase, can remove later
+  select(date, day_of_week, day_number, week_number, month_year, id,
+         walk_cycle) |> 
+  drop_na() |> 
+  
+  # Start the plot
+  ggplot(
+    mapping = aes(
+      group = id,
+      x = week_number,
+      # x_min = week_number - 0.4,
+      # x_max = week_number + 0.4,
+      
+      y = day_of_week,
+      # y_min = as.numeric(day_of_week) - 0.4,
+      # y_max = as.numeric(day_of_week) + 0.4,
+      fill = walk_cycle
+    )
+  ) +
+  # ggchicklet::geom_chicklet() +
+  geom_rtile(
+    radius = unit(3, "pt"),
+    colour = "white"
+  ) +
+  # geom_tile(colour = "white") +
+  coord_fixed() +
+  scale_x_continuous(
+    limits = c(15, 52),
+    expand = expansion(0),
+    breaks = c(15, 25, 35, 45, 52)
+  ) +
+  scale_y_discrete(
+    breaks = checkmarks$day_of_week |> levels(),
+    limits = checkmarks$day_of_week |> levels(),
+    labels = checkmarks$day_of_week |> levels(),
+    expand = expansion(0)
+  ) +
+  scale_fill_gradient2(
+    low = "white", high = "red",
+    na.value = bg_col
+  ) +
+  labs(
+    x = NULL, y = NULL,
+    fill = NULL
+  ) +
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+Attempt at an interactive Chart
 
 ```{r}
 
