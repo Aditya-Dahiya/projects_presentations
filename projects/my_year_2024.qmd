@@ -1,8 +1,8 @@
 ---
-title: "Year-end review: 2024"
+title: "Crushing Excuses, Building Habits (2024)"
 author: "Aditya Dahiya"
 date: "2024-12-31"
-subtitle: "Graphing out the habits I tried to form, and the daily tasks I aimed at completing during 2024."
+subtitle: "Building GitHub style timeseries charts for daily habits in 2024, building cutstom functions, including geom_rtile() for a geom_tile with rounded corners."
 categories:
   - "Data Visualization"
 image: "images/my_year_2024.png"
@@ -30,10 +30,15 @@ comments:
     repo: Aditya-Dahiya/projects_presentations
 ---
 
-Analysing my achievements for the year 2024 in my different habits.
+![A GitHub contributions style plot for habits tracked during 2024.](my_year_2024.png)
+
+### Loading Libraries
+
+This code loads several R packages, each serving a specific purpose to enhance data visualization and analysis. **`tidyverse`** is used for data wrangling, **`gt`** for creating beautiful tables, and **`ggiraph`** for interactive graphics. **`showtext`** allows the use of custom fonts in plots, while **`fontawesome`** provides access to icons and fonts. **`janitor`** cleans raw data, **`patchwork`** helps combine multiple plots, and **`ggtext`** adds custom text formatting in ggplot2 visualizations.
 
 ```{r}
 #| label: setup
+#| eval: true
 
 # Loading the relevant packages
 library(tidyverse)          # Data Wrangling
@@ -45,18 +50,11 @@ library(janitor)            # Cleaning tidying raw data
 library(patchwork)          # Composing plots in R
 library(ggtext)             # Displaying custom text in ggplot2
 
-# Setting default options for the interactive graphics
-set_girafe_defaults(
-  opts_hover = opts_hover(
-    css = "fill:yellow;stroke:black;stroke-width:1px"
-    ),
-  opts_tooltip = opts_tooltip(
-    css = "padding:3px;color:black;background-color:white;"
-    )
-)
 ```
 
-Visualization Parameters
+### Visualization Parameters
+
+This code sets up fonts, colors, and captions for a custom plot with a motivational theme inspired by books like *Atomic Habits* and *Can’t Hurt Me*. It uses **Google Fonts** for titles, captions, and plot text, extracts a color palette from a book cover using **imgpalr**, and defines colors for text, highlights, and backgrounds. Social media icons and usernames are styled with **Font Awesome**, and the final captions combine code credits and hashtags, while titles and subtitles convey a motivational message.
 
 ```{r}
 #| eval: false
@@ -138,12 +136,21 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "My Year 2024 - targets and habits"
+plot_title <- "2024: Crushing Excuses, Building Habits"
 
-plot_subtitle <- str_wrap("2024 was transformative! Atomic Habits (read in June) and Can’t Hurt Me (read in Oct) helped me crush procrastination, stop blaming my environment, and build disciplined habits. Now, I work with clockwork precision.\n#TalentNotRequired #AtomicHabits #CantHurtMe", 100)
+plot_subtitle <- str_wrap("2024 was transformative! Atomic Habits (read in June) and Can’t Hurt Me (read in Oct) helped me crush procrastination, stop blaming my environment, and build disciplined habits. Now, I work with clockwork precision.", 115)
+plot_subtitle <- paste0(
+  plot_subtitle, 
+  "\n",
+  "#TalentNotRequired #AtomicHabits #CantHurtMe"
+  )
 ```
 
-Loading the data, studying and understanding it. Cleaning the names. (please set the working directory to your custom location)
+### Loading the data, E.D.A., and cleaning the names. 
+
+(please set the working directory to your custom location)
+
+This code dynamically loads and processes multiple CSV files from a specified directory (`loop_habits`). It lists all CSV files, generates object names based on file names, and reads each file into R as a data frame. The **`janitor::clean_names`** function is applied to standardize column names for easier data handling. Using **`purrr::walk2`** and **`purrr::walk`**, the data is loaded, cleaned, and reassigned efficiently, making the environment organized and ready for analysis. Temporary variables are removed afterward to maintain a clean workspace.
 
 ```{r}
 
@@ -190,7 +197,11 @@ rm(csv_files, directory, file_names)
 
 ```
 
-Cleaning up the data and keeping only the relevant variables, adding date, day of week, week number, month and year for each row separately to aid in GitHub style plot
+### Cleaning up the data and keeping only the relevant variables
+
+Adding date, day of week, week number, month and year for each row separately to aid in GitHub style plot.
+
+This code processes and transforms two datasets, `habits` and `checkmarks`, for habit tracking. The `habits` dataset is cleaned by selecting relevant columns, formatting numeric fields, renaming variables, and updating descriptions for clarity using conditional rules. In the `checkmarks` dataset, new time-based variables like day of the week and week number are derived, and units are adjusted for consistency. Logical values (TRUE/FALSE) are assigned to specific columns using custom functions, ensuring the data is well-structured for further analysis and visualization.
 
 ```{r}
 
@@ -277,12 +288,30 @@ checkmarks <- checkmarks |>
 
 ```
 
-Exploring the raw data in the root folder - the overall habits - to make a beautiful table in {gt} tables
+### Exploring the raw data to make a beautiful table in {gt} tables
+
+This code creates a visually appealing table summarizing the habits tracked in 2024 using the **`gt`** package. Column labels are customized for better clarity, renaming fields like "position" to "S. No." and "num_repetitions" to "Target number of repetitions." A header is added with a title and subtitle, providing context about the data. Finally, the **`gtExtras::gt_theme_espn()`** theme is applied, giving the table a polished and professional appearance reminiscent of ESPN's design style.
 
 ```{r}
 #| label: tbl-root1
 #| tbl-cap: "The different habits that I tracked"
+#| eval: true
 
+habits <- structure(list(position = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 
+12), name = c("Walk/Cycle", "Strength Training", "Slept 8 hr?", 
+"Family Tel Calls", "Kid Studies", "Office Goals", "Plan next day", 
+"Daily Filework", "DataViz Coding", "Learnt new code?", "Diet Coke today", 
+"Kids Junk Food"), description = c("Did you do strength training today?", 
+"Did you do exercise today with Fitness Blender?", "Did you sleep early / enough last night?", 
+"Did you call Naniji and Parents?", "How much time did you spend studying with kids today?", 
+"Did you work towards your long term office goals today?", "Did you create your work/avocation schedule for tomorrow?", 
+"Did you finish you files for the day", "How many hours did you code for data visualization today?", 
+"Did you study any R Target Book or learn new code today?", "Did you drink Diet Coke today?", 
+"Did you give junk food to kids today?"), num_repetitions = c(1, 
+3, 1, 1, 1, 5, 1, 1, 1, 5, 1, 1), interval = c("Daily", "Weekly", 
+"Daily", "Daily", "Daily", "Weekly", "Daily", "Daily", "Daily", 
+"Weekly", "Weekly", "Weekly")), row.names = c(NA, -12L), class = c("tbl_df", 
+"tbl", "data.frame"))
 habits |> 
   gt() |> 
   cols_label(
@@ -299,7 +328,7 @@ habits |>
   gtExtras::gt_theme_espn()
 ```
 
-Next, exploring any one habit - an attempt at Github Contributions style chart.
+### Writing Custom functions
 
 ::: callout-note
 **Key Learning: Using Tidy Evaluation for Dynamic Column Referencing in Tidyverse Functions**
@@ -307,7 +336,9 @@ Next, exploring any one habit - an attempt at Github Contributions style chart.
 When writing custom functions that involve dynamically referencing variable names in tidyverse functions (e.g., `mutate`, `filter`, or `select`), it's essential to use **tidy evaluation**. Tidyverse functions typically expect bare variable names, but inside a custom function, column names are usually passed as strings. To handle this, use the `rlang` package functions like `sym()` to convert strings into symbols and `!!` to unquote these symbols, making them usable as column references. For instance, `mutate(!!sym(var_name) := !!sym(var_name) * factor)` allows the column name given by `var_name` to be dynamically transformed. The `:=` operator is necessary for creating or modifying columns dynamically. This approach ensures that variable names passed as arguments to your custom function integrate seamlessly with tidyverse workflows.
 :::
 
-Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners
+**Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners**
+
+This code defines a custom ggplot2 geometry, `geom_rtile`, to create rounded tiles for visualizations. It uses the **`ggproto`** object `GeomRtile`, extending functionality from **`statebins:::GeomRrect`**. Rounded tiles are achieved by introducing a `radius` parameter for controlling corner curvature. The `setup_data` function calculates tile dimensions dynamically based on provided or default values. This geometry supports essential aesthetics like `fill`, `size`, and `alpha`, offering a flexible and visually distinct alternative to traditional rectangular tiles for data visualization.
 
 ```{r}
 #| label: geom_rtile()-custom-function
@@ -369,7 +400,9 @@ geom_rtile <- function(mapping = NULL, data = NULL,
 }
 ```
 
-Write a custom function of plotting in **{ggplot2}** for using in each variable.
+**Write a custom function of plotting in {ggplot2} for using in each variable.**
+
+This code defines a custom plotting function, `plot_custom`, for creating facet plots of habit tracking data. It dynamically adjusts data transformations and visual aesthetics based on the provided variable. The function highlights key days using rounded tiles with `geom_rtile` and annotates them with values and dates. Aesthetic parameters, including scales, labels, and themes, are finely tuned for clarity and elegance. The function is versatile, allowing customization of the facet title, legend, cutoff values, and transformation factors, ensuring tailored and visually appealing visualizations.
 
 ```{r}
 #| label: plot_custom-function
@@ -403,7 +436,7 @@ plot_custom <- function(
       )
     ) +
     geom_rtile(
-      radius = unit(bts / 25, "pt"),
+      radius = unit(bts / 10, "pt"),
       colour = "white"
     ) +
     
@@ -512,7 +545,9 @@ plot_custom <- function(
 }
 ```
 
-The actual plots to compose
+### The actual plots to compose
+
+This code creates a series of customized visualizations for habit tracking using the `plot_custom` function. Each plot highlights a specific habit or activity, categorized as either continuous (e.g., hours walked, coding time) or discrete (e.g., yes/no responses for tasks like planning the day or strength training). Continuous variables use gradient scales to represent hours, while discrete variables emphasize yes/no responses with a binary gradient. Tailored aesthetics, such as titles and cut-off values, ensure the plots are meaningful and visually engaging for habit analysis.
 
 ```{r}
 #| label: multiple-plots-to-be-plotted
@@ -675,7 +710,9 @@ g12 <- plot_custom(
   guides(fill = "none")
 ```
 
-Composing the plot using {patchwork}
+### Composing the plot using {patchwork}
+
+This code combines the individual habit-tracking visualizations (`g1` to `g12`) into a cohesive multi-panel plot using **`wrap_plots`** from the `patchwork` package. The layout arranges the plots in two columns, collects shared y-axes, and includes a unified title, subtitle, and caption for context. Custom themes ensure consistent and polished styling. The final plot is saved as a high-resolution PNG file (`my_year_2024.png`) with specified dimensions and background color, making it ready for sharing or publication.
 
 ```{r}
 
@@ -731,9 +768,18 @@ ggsave(
 )
 ```
 
-Attempt at an interactive Chart
+Attempt at an interactive Chart (work in progress)
 
 ```{r}
+# Setting default options for the interactive graphics
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "fill:yellow;stroke:black;stroke-width:1px"
+    ),
+  opts_tooltip = opts_tooltip(
+    css = "padding:3px;color:black;background-color:white;"
+    )
+)
 
 plot1 <- checkmarks |> 
   ggplot(
@@ -820,4 +866,25 @@ checkmarks |>
   theme(
     panel.grid = element_blank()
   )
+```
+
+```{r}
+#| eval: true
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
 ```
