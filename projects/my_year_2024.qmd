@@ -42,14 +42,8 @@ library(ggiraph)            # Interactive Graphics
 library(showtext)           # Display fancy text in ggplot2
 library(fontawesome)        # Icons and Fonts 
 library(janitor)            # Cleaning tidying raw data
-
- 
-# Setting font defaults
-font_add_google("Monda", "body_font")
-showtext_auto()
-
-# Set the default theme with a custom font family
-theme_set(theme_minimal(base_family = "body_font"))
+library(patchwork)          # Composing plots in R
+library(ggtext)             # Displaying custom text in ggplot2
 
 # Setting default options for the interactive graphics
 set_girafe_defaults(
@@ -104,7 +98,7 @@ showtext_auto()
 mypal <- c(
   "#E2E3E9", "#7A8162", "#75555C", "#3D302A",
   "#292326", "#B98E2D", "#7A6981", "#7C8C66",
-  "#ACA2BB", "#BED0CF"
+  "#ACA2BB", "#BED0CF", "#EF3B2C", "#41AB5D"
 )
 
 # A base Colour
@@ -119,9 +113,8 @@ seecolor::print_color(text_hil)
 text_col <- colorspace::darken(mypal[3], 0.3)
 seecolor::print_color(text_col)
 
-
 # Define Base Text Size
-bts <- 50 
+bts <- 40
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -135,7 +128,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  " |  **Code:** ", 
+  "**Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
   social_caption_2
@@ -147,10 +140,10 @@ rm(github, github_username, xtwitter,
 # Add text to plot-------------------------------------------------
 plot_title <- "My Year 2024 - targets and habits"
 
-plot_subtitle <- "........................."
+plot_subtitle <- str_wrap("During this year 2024, I read the books Atomic HAbits (around June) and Can't Hurt Me (Around Oct-November), which helped me shape my routine daily habits. Here is an outcome chart for my year 2024.", 80)
 ```
 
-Loading the data, studying and understanding it. Cleaning the names.
+Loading the data, studying and understanding it. Cleaning the names. (please set the working directory to your custom location)
 
 ```{r}
 
@@ -229,17 +222,59 @@ habits <- habits |>
     )
   )
 
+# A custom function to convert some data into true false
+convert_discrete <- function(x){if_else(x == 2, TRUE, FALSE)}
+negative_discrete <- function(x){
+  if_else(
+    x == -1,
+    true = FALSE,
+    false = if_else(
+      x == 0,
+      true = NA,
+      false = TRUE
+    )
+  )
+}
+
+# Variable I want to convert to TRUE or FALSE
+vars_to_dicretize <- c(
+  "strength_training", "slept_8_hr", "family_tel_calls",
+  "office_goals", "plan_next_day", "daily_filework",
+  "learnt_new_code"
+)
+vars_to_negative_dicretize <- c(
+  "diet_coke_today", "aryan_junk_food"
+)
 
 checkmarks <- checkmarks |> 
   mutate(
-    day_of_week = fct_rev(wday(date, label = T, abbr = F)),
+    day_of_week = wday(date, label = T, abbr = F),
     day_number = yday(date),
     week_number = week(date),
     month_year = month(date, label = TRUE),
     walk_cycle = walk_cycle / 1000,
     date = format(date, "%d %B"),
     id = row_number()
+  ) |> 
+  mutate(
+    day_of_week = fct_relevel(
+      day_of_week,
+        "Sunday", "Saturday", "Friday",
+        "Thursday", "Wednesday", "Tuesday",
+        "Monday"    
+    )
+  ) |> 
+  mutate(
+    across(
+      .cols = all_of(vars_to_dicretize),
+      .fns = convert_discrete
+    ),
+    across(
+      .cols = all_of(vars_to_negative_dicretize),
+      .fns = negative_discrete
+    )
   )
+
 ```
 
 Exploring the raw data in the root folder - the overall habits - to make a beautiful table in {gt} tables
@@ -264,7 +299,15 @@ habits |>
   gtExtras::gt_theme_espn()
 ```
 
-Next, exploring any one habit - an attempt at Github Contributions style chart
+Next, exploring any one habit - an attempt at Github Contributions style chart.
+
+::: callout-note
+**Key Learning: Using Tidy Evaluation for Dynamic Column Referencing in Tidyverse Functions**
+
+When writing custom functions that involve dynamically referencing variable names in tidyverse functions (e.g., `mutate`, `filter`, or `select`), it's essential to use **tidy evaluation**. Tidyverse functions typically expect bare variable names, but inside a custom function, column names are usually passed as strings. To handle this, use the `rlang` package functions like `sym()` to convert strings into symbols and `!!` to unquote these symbols, making them usable as column references. For instance, `mutate(!!sym(var_name) := !!sym(var_name) * factor)` allows the column name given by `var_name` to be dynamically transformed. The `:=` operator is necessary for creating or modifying columns dynamically. This approach ensures that variable names passed as arguments to your custom function integrate seamlessly with tidyverse workflows.
+:::
+
+Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners
 
 ```{r}
 #| label: geom_rtile()-custom-function
@@ -273,7 +316,7 @@ Next, exploring any one habit - an attempt at Github Contributions style chart
 
 
 `%||%` <- function(a, b) {
-  if(is.null(a)) b else a
+  if (is.null(a)) b else a
 }
 
 GeomRtile <- ggproto("GeomRtile", 
@@ -326,6 +369,8 @@ geom_rtile <- function(mapping = NULL, data = NULL,
 }
 ```
 
+Write a custom function of plotting in **{ggplot2}** for using in each variable.
+
 ```{r}
 #| label: plot_custom-function
 
@@ -333,12 +378,18 @@ plot_custom <- function(
     var_name, 
     facet_title = "", 
     legend_title = "",
-    cut_off_val = 1){
+    cut_off_val = 1,
+    transform_factor = 1
+    ){
   
-  checkmarks |> 
-    rename(fill_var = var_name) |> 
+  temp_df <- checkmarks |> 
+    # Inside mutate function, we need to convert var_name from a
+    # string to a symbol that dplyr can interpret
+    mutate(!!sym(var_name) := !!sym(var_name) * transform_factor)
+    
     # Start the plot
     ggplot(
+      data = temp_df,
       mapping = aes(
         group = id,
         x = week_number,
@@ -348,22 +399,51 @@ plot_custom <- function(
         y = day_of_week,
         # y_min = as.numeric(day_of_week) - 0.4,
         # y_max = as.numeric(day_of_week) + 0.4,
-        fill = fill_var
+        fill = !!sym(var_name)
       )
     ) +
-    # ggchicklet::geom_chicklet() +
     geom_rtile(
       radius = unit(bts / 20, "pt"),
       colour = "white"
     ) +
+    
+    # Label the best performing days
+    geom_text(
+      data = temp_df |> filter(!!sym(var_name) > cut_off_val),
+      mapping = aes(
+        label = round(!!sym(var_name), 2)
+      ),
+      size = bts / 20,
+      family = "body_font",
+      hjust = 0.5,
+      vjust = 0,
+      nudge_y = 0.05
+    ) +
+    geom_text(
+      data = temp_df |> filter(!!sym(var_name) > cut_off_val),
+      mapping = aes(
+        label = paste0(
+          parse_number(date),
+          " ",
+          month_year
+        ),
+      ),
+      size = bts / 30,
+      family = "body_font",
+      hjust = 0.5,
+      vjust = 1,
+      nudge_y = -0.05
+    ) +
+    
     # geom_tile(colour = "white") +
     coord_fixed(
       clip = "off"
     ) +
     scale_x_continuous(
-      limits = c(14, 52),
-      expand = expansion(0),
-      breaks = c(15, 25, 35, 45, 52)
+      limits = c(17, 54),
+      expand = expansion(c(0, 0.05)),
+      breaks = c(17, 25, 35, 45, 52),
+      labels = c("Apr", "Jun", "Sep", "Nov", "Dec")
     ) +
     scale_y_discrete(
       breaks = checkmarks$day_of_week |> levels(),
@@ -371,27 +451,35 @@ plot_custom <- function(
       labels = checkmarks$day_of_week |> levels(),
       expand = expansion(0)
     ) +
-    scale_fill_gradient2(
-      low = "white", high = "red",
-      na.value = "transparent"
-    ) +
     labs(
       x = NULL, y = NULL,
       fill = legend_title,
       title = facet_title
+    ) +
+    theme_minimal(
+      base_family = "body_font",
+      base_size = bts
     ) +
     theme(
       # Overall Plot
       legend.position = "bottom",
       legend.key.height = unit(bts / 80, "mm"),
       panel.grid = element_blank(),
-      plot.margin = margin(0,0,0,0, "mm"),
+      
+      # All margins
+      plot.margin = margin(10,0,5,0, "mm"),
       legend.margin = margin(0,0,0,0, "mm"),
+      legend.box.margin = margin(0,0,0,0, "mm"),
       legend.title.position = "top",
       legend.title = element_text(
-        margin = margin(0,0,0,0, "mm"),
+        margin = margin(0,0,2,0, "mm"),
         hjust = 0.5
       ),
+      legend.text = element_text(
+        margin = margin(1,0,0,0, "mm")
+      ),
+      
+      # All texts appearing in the plot
       text = element_text(
         colour = text_col,
         margin = margin(0,0,0,0, "mm"),
@@ -399,8 +487,11 @@ plot_custom <- function(
       ),
       
       plot.title = element_text(
-        margin = margin(0,0,0,0, "mm"),
-        hjust = 0.5
+        margin = margin(0,0,2,0, "mm"),
+        hjust = 0.5,
+        colour = text_col,
+        size = bts * 2,
+        family = "caption_font"
       ),
       plot.subtitle = element_text(
         margin = margin(0,0,0,0, "mm")
@@ -410,28 +501,215 @@ plot_custom <- function(
       ),
       axis.title = element_text(
         margin = margin(0,0,0,0, "mm")
-      )
+      ),
+      axis.ticks = element_blank(),
+      axis.ticks.length = unit(0, "mm")
     )
   
 }
 ```
 
+The actual plots to compose
+
 ```{r}
 
-names(checkmarks)
 
+########### CONTINUOUS VARIABLES #######################
+#-------------------------------------------------------
 g1 <- plot_custom(
   var_name = "walk_cycle",
   facet_title = "Number of hours walked during the day",
-  legend_title = "Hours"
-)
+  legend_title = "Hours",
+  cut_off_val = 3
+) +
+  scale_fill_gradient2(
+      low = "white", high = mypal[12],
+      na.value = "transparent"
+    )
+    
+#-------------------------------------------------------
+g2 <- plot_custom(
+  var_name = "aryan_studies",
+  facet_title = "Hours per day spent on kid's studies",
+  legend_title = "Hours",
+  transform_factor = 0.001,
+  cut_off_val = 1.5
+) +
+  scale_fill_gradient2(
+      low = "white", high = mypal[12],
+      na.value = "transparent"
+    )
+    
+#------------------------------------------------------
+g3 <- plot_custom(
+  var_name = "data_viz_coding",
+  facet_title = "Number of hours spent on Coding / Data Visualization",
+  legend_title = "Hours",
+  cut_off_val = 4,
+  transform_factor = 0.001
+) +
+  scale_fill_gradient2(
+      low = "white", high = mypal[12],
+      na.value = "transparent"
+    )
 
-plot_custom(
+########### DISCRETE VARIABLES #######################
+g4 <- plot_custom(
+  var_name = "learnt_new_code",
+  facet_title = "Days on which I learnt new Code / improved my avocation",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+
+g5 <- plot_custom(
   var_name = "strength_training",
-  facet_title = "Whether strength training done?",
-  legend_title = "Yes"
-)
+  facet_title = "Days on which I did strength training.",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
 
+
+g6 <- plot_custom(
+  var_name = "slept_8_hr",
+  facet_title = "Days on which I slept early or for 8 hours",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+
+g7 <- plot_custom(
+  var_name = "family_tel_calls",
+  facet_title = "Days on which I called up my elders",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+
+g8 <- plot_custom(
+  var_name = "plan_next_day",
+  facet_title = "Days on which I planned my next day before sleeping",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+
+g9 <- plot_custom(
+  var_name = "daily_filework",
+  facet_title = "Days on which I completed my office file-work",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[12],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+
+g10 <- plot_custom(
+  var_name = "diet_coke_today",
+  facet_title = "Days on which I drank diet coke!",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[11],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+
+g11 <- plot_custom(
+  var_name = "aryan_junk_food",
+  facet_title = "Days on which I gave junk food to kids!",
+  legend_title = "Yes / No",
+  cut_off_val = 2
+) +
+  scale_fill_gradient(
+    low = "white", high = mypal[11],
+    na.value = "transparent"
+  ) +
+  guides(fill = "none")
+```
+
+Composing the plot using {patchwork}
+
+```{r}
+
+g <- wrap_plots(
+  g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11
+) +
+  plot_layout(
+    ncol = 2,
+    byrow = TRUE,
+    axes = "collect_y"
+  ) +
+  plot_annotation(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    theme = theme(
+      plot.title = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "mm"),
+        colour = text_hil,
+        size = bts * 3,
+        family = "title_font"
+      ),
+      plot.subtitle = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "mm"),
+        colour = text_hil,
+        size = bts * 2,
+        lineheight = 0.3,
+        family = "title_font"
+      ),
+      plot.caption = element_textbox(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "mm"),
+        colour = text_hil,
+        size = bts * 2,
+        family = "caption_font"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "projects",
+    "my_year_2024.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
 ```
 
 Attempt at an interactive Chart
