@@ -1,0 +1,341 @@
+---
+title: "ACLED Data: Protests and Civil Unrest"
+author: "Aditya Dahiya"
+date: "2025-01-04"
+subtitle: "Reproducing maps from J. Luengo-Carbera on protests around different European Countries using ACLED Data"
+categories:
+  - "#TidyTuesday"
+  - "Maps"
+  - "Governance"
+  - "{sf}"
+image: "images/acled_data_maps_logo.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+...........
+
+![..........................](acled_data_maps.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions. Downloading the logo.
+
+```{r}
+#| label: setup
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+# Mapping Tools
+library(sf)                   # Simple Features in R
+library(terra)                # Rasters in R
+library(tidyterra)            # Plotting rasters with ggplot2
+library(osmdata)
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Fetch data from https://acleddata.com/data-export-tool/
+# Data not uploaded or attached here respecting Copyrights
+raw_data <- read_csv("acled_data_europe_central_asia.csv")
+```
+
+Getting raster and vector data for the country
+
+```{r}
+
+selected_country = "Spain"
+
+europe_bbox <- c(-20, 40, 30, 70)
+names(europe_bbox) <- c("xmin", "xmax", "ymin", "ymax")
+
+country_map <- rnaturalearth::ne_countries(
+  country = selected_country,
+  scale = "large"
+) |> 
+  select(name, geounit, iso_a3, geometry) |> 
+  st_crop(europe_bbox)
+
+country_bbox <- st_bbox(country_map)
+
+# Taking a smaller country to save data download time
+elevation_raster <- geodata::elevation_30s(
+  country = country_map$iso_a3 |> unique(), 
+  path = tempdir()
+  )
+
+# country_osm_bbox <- osmdata::getbb(selected_country)
+
+# roads_1 <- opq(
+#   bbox = country_osm_bbox,
+#   timeout = 100
+#   ) |> 
+#   add_osm_feature(
+#     key = "highway", 
+#     value = c("motorway", "trunk")
+#   ) |> 
+#   osmdata_sf()
+# 
+# object.size(roads_1) |> print(units = "Mb")
+
+# raster::writeRaster(
+#   elevation_raster,
+#   filename = here::here("data_vizs", "images", "temp.tif")
+# )
+elevation_raster <- rast("temp.tif")
+
+# Test out the map
+ggplot() +
+  geom_spatraster(data = elevation_raster) +
+  geom_sf(data = country_map, fill = "transparent")  +
+  scale_fill_gradient2(
+    low = "white", high = "grey30",
+    na.value = "white"
+  ) +
+  coord_sf() +
+  ggthemes::theme_map()
+```
+
+Visualization Parameters. Extracting colour palette.
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Domine",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Oranienbaum",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c("#A68D6F", "#906A57", "#FCFCFE", 
+           "#521616", "#681A1C", "#7B473D",
+           "#A7976F")
+
+mypal |> 
+  seecolor::print_color()
+
+# A base Colour
+bg_col <- mypal[3]
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[4]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- colorspace::darken(mypal[4], 0.3)
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** ACLED; acleddata.com", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "..........................."
+
+plot_subtitle <- "..............................."
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+df <- raw_data |> 
+  filter(country == selected_country) |> 
+  filter(event_date > as_date("2024-01-01")) |> 
+  filter(event_type == "Protests") |> 
+  filter(sub_event_type %in% c("Peaceful protest", "Violent demonstration")) |> 
+  filter(str_detect(tags, "crowd size")) |> 
+  filter(tags != "crowd size=no report") |>
+  mutate(
+    crowd_size = case_when(
+      str_detect(tags, "dozen") ~ 20,
+      str_detect(tags, "fifty") ~ 50,
+      str_detect(tags, "hundred") ~ 100,
+      str_detect(tags, "thousand") ~ 1000,
+      .default = parse_number(tags)
+    )
+  ) |>
+  select(
+    event_id_cnty, event_date, year, 
+    latitude, longitude,
+    crowd_size
+  ) |> 
+  st_as_sf(coords = c("longitude", "latitude")) |> 
+  st_set_crs(value = 4326) |> 
+  st_crop(europe_bbox)
+  
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+# Test out the map
+ggplot() +
+  geom_spatraster(data = elevation_raster) +
+  geom_sf(data = country_map, fill = "transparent")  +
+  geom_sf(
+    data = df,
+    mapping = aes(size = crowd_size),
+    alpha = 0.2,
+    fill = "blue",
+    pch = 21,
+    colour = "black"
+  ) +
+  scale_fill_gradient2(
+    low = "white", high = "grey50",
+    na.value = "white"
+  ) +
+  scale_size_continuous(
+    range = c(1, 10)
+  ) +
+  guides(
+    size = "none",
+    fill = "none"
+  ) +
+  coord_sf(
+    crs = "EPSG:3857"
+  ) +
+  ggthemes::theme_map()
+
+df |> 
+  st_drop_geometry() |> 
+  mutate(event_month = month(event_date)) |> 
+  count(event_month)
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "acled_data_maps.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "acled_data_maps.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "acled_data_maps.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+
+# Mapping Tools
+library(sf)                   # Simple Features in R
+library(terra)                # Rasters in R
+library(tidyterra)            # Plotting rasters with ggplot2
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```

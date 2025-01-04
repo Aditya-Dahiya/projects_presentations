@@ -1,0 +1,1392 @@
+---
+title: "GitHub Contributions Activity style interactive Chart"
+author: "Aditya Dahiya"
+date: "2025-01-07"
+subtitle: "Building GitHub style timeseries charts for some tracked acitivites in 2024, building custom functions for rounded tiles, and interactivity with {ggiraph}."
+categories:
+  - "Data Visualization"
+  - "#TidyTuesday"
+  - "Interactive"
+  - "{ggiraph}"
+image: "thumbnails/tidy_github_2024_activity.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+![A geom_tile() customized to produce rounded corners, and three facets (three habits tracked) with opacity reflecting intensity of activity on a particular date.](tidy_github_2024_activity.png){width="900"}
+
+Loading Libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+# Loading the relevant packages
+library(tidyverse)          # Data Wrangling
+library(gt)                 # Displaying beautiful tables
+library(ggiraph)            # Interactive Graphics
+library(showtext)           # Display fancy text in ggplot2
+library(fontawesome)        # Icons and Fonts 
+library(janitor)            # Cleaning tidying raw data
+library(patchwork)          # Composing plots in R
+library(ggtext)             # Displaying custom text in ggplot2
+
+```
+
+Visualization Parameters
+
+```{r}
+#| eval: false
+
+# Font for titles
+font_add_google("Oswald",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Jost",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c(
+  "#FFA400", "#EF3B2C", "#41AB5D", "grey30", "grey40"
+)
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[5]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[4]
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data & Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "GitHub Contributions style\nHabits tracking chart !"
+
+plot_subtitle <- str_wrap("2024 was transformative! Atomic Habits (read in June) and Can’t Hurt Me (read in Oct) helped me focus on Data Visualization.", 70)
+```
+
+Loading the data, E.D.A., and cleaning the names
+
+```{r}
+
+# Set the working directory (I didnt want to host raw data on GitHub)
+list.files("loop_habits")
+
+# Define the directory containing the CSV files
+directory <- "loop_habits"
+
+# List all CSV files in the directory
+csv_files <- list.files(
+  path = directory, 
+  pattern = "\\.csv$", 
+  full.names = TRUE
+  )
+
+# Extract base names (without file extension) to use as object names
+file_names <- tools::file_path_sans_ext(basename(csv_files)) |>
+  tolower()
+
+# Read each CSV file and assign it to an object with the corresponding name
+purrr::walk2(
+  csv_files, 
+  file_names, 
+  ~ assign(.y, read_csv(.x), 
+           envir = .GlobalEnv)
+  )
+
+# Apply janitor::clean_names() to all created objects
+purrr::walk(
+  file_names, ~
+    {
+      cleaned_data <- get(.x) |>  clean_names() 
+      # Retrieve object, clean names
+      
+      assign(.x, cleaned_data, envir = .GlobalEnv) 
+      # Reassign cleaned data back to the same object
+    }
+  )
+
+# Remove the temporary files
+rm(csv_files, directory, file_names)
+```
+
+Cleaning up the data and keeping only the relevant variables
+
+```{r}
+checkmarks <- checkmarks |> 
+  mutate(
+    day_of_week = wday(date, label = T, abbr = F),
+    day_number = yday(date),
+    week_number = week(date),
+    month_year = month(date, label = TRUE),
+    walk_cycle = walk_cycle / 1000,
+    date = format(date, "%d %B"),
+    id = row_number()
+  ) |> 
+  mutate(
+    day_of_week = fct_relevel(
+      day_of_week,
+        "Sunday", "Saturday", "Friday",
+        "Thursday", "Wednesday", "Tuesday",
+        "Monday"    
+    )
+  )
+
+df <- checkmarks |> 
+  select(
+    date, day_number, month_year, week_number, day_of_week,
+    walk_cycle, aryan_studies, data_viz_coding
+  ) |> 
+  mutate(
+    aryan_studies = aryan_studies / 1000,
+    data_viz_coding = data_viz_coding / 1000
+  ) |> 
+  pivot_longer(
+    cols = c(walk_cycle, aryan_studies, data_viz_coding),
+    names_to = "activity",
+    values_to = "value"
+  ) |> 
+  group_by(activity) |> 
+  mutate(
+    alpha_var = value / max(value)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    activity = case_when(
+      activity == "walk_cycle" ~ "Hours Spent walking / cycling",
+      activity == "aryan_studies" ~ "Hours spent on kids' studies",
+      activity == "data_viz_coding" ~ "Hours spent coding in R (data visualization)"
+    )
+  )
+```
+
+Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners
+
+```{r}
+#| label: geom_rtile()-custom-function
+# Custom functions: creating a geom_rtile()
+# Credits: https://stackoverflow.com/questions/64355877/round-corners-in-ggplots-geom-tile-possible
+
+
+`%||%` <- function(a, b) {
+  if (is.null(a)) b else a
+}
+
+GeomRtile <- ggproto("GeomRtile", 
+                     statebins:::GeomRrect, # 1) only change compared to ggplot2:::GeomTile
+                     
+  extra_params = c("na.rm"),
+  setup_data = function(data, params) {
+    data$width <- data$width %||% params$width %||% resolution(data$x, FALSE)
+    data$height <- data$height %||% params$height %||% resolution(data$y, FALSE)
+
+    transform(data,
+      xmin = x - width / 2,  xmax = x + width / 2,  width = NULL,
+      ymin = y - height / 2, ymax = y + height / 2, height = NULL
+    )
+  },
+  default_aes = aes(
+    fill = "grey20", colour = NA, size = 0.1, linetype = 1,
+    alpha = NA, width = NA, height = NA
+  ),
+  required_aes = c("x", "y"),
+
+  # These aes columns are created by setup_data(). They need to be listed here so
+  # that GeomRect$handle_na() properly removes any bars that fall outside the defined
+  # limits, not just those for which x and y are outside the limits
+  non_missing_aes = c("xmin", "xmax", "ymin", "ymax"),
+  draw_key = draw_key_polygon
+)
+
+geom_rtile <- function(mapping = NULL, data = NULL,
+                       stat = "identity", position = "identity",
+                       radius = grid::unit(6, "pt"), # 2) add radius argument
+                       ...,
+                       na.rm = FALSE,
+                       show.legend = NA,
+                       inherit.aes = TRUE) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomRtile, # 3) use ggproto object here
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = rlang::list2(
+      radius = radius,
+      na.rm = na.rm,
+      ...
+    )
+  )
+}
+```
+
+Plotting in {ggplot2} with 3 facets - a static graphic
+
+```{r}
+#| label: plot
+
+g <- df |> 
+  ggplot(
+    mapping = aes(
+      x = week_number,
+      y = day_of_week,
+      fill = activity, 
+      alpha = alpha_var
+    )
+  ) +
+  geom_rtile(
+    radius = unit(bts/10, "pt"),
+    colour = bg_col,
+    linewidth = 1
+  ) +
+  geom_text(
+    data = df |> filter(alpha_var > 0.7),
+    mapping = aes(
+      label = round(value, 2)
+    ),
+    size = bts / 10,
+    family = "body_font",
+    hjust = 0.5,
+    vjust = 0,
+    nudge_y = 0.05
+  ) +
+  geom_text(
+    data = df |> filter(alpha_var > 0.7),
+    mapping = aes(
+      label = paste0(
+        parse_number(date), " ", month_year
+      )
+    ),
+    size = bts / 15,
+    family = "body_font",
+    hjust = 0.5,
+    vjust = 0,
+    nudge_y = -0.15
+  ) +
+  coord_fixed(clip = "off") +
+  scale_x_continuous(
+    limits = c(17, 54),
+    expand = expansion(c(0, 0)),
+    breaks = c(17, 25, 35, 45, 52),
+    labels = c("Apr", "Jun", "Sep", "Nov", "Dec")
+  ) +
+  scale_y_discrete(
+    breaks = checkmarks$day_of_week |> levels(),
+    limits = checkmarks$day_of_week |> levels(),
+    labels = checkmarks$day_of_week |> levels(),
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(
+    values = mypal[c(1, 2, 3)]
+  ) +
+  scale_alpha_continuous(
+    range = c(0, 1),
+    na.value = 0
+  ) +
+  facet_wrap(
+    ~activity,
+    ncol = 1
+  ) +
+  guides(
+    fill = "none",
+    alpha = "none"
+  ) +
+  labs(
+    x = NULL, y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    legend.position = "bottom",
+    legend.key.height = unit(bts / 80, "mm"),
+    legend.key.width = unit(bts / 2, "mm"),
+    panel.grid = element_blank(),
+    plot.title.position = "plot",
+      
+    # All margins
+    plot.margin = margin(10,0,10,0, "mm"),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    # All texts appearing in the plot
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5, vjust = 0.5
+    ),
+    plot.title = element_text(
+      margin = margin(10,0,10,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = bts * 2,
+      # family = "title_font",
+      lineheight = 0.3,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.3, 
+      family = "body_font",
+      colour = text_hil
+    ),
+    plot.caption = element_textbox(
+        hjust = 0.5,
+        margin = margin(15,0,5,0, "mm"),
+        colour = text_hil,
+        family = "caption_font"
+    ),
+    strip.text = element_text(
+      margin = margin(10,0,5,0, "mm"),
+      hjust = 0.5, 
+      colour = text_hil,
+      size = 1.5 * bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,-2,0,0, "mm")
+    ),
+    axis.text.x = element_text(
+      margin = margin(5,0,0,0, "mm"),
+      size = 1.2 * bts
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_github_2024_activity.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Making thumbnail for the webpage
+
+```{r}
+library(magick)
+
+image_read(here::here("data_vizs", "tidy_github_2024_activity.png")) |> 
+  image_resize("x400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails",
+                         "tidy_github_2024_activity.png"))
+```
+
+------------------------------------------------------------------------
+
+### Interactive Chart
+
+Part 1: Custom save the required data
+
+```{r}
+#| eval: true
+
+# Loading the relevant packages
+library(tidyverse)          # Data Wrangling
+library(ggiraph)            # Interactive Graphics
+
+df <- structure(list(date = c("31 December", "31 December", "31 December", 
+"30 December", "30 December", "30 December", "29 December", "29 December", 
+"29 December", "28 December", "28 December", "28 December", "27 December", 
+"27 December", "27 December", "26 December", "26 December", "26 December", 
+"25 December", "25 December", "25 December", "24 December", "24 December", 
+"24 December", "23 December", "23 December", "23 December", "22 December", 
+"22 December", "22 December", "21 December", "21 December", "21 December", 
+"20 December", "20 December", "20 December", "19 December", "19 December", 
+"19 December", "18 December", "18 December", "18 December", "17 December", 
+"17 December", "17 December", "16 December", "16 December", "16 December", 
+"15 December", "15 December", "15 December", "14 December", "14 December", 
+"14 December", "13 December", "13 December", "13 December", "12 December", 
+"12 December", "12 December", "11 December", "11 December", "11 December", 
+"10 December", "10 December", "10 December", "09 December", "09 December", 
+"09 December", "08 December", "08 December", "08 December", "07 December", 
+"07 December", "07 December", "06 December", "06 December", "06 December", 
+"05 December", "05 December", "05 December", "04 December", "04 December", 
+"04 December", "03 December", "03 December", "03 December", "02 December", 
+"02 December", "02 December", "01 December", "01 December", "01 December", 
+"30 November", "30 November", "30 November", "29 November", "29 November", 
+"29 November", "28 November", "28 November", "28 November", "27 November", 
+"27 November", "27 November", "26 November", "26 November", "26 November", 
+"25 November", "25 November", "25 November", "24 November", "24 November", 
+"24 November", "23 November", "23 November", "23 November", "22 November", 
+"22 November", "22 November", "21 November", "21 November", "21 November", 
+"20 November", "20 November", "20 November", "19 November", "19 November", 
+"19 November", "18 November", "18 November", "18 November", "17 November", 
+"17 November", "17 November", "16 November", "16 November", "16 November", 
+"15 November", "15 November", "15 November", "14 November", "14 November", 
+"14 November", "13 November", "13 November", "13 November", "12 November", 
+"12 November", "12 November", "11 November", "11 November", "11 November", 
+"10 November", "10 November", "10 November", "09 November", "09 November", 
+"09 November", "08 November", "08 November", "08 November", "07 November", 
+"07 November", "07 November", "06 November", "06 November", "06 November", 
+"05 November", "05 November", "05 November", "04 November", "04 November", 
+"04 November", "03 November", "03 November", "03 November", "02 November", 
+"02 November", "02 November", "01 November", "01 November", "01 November", 
+"31 October", "31 October", "31 October", "30 October", "30 October", 
+"30 October", "29 October", "29 October", "29 October", "28 October", 
+"28 October", "28 October", "27 October", "27 October", "27 October", 
+"26 October", "26 October", "26 October", "25 October", "25 October", 
+"25 October", "24 October", "24 October", "24 October", "23 October", 
+"23 October", "23 October", "22 October", "22 October", "22 October", 
+"21 October", "21 October", "21 October", "20 October", "20 October", 
+"20 October", "19 October", "19 October", "19 October", "18 October", 
+"18 October", "18 October", "17 October", "17 October", "17 October", 
+"16 October", "16 October", "16 October", "15 October", "15 October", 
+"15 October", "14 October", "14 October", "14 October", "13 October", 
+"13 October", "13 October", "12 October", "12 October", "12 October", 
+"11 October", "11 October", "11 October", "10 October", "10 October", 
+"10 October", "09 October", "09 October", "09 October", "08 October", 
+"08 October", "08 October", "07 October", "07 October", "07 October", 
+"06 October", "06 October", "06 October", "05 October", "05 October", 
+"05 October", "04 October", "04 October", "04 October", "03 October", 
+"03 October", "03 October", "02 October", "02 October", "02 October", 
+"01 October", "01 October", "01 October", "30 September", "30 September", 
+"30 September", "29 September", "29 September", "29 September", 
+"28 September", "28 September", "28 September", "27 September", 
+"27 September", "27 September", "26 September", "26 September", 
+"26 September", "25 September", "25 September", "25 September", 
+"24 September", "24 September", "24 September", "23 September", 
+"23 September", "23 September", "22 September", "22 September", 
+"22 September", "21 September", "21 September", "21 September", 
+"20 September", "20 September", "20 September", "19 September", 
+"19 September", "19 September", "18 September", "18 September", 
+"18 September", "17 September", "17 September", "17 September", 
+"16 September", "16 September", "16 September", "15 September", 
+"15 September", "15 September", "14 September", "14 September", 
+"14 September", "13 September", "13 September", "13 September", 
+"12 September", "12 September", "12 September", "11 September", 
+"11 September", "11 September", "10 September", "10 September", 
+"10 September", "09 September", "09 September", "09 September", 
+"08 September", "08 September", "08 September", "07 September", 
+"07 September", "07 September", "06 September", "06 September", 
+"06 September", "05 September", "05 September", "05 September", 
+"04 September", "04 September", "04 September", "03 September", 
+"03 September", "03 September", "02 September", "02 September", 
+"02 September", "01 September", "01 September", "01 September", 
+"31 August", "31 August", "31 August", "30 August", "30 August", 
+"30 August", "29 August", "29 August", "29 August", "28 August", 
+"28 August", "28 August", "27 August", "27 August", "27 August", 
+"26 August", "26 August", "26 August", "25 August", "25 August", 
+"25 August", "24 August", "24 August", "24 August", "23 August", 
+"23 August", "23 August", "22 August", "22 August", "22 August", 
+"21 August", "21 August", "21 August", "20 August", "20 August", 
+"20 August", "19 August", "19 August", "19 August", "18 August", 
+"18 August", "18 August", "17 August", "17 August", "17 August", 
+"16 August", "16 August", "16 August", "15 August", "15 August", 
+"15 August", "14 August", "14 August", "14 August", "13 August", 
+"13 August", "13 August", "12 August", "12 August", "12 August", 
+"11 August", "11 August", "11 August", "10 August", "10 August", 
+"10 August", "09 August", "09 August", "09 August", "08 August", 
+"08 August", "08 August", "07 August", "07 August", "07 August", 
+"06 August", "06 August", "06 August", "05 August", "05 August", 
+"05 August", "04 August", "04 August", "04 August", "03 August", 
+"03 August", "03 August", "02 August", "02 August", "02 August", 
+"01 August", "01 August", "01 August", "31 July", "31 July", 
+"31 July", "30 July", "30 July", "30 July", "29 July", "29 July", 
+"29 July", "28 July", "28 July", "28 July", "27 July", "27 July", 
+"27 July", "26 July", "26 July", "26 July", "25 July", "25 July", 
+"25 July", "24 July", "24 July", "24 July", "23 July", "23 July", 
+"23 July", "22 July", "22 July", "22 July", "21 July", "21 July", 
+"21 July", "20 July", "20 July", "20 July", "19 July", "19 July", 
+"19 July", "18 July", "18 July", "18 July", "17 July", "17 July", 
+"17 July", "16 July", "16 July", "16 July", "15 July", "15 July", 
+"15 July", "14 July", "14 July", "14 July", "13 July", "13 July", 
+"13 July", "12 July", "12 July", "12 July", "11 July", "11 July", 
+"11 July", "10 July", "10 July", "10 July", "09 July", "09 July", 
+"09 July", "08 July", "08 July", "08 July", "07 July", "07 July", 
+"07 July", "06 July", "06 July", "06 July", "05 July", "05 July", 
+"05 July", "04 July", "04 July", "04 July", "03 July", "03 July", 
+"03 July", "02 July", "02 July", "02 July", "01 July", "01 July", 
+"01 July", "30 June", "30 June", "30 June", "29 June", "29 June", 
+"29 June", "28 June", "28 June", "28 June", "27 June", "27 June", 
+"27 June", "26 June", "26 June", "26 June", "25 June", "25 June", 
+"25 June", "24 June", "24 June", "24 June", "23 June", "23 June", 
+"23 June", "22 June", "22 June", "22 June", "21 June", "21 June", 
+"21 June", "20 June", "20 June", "20 June", "19 June", "19 June", 
+"19 June", "18 June", "18 June", "18 June", "17 June", "17 June", 
+"17 June", "16 June", "16 June", "16 June", "15 June", "15 June", 
+"15 June", "14 June", "14 June", "14 June", "13 June", "13 June", 
+"13 June", "12 June", "12 June", "12 June", "11 June", "11 June", 
+"11 June", "10 June", "10 June", "10 June", "09 June", "09 June", 
+"09 June", "08 June", "08 June", "08 June", "07 June", "07 June", 
+"07 June", "06 June", "06 June", "06 June", "05 June", "05 June", 
+"05 June", "04 June", "04 June", "04 June", "03 June", "03 June", 
+"03 June", "02 June", "02 June", "02 June", "01 June", "01 June", 
+"01 June", "31 May", "31 May", "31 May", "30 May", "30 May", 
+"30 May", "29 May", "29 May", "29 May", "28 May", "28 May", "28 May", 
+"27 May", "27 May", "27 May", "26 May", "26 May", "26 May", "25 May", 
+"25 May", "25 May", "24 May", "24 May", "24 May", "23 May", "23 May", 
+"23 May", "22 May", "22 May", "22 May", "21 May", "21 May", "21 May", 
+"20 May", "20 May", "20 May", "19 May", "19 May", "19 May", "18 May", 
+"18 May", "18 May", "17 May", "17 May", "17 May", "16 May", "16 May", 
+"16 May", "15 May", "15 May", "15 May", "14 May", "14 May", "14 May", 
+"13 May", "13 May", "13 May", "12 May", "12 May", "12 May", "11 May", 
+"11 May", "11 May", "10 May", "10 May", "10 May", "09 May", "09 May", 
+"09 May", "08 May", "08 May", "08 May", "07 May", "07 May", "07 May", 
+"06 May", "06 May", "06 May", "05 May", "05 May", "05 May", "04 May", 
+"04 May", "04 May", "03 May", "03 May", "03 May", "02 May", "02 May", 
+"02 May"), week_number = c(53, 53, 53, 53, 53, 53, 52, 52, 52, 
+52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 52, 
+52, 52, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 
+51, 51, 51, 51, 51, 51, 51, 50, 50, 50, 50, 50, 50, 50, 50, 50, 
+50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 49, 49, 49, 49, 
+49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 
+49, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 
+48, 48, 48, 48, 48, 48, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 
+47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 46, 46, 46, 46, 46, 
+46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 
+45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 
+45, 45, 45, 45, 45, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 
+44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43, 43, 43, 
+43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 42, 
+42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 
+42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 
+41, 41, 41, 41, 41, 41, 41, 41, 41, 40, 40, 40, 40, 40, 40, 40, 
+40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 39, 39, 
+39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 
+39, 39, 39, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 
+38, 38, 38, 38, 38, 38, 38, 38, 37, 37, 37, 37, 37, 37, 37, 37, 
+37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 36, 36, 36, 
+36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 
+36, 36, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 
+35, 35, 35, 35, 35, 35, 35, 34, 34, 34, 34, 34, 34, 34, 34, 34, 
+34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 33, 33, 33, 33, 
+33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 
+33, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
+32, 32, 32, 32, 32, 32, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 
+31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 
+30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 
+29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 
+29, 29, 29, 29, 29, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 
+28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 
+27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 26, 
+26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 
+26, 26, 26, 26, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 
+25, 25, 25, 25, 25, 25, 25, 25, 25, 24, 24, 24, 24, 24, 24, 24, 
+24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 
+23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 
+23, 23, 23, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 
+22, 22, 22, 22, 22, 22, 22, 22, 21, 21, 21, 21, 21, 21, 21, 21, 
+21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 20, 20, 20, 
+20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 
+20, 20, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 
+19, 19, 19, 19, 19, 19, 19, 18, 18, 18, 18, 18, 18, 18, 18, 18, 
+18, 18, 18), day_of_week = structure(c(6L, 6L, 6L, 7L, 7L, 7L, 
+1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 
+6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 
+4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 
+3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 
+1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 
+6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 
+5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 
+3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 
+1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 
+7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 
+5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 
+3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 
+2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 
+7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 
+5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 
+4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 
+2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 
+7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 
+6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 
+4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 
+2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 
+1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 
+6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 
+4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 
+3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 
+1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 
+6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 
+5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 
+3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 
+1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 
+7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 
+5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 
+3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 
+2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 
+7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 
+5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 
+4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 
+2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 
+7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 
+6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 
+4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 
+2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 
+1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L, 5L, 5L, 6L, 
+6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 
+4L, 5L, 5L, 5L, 6L, 6L, 6L, 7L, 7L, 7L, 1L, 1L, 1L, 2L, 2L, 2L, 
+3L, 3L, 3L, 4L, 4L, 4L), levels = c("Sunday", "Saturday", "Friday", 
+"Thursday", "Wednesday", "Tuesday", "Monday"), class = c("ordered", 
+"factor")), activity = c("Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)", 
+"Hours Spent walking / cycling", "Hours spent on kids' studies", 
+"Hours spent coding in R (data visualization)", "Hours Spent walking / cycling", 
+"Hours spent on kids' studies", "Hours spent coding in R (data visualization)"
+), value = c(2.25, 0.5, 2.2, 1.25, 1.5, 2.2, 3.1, 0.6, 3.5, 1.25, 
+0.5, 2.5, 1.1, 1.2, 1, 1.25, 0.5, 2.5, 2.5, 0.5, 4.1, 1.25, 1.25, 
+1.5, 1.25, 1.5, 2, 2.6, 1, 2, 1.25, 0.5, 2.5, 1.25, 0.5, 1.1, 
+1.25, 0.25, 2, 1.25, 0.5, 2.5, 1.25, 1, 2, 1.25, 1, 2, 2.5, 0.5, 
+3, 0.75, 0.5, 2.5, 1.25, 1.5, 3, 1.25, 1.1, 2, 2.5, 1.55, 1.5, 
+1, 1.5, 1.35, 1.25, 1.25, 2.6, 2.75, 1.25, 1.75, 1, -0.001, 2.2, 
+2, 1, 1.1, 1.75, 1, 2, 1.25, 1.2, 2, 1.25, 1, -0.001, 1, 1, 1.2, 
+1.25, 1, 1, 2.25, 1, 0.5, 1.25, 1, 0.5, 1.25, 0.5, 0, 1.1, 1.2, 
+-0.001, -0.001, 1.25, -0.001, 1.45, -0.001, 4.5, 1.25, -0.001, 
+4.5, 1.75, 1, 4, 1.25, 1.2, -0.001, 1.25, 0.5, 0.5, 1.1, 0.5, 
+2.5, 1.25, 1.2, 1.5, 1.2, 0.5, -0.001, 2.25, 1.75, 2.5, 2.15, 
+-0.001, 2, 0.75, -0.001, 4, 1.5, 1, -0.001, 1.25, 0.5, -0.001, 
+2.5, 1, -0.001, 1.25, 0.15, -0.001, 1.25, 0.5, 1.5, 1.25, 1.2, 
+-0.001, -0.001, 1, 1, 0.5, 1.5, 0.5, 1.25, 0.5, 3, 1.5, 0, 1, 
+1.25, 1, -0.001, 1.25, -0.001, 2, -0.001, -0.001, -0.001, 2.5, 
+1.25, -0.001, 1.25, -0.001, 0.5, -0.001, -0.001, -0.001, 1.25, 
+-0.001, 1.5, -0.001, -0.001, 0.5, 1.25, -0.001, 2, 2.5, -0.001, 
+4, 1.25, 1, 4, 2.5, 0.75, 0.5, 1.25, 1.5, 1.5, 1.25, 0.5, 3, 
+1.25, 1, 2, 1.25, 0, 2, 1, 0.5, -0.001, 1.25, 1.1, 1.5, 2.5, 
+1.45, 2, 2.7, 0.75, 2.5, -0.001, 0.75, 1, 1.75, 0.75, 1, 1.75, 
+1.5, 2.5, 4, 1.2, 1, 1.2, 0.25, -0.001, 3, 1.5, 1, 2.5, 1.5, 
+1, 3.75, 0.5, 3.5, 1.25, 0.5, -0.001, 1, 0.5, 0.5, 1.25, 0.5, 
+2.5, 2.9, 0.5, 4, 4.75, 0.5, 2.5, 2.85, 1.5, 4, 2.75, 0.5, 3, 
+2.5, 0.5, 3, 1.75, 1.2, 2, 1.25, 1.25, 2.5, 3.55, 1.2, 3.5, 1.25, 
+1.6, 2.5, 1.25, 1.25, -0.001, 2.35, 1.25, 2, 3.5, 1.25, -0.001, 
+2.1, 1, -0.001, 1.35, 1, -0.001, 3, 0, -0.001, 1.25, 0.5, -0.001, 
+1.25, 1.5, -0.001, 1.25, 0.15, 2, 2.5, 0.5, -0.001, 3, -0.001, 
+-0.001, 2.5, -0.001, -0.001, 3.5, 1, -0.001, 1.25, 1.2, -0.001, 
+3, 0.5, -0.001, -0.001, 1.25, 2, 2, 1.5, 1, -0.001, 0.6, -0.001, 
+-0.001, 1.5, -0.001, -0.001, -0.001, 2, 1.25, -0.001, -0.001, 
+1, -0.001, 2, 2.25, 0.2, -0.001, 2.1, 1, 2, 1.25, 0.5, 3, 1.25, 
+0.25, -0.001, 2.5, -0.001, -0.001, 2.35, 1, -0.001, 1, -0.001, 
+-0.001, 2.5, 1, -0.001, 1.5, 0.5, -0.001, -0.001, 0.5, -0.001, 
+-0.001, 0.5, -0.001, 2.75, 0, -0.001, 0.5, 0.2, -0.001, 1.45, 
+0.5, 2, 2, 0.75, -0.001, 2.5, 0.5, -0.001, 2.5, 1, 2, 2.5, -0.001, 
+1, 1.25, 0.5, 2, 1.25, 0.5, -0.001, 1.5, 0.2, 2.5, 2.5, 0.5, 
+0.5, 0.75, 0.5, 1.5, 2.5, 0.75, 2, 3.6, 0.5, 1.5, 2.5, 1, 2, 
+-0.001, 0.6, 1.5, -0.001, 0.7, 0.5, 2.6, 0.7, 2.5, 2.55, 0.75, 
+2, 2.5, -0.001, 0.5, 2.3, 0.5, -0.001, 2.25, 0.6, 3, 1.75, -0.001, 
+1, 2.25, 0.5, 2, 1.25, 0.75, 1, 2.25, 0.5, -0.001, 2.1, 1.5, 
+2, 1.25, 1.5, -0.001, 3, -0.001, 2, 3.5, 0, 2, 2.35, 0.5, 1.5, 
+1.35, 0.7, 2, 0.9, 0.5, 1, 2.5, 0.5, 2.2, 2.5, -0.001, -0.001, 
+-0.001, -0.001, -0.001, 1, 0.25, -0.001, 0.75, 0.5, 0.5, 1, 0.5, 
+0, 1.25, 0.5, 2, 2, 0.5, 2.5, 1.4, -0.001, 2.5, -0.001, 0.5, 
+3.5, -0.001, -0.001, 3.5, 1.25, 0.5, 2, 2.5, 1, 1.5, 1.25, 0.6, 
+2.5, 1.7, 0.5, 2, 2.5, -0.001, 0.25, 1.5, 0.5, 2, -0.001, 0.5, 
+-0.001, 2.5, 1, 0.5, 2, 1.5, 0.25, 1.25, 0.6, 2, 1.35, -0.001, 
+-0.001, 2.25, -0.001, 0.5, 1.25, 0, 0.5, 1.25, 0.75, 2, 2.5, 
+1, 1.5, -0.001, 1.5, 2.5, 0.75, 0.5, 5.5, 1.25, 0.5, 1, -0.001, 
+0, 2, -0.001, 0.75, -0.001, 1.25, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, 1.25, 0, 2.5, 1.25, -0.001, 1, 2.95, 
+0.25, 2.5, 3.95, 0.5, 2, 1.1, -0.001, 2, -0.001, 0.5, 0.5, 1.2, 
+0.5, 2, 1.2, 1.5, 3, 1.1, 0.5, 2.2, 3.25, 2, 2, 3.35, 1, 4.5, 
+3.6, 1, 2.5, 2.1, 0.5, 3, 1, 0.5, 2, 1.1, 0.75, 3.2, 2.85, 0.5, 
+3, 1.25, 1, 4, 0, 1.5, 4.5, 1.4, 0.5, 2, 1.1, 0.5, 3.5, 2.35, 
+0.5, 1.5, 1.2, 0.5, 2.7, 2.1, 1, -0.001, 3.75, 0.5, -0.001, 0.5, 
+0.6, 0, 1.25, 0.5, 2.2, 1.5, 0.1, 1.5, 1.1, 0.5, 3.25, 1.1, 0.5, 
+2, 1, 0.75, 2.5, 1, 0.5, 2, -0.001, -0.001, -0.001, -0.001, -0.001, 
+-0.001, -0.001, -0.001, -0.001), alpha_var = c(0.473684210526316, 
+0.25, 0.4, 0.263157894736842, 0.75, 0.4, 0.652631578947368, 0.3, 
+0.636363636363636, 0.263157894736842, 0.25, 0.454545454545455, 
+0.231578947368421, 0.6, 0.181818181818182, 0.263157894736842, 
+0.25, 0.454545454545455, 0.526315789473684, 0.25, 0.745454545454545, 
+0.263157894736842, 0.625, 0.272727272727273, 0.263157894736842, 
+0.75, 0.363636363636364, 0.547368421052632, 0.5, 0.363636363636364, 
+0.263157894736842, 0.25, 0.454545454545455, 0.263157894736842, 
+0.25, 0.2, 0.263157894736842, 0.125, 0.363636363636364, 0.263157894736842, 
+0.25, 0.454545454545455, 0.263157894736842, 0.5, 0.363636363636364, 
+0.263157894736842, 0.5, 0.363636363636364, 0.526315789473684, 
+0.25, 0.545454545454545, 0.157894736842105, 0.25, 0.454545454545455, 
+0.263157894736842, 0.75, 0.545454545454545, 0.263157894736842, 
+0.55, 0.363636363636364, 0.526315789473684, 0.775, 0.272727272727273, 
+0.210526315789474, 0.75, 0.245454545454545, 0.263157894736842, 
+0.625, 0.472727272727273, 0.578947368421053, 0.625, 0.318181818181818, 
+0.210526315789474, -5e-04, 0.4, 0.421052631578947, 0.5, 0.2, 
+0.368421052631579, 0.5, 0.363636363636364, 0.263157894736842, 
+0.6, 0.363636363636364, 0.263157894736842, 0.5, -0.000181818181818182, 
+0.210526315789474, 0.5, 0.218181818181818, 0.263157894736842, 
+0.5, 0.181818181818182, 0.473684210526316, 0.5, 0.0909090909090909, 
+0.263157894736842, 0.5, 0.0909090909090909, 0.263157894736842, 
+0.25, 0, 0.231578947368421, 0.6, -0.000181818181818182, -0.000210526315789474, 
+0.625, -0.000181818181818182, 0.305263157894737, -5e-04, 0.818181818181818, 
+0.263157894736842, -5e-04, 0.818181818181818, 0.368421052631579, 
+0.5, 0.727272727272727, 0.263157894736842, 0.6, -0.000181818181818182, 
+0.263157894736842, 0.25, 0.0909090909090909, 0.231578947368421, 
+0.25, 0.454545454545455, 0.263157894736842, 0.6, 0.272727272727273, 
+0.252631578947368, 0.25, -0.000181818181818182, 0.473684210526316, 
+0.875, 0.454545454545455, 0.452631578947368, -5e-04, 0.363636363636364, 
+0.157894736842105, -5e-04, 0.727272727272727, 0.315789473684211, 
+0.5, -0.000181818181818182, 0.263157894736842, 0.25, -0.000181818181818182, 
+0.526315789473684, 0.5, -0.000181818181818182, 0.263157894736842, 
+0.075, -0.000181818181818182, 0.263157894736842, 0.25, 0.272727272727273, 
+0.263157894736842, 0.6, -0.000181818181818182, -0.000210526315789474, 
+0.5, 0.181818181818182, 0.105263157894737, 0.75, 0.0909090909090909, 
+0.263157894736842, 0.25, 0.545454545454545, 0.315789473684211, 
+0, 0.181818181818182, 0.263157894736842, 0.5, -0.000181818181818182, 
+0.263157894736842, -5e-04, 0.363636363636364, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, 0.526315789473684, 0.625, -0.000181818181818182, 
+0.263157894736842, -5e-04, 0.0909090909090909, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, 0.263157894736842, -5e-04, 0.272727272727273, 
+-0.000210526315789474, -5e-04, 0.0909090909090909, 0.263157894736842, 
+-5e-04, 0.363636363636364, 0.526315789473684, -5e-04, 0.727272727272727, 
+0.263157894736842, 0.5, 0.727272727272727, 0.526315789473684, 
+0.375, 0.0909090909090909, 0.263157894736842, 0.75, 0.272727272727273, 
+0.263157894736842, 0.25, 0.545454545454545, 0.263157894736842, 
+0.5, 0.363636363636364, 0.263157894736842, 0, 0.363636363636364, 
+0.210526315789474, 0.25, -0.000181818181818182, 0.263157894736842, 
+0.55, 0.272727272727273, 0.526315789473684, 0.725, 0.363636363636364, 
+0.568421052631579, 0.375, 0.454545454545455, -0.000210526315789474, 
+0.375, 0.181818181818182, 0.368421052631579, 0.375, 0.181818181818182, 
+0.368421052631579, 0.75, 0.454545454545455, 0.842105263157895, 
+0.6, 0.181818181818182, 0.252631578947368, 0.125, -0.000181818181818182, 
+0.631578947368421, 0.75, 0.181818181818182, 0.526315789473684, 
+0.75, 0.181818181818182, 0.789473684210526, 0.25, 0.636363636363636, 
+0.263157894736842, 0.25, -0.000181818181818182, 0.210526315789474, 
+0.25, 0.0909090909090909, 0.263157894736842, 0.25, 0.454545454545455, 
+0.610526315789474, 0.25, 0.727272727272727, 1, 0.25, 0.454545454545455, 
+0.6, 0.75, 0.727272727272727, 0.578947368421053, 0.25, 0.545454545454545, 
+0.526315789473684, 0.25, 0.545454545454545, 0.368421052631579, 
+0.6, 0.363636363636364, 0.263157894736842, 0.625, 0.454545454545455, 
+0.747368421052632, 0.6, 0.636363636363636, 0.263157894736842, 
+0.8, 0.454545454545455, 0.263157894736842, 0.625, -0.000181818181818182, 
+0.494736842105263, 0.625, 0.363636363636364, 0.736842105263158, 
+0.625, -0.000181818181818182, 0.442105263157895, 0.5, -0.000181818181818182, 
+0.284210526315789, 0.5, -0.000181818181818182, 0.631578947368421, 
+0, -0.000181818181818182, 0.263157894736842, 0.25, -0.000181818181818182, 
+0.263157894736842, 0.75, -0.000181818181818182, 0.263157894736842, 
+0.075, 0.363636363636364, 0.526315789473684, 0.25, -0.000181818181818182, 
+0.631578947368421, -5e-04, -0.000181818181818182, 0.526315789473684, 
+-5e-04, -0.000181818181818182, 0.736842105263158, 0.5, -0.000181818181818182, 
+0.263157894736842, 0.6, -0.000181818181818182, 0.631578947368421, 
+0.25, -0.000181818181818182, -0.000210526315789474, 0.625, 0.363636363636364, 
+0.421052631578947, 0.75, 0.181818181818182, -0.000210526315789474, 
+0.3, -0.000181818181818182, -0.000210526315789474, 0.75, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, 0.363636363636364, 0.263157894736842, 
+-5e-04, -0.000181818181818182, 0.210526315789474, -5e-04, 0.363636363636364, 
+0.473684210526316, 0.1, -0.000181818181818182, 0.442105263157895, 
+0.5, 0.363636363636364, 0.263157894736842, 0.25, 0.545454545454545, 
+0.263157894736842, 0.125, -0.000181818181818182, 0.526315789473684, 
+-5e-04, -0.000181818181818182, 0.494736842105263, 0.5, -0.000181818181818182, 
+0.210526315789474, -5e-04, -0.000181818181818182, 0.526315789473684, 
+0.5, -0.000181818181818182, 0.315789473684211, 0.25, -0.000181818181818182, 
+-0.000210526315789474, 0.25, -0.000181818181818182, -0.000210526315789474, 
+0.25, -0.000181818181818182, 0.578947368421053, 0, -0.000181818181818182, 
+0.105263157894737, 0.1, -0.000181818181818182, 0.305263157894737, 
+0.25, 0.363636363636364, 0.421052631578947, 0.375, -0.000181818181818182, 
+0.526315789473684, 0.25, -0.000181818181818182, 0.526315789473684, 
+0.5, 0.363636363636364, 0.526315789473684, -5e-04, 0.181818181818182, 
+0.263157894736842, 0.25, 0.363636363636364, 0.263157894736842, 
+0.25, -0.000181818181818182, 0.315789473684211, 0.1, 0.454545454545455, 
+0.526315789473684, 0.25, 0.0909090909090909, 0.157894736842105, 
+0.25, 0.272727272727273, 0.526315789473684, 0.375, 0.363636363636364, 
+0.757894736842105, 0.25, 0.272727272727273, 0.526315789473684, 
+0.5, 0.363636363636364, -0.000210526315789474, 0.3, 0.272727272727273, 
+-0.000210526315789474, 0.35, 0.0909090909090909, 0.547368421052632, 
+0.35, 0.454545454545455, 0.536842105263158, 0.375, 0.363636363636364, 
+0.526315789473684, -5e-04, 0.0909090909090909, 0.484210526315789, 
+0.25, -0.000181818181818182, 0.473684210526316, 0.3, 0.545454545454545, 
+0.368421052631579, -5e-04, 0.181818181818182, 0.473684210526316, 
+0.25, 0.363636363636364, 0.263157894736842, 0.375, 0.181818181818182, 
+0.473684210526316, 0.25, -0.000181818181818182, 0.442105263157895, 
+0.75, 0.363636363636364, 0.263157894736842, 0.75, -0.000181818181818182, 
+0.631578947368421, -5e-04, 0.363636363636364, 0.736842105263158, 
+0, 0.363636363636364, 0.494736842105263, 0.25, 0.272727272727273, 
+0.284210526315789, 0.35, 0.363636363636364, 0.189473684210526, 
+0.25, 0.181818181818182, 0.526315789473684, 0.25, 0.4, 0.526315789473684, 
+-5e-04, -0.000181818181818182, -0.000210526315789474, -5e-04, 
+-0.000181818181818182, 0.210526315789474, 0.125, -0.000181818181818182, 
+0.157894736842105, 0.25, 0.0909090909090909, 0.210526315789474, 
+0.25, 0, 0.263157894736842, 0.25, 0.363636363636364, 0.421052631578947, 
+0.25, 0.454545454545455, 0.294736842105263, -5e-04, 0.454545454545455, 
+-0.000210526315789474, 0.25, 0.636363636363636, -0.000210526315789474, 
+-5e-04, 0.636363636363636, 0.263157894736842, 0.25, 0.363636363636364, 
+0.526315789473684, 0.5, 0.272727272727273, 0.263157894736842, 
+0.3, 0.454545454545455, 0.357894736842105, 0.25, 0.363636363636364, 
+0.526315789473684, -5e-04, 0.0454545454545455, 0.315789473684211, 
+0.25, 0.363636363636364, -0.000210526315789474, 0.25, -0.000181818181818182, 
+0.526315789473684, 0.5, 0.0909090909090909, 0.421052631578947, 
+0.75, 0.0454545454545455, 0.263157894736842, 0.3, 0.363636363636364, 
+0.284210526315789, -5e-04, -0.000181818181818182, 0.473684210526316, 
+-5e-04, 0.0909090909090909, 0.263157894736842, 0, 0.0909090909090909, 
+0.263157894736842, 0.375, 0.363636363636364, 0.526315789473684, 
+0.5, 0.272727272727273, -0.000210526315789474, 0.75, 0.454545454545455, 
+0.157894736842105, 0.25, 1, 0.263157894736842, 0.25, 0.181818181818182, 
+-0.000210526315789474, 0, 0.363636363636364, -0.000210526315789474, 
+0.375, -0.000181818181818182, 0.263157894736842, -5e-04, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, -0.000181818181818182, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, -0.000210526315789474, -5e-04, 
+-0.000181818181818182, -0.000210526315789474, -5e-04, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, -0.000181818181818182, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, -0.000210526315789474, -5e-04, 
+-0.000181818181818182, -0.000210526315789474, -5e-04, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, -0.000181818181818182, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, -0.000210526315789474, -5e-04, 
+-0.000181818181818182, -0.000210526315789474, -5e-04, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, -0.000181818181818182, -0.000210526315789474, 
+-5e-04, -0.000181818181818182, -0.000210526315789474, -5e-04, 
+-0.000181818181818182, 0.263157894736842, 0, 0.454545454545455, 
+0.263157894736842, -5e-04, 0.181818181818182, 0.621052631578947, 
+0.125, 0.454545454545455, 0.831578947368421, 0.25, 0.363636363636364, 
+0.231578947368421, -5e-04, 0.363636363636364, -0.000210526315789474, 
+0.25, 0.0909090909090909, 0.252631578947368, 0.25, 0.363636363636364, 
+0.252631578947368, 0.75, 0.545454545454545, 0.231578947368421, 
+0.25, 0.4, 0.684210526315789, 1, 0.363636363636364, 0.705263157894737, 
+0.5, 0.818181818181818, 0.757894736842105, 0.5, 0.454545454545455, 
+0.442105263157895, 0.25, 0.545454545454545, 0.210526315789474, 
+0.25, 0.363636363636364, 0.231578947368421, 0.375, 0.581818181818182, 
+0.6, 0.25, 0.545454545454545, 0.263157894736842, 0.5, 0.727272727272727, 
+0, 0.75, 0.818181818181818, 0.294736842105263, 0.25, 0.363636363636364, 
+0.231578947368421, 0.25, 0.636363636363636, 0.494736842105263, 
+0.25, 0.272727272727273, 0.252631578947368, 0.25, 0.490909090909091, 
+0.442105263157895, 0.5, -0.000181818181818182, 0.789473684210526, 
+0.25, -0.000181818181818182, 0.105263157894737, 0.3, 0, 0.263157894736842, 
+0.25, 0.4, 0.315789473684211, 0.05, 0.272727272727273, 0.231578947368421, 
+0.25, 0.590909090909091, 0.231578947368421, 0.25, 0.363636363636364, 
+0.210526315789474, 0.375, 0.454545454545455, 0.210526315789474, 
+0.25, 0.363636363636364, -0.000210526315789474, -5e-04, -0.000181818181818182, 
+-0.000210526315789474, -5e-04, -0.000181818181818182, -0.000210526315789474, 
+-5e-04, -0.000181818181818182)), row.names = c(NA, -732L), class = c("tbl_df", 
+"tbl", "data.frame"))
+```
+
+### Part 2: Draw the interactive plot with {ggplot2} and {ggiraph}
+
+```{r}
+#| eval: true
+
+plot1 <- df |> 
+  mutate(id = row_number()) |> 
+  ggplot(
+    mapping = aes(
+      x = week_number,
+      y = day_of_week,
+      fill = activity, 
+      alpha = alpha_var,
+      data_id = id,
+      tooltip = paste0(
+        date, "\n", day_of_week, "\n", 
+        round(value, 2), " hours"
+      )
+    )
+  ) +
+  geom_tile_interactive(
+    colour = "white",
+    linewidth = 1
+  ) +
+  coord_fixed(clip = "off") +
+  scale_x_continuous(
+    limits = c(17, 54),
+    expand = expansion(c(0, 0)),
+    breaks = c(17, 25, 35, 45, 52),
+    labels = c("Apr", "Jun", "Sep", "Nov", "Dec")
+  ) +
+  scale_y_discrete(
+    breaks = df$day_of_week |> levels(),
+    limits = df$day_of_week |> levels(),
+    labels = df$day_of_week |> levels(),
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(
+    values = c("#FFA400", "#EF3B2C", "#41AB5D")
+  ) +
+  scale_alpha_continuous(
+    range = c(0, 1),
+    na.value = 0
+  ) +
+  facet_wrap(
+    ~activity,
+    ncol = 1
+  ) +
+  guides(
+    fill = "none",
+    alpha = "none"
+  ) +
+  labs(
+    x = NULL, y = NULL,
+    title = "GitHub Contributions style Habits tracking chart !",
+    subtitle = "Interactive Version created with {ggiraph}.",
+    caption = "Data & Graphics:    Github @Aditya-Dahiya     X @AdityaDahiyaIAS"
+  ) +
+  theme_minimal(
+    base_size = 12
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5
+    ),
+    strip.text = element_text(
+      face = "bold"
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      size = 6
+    )
+  )
+
+girafe(
+  ggobj = plot1,
+  options = list(
+    opts_hover_inv(css = "opacity:0.7;"),
+    opts_hover(css = "stroke:black;stroke-width:2;")
+  )
+)
+```
+
+```{r}
+#| eval: true
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
