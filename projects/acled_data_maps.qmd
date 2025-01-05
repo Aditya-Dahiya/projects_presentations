@@ -64,6 +64,7 @@ library(tidyverse)            # All things tidy
 # Fetch data from https://acleddata.com/data-export-tool/
 # Data not uploaded or attached here respecting Copyrights
 raw_data <- read_csv("acled_data_europe_central_asia.csv")
+elevation_raster <- rast("temp.tif")
 ```
 
 Getting raster and vector data for the country
@@ -85,10 +86,10 @@ country_map <- rnaturalearth::ne_countries(
 country_bbox <- st_bbox(country_map)
 
 # Taking a smaller country to save data download time
-elevation_raster <- geodata::elevation_30s(
-  country = country_map$iso_a3 |> unique(), 
-  path = tempdir()
-  )
+# elevation_raster <- geodata::elevation_30s(
+#   country = country_map$iso_a3 |> unique(), 
+#   path = tempdir()
+#   )
 
 # country_osm_bbox <- osmdata::getbb(selected_country)
 
@@ -108,7 +109,7 @@ elevation_raster <- geodata::elevation_30s(
 #   elevation_raster,
 #   filename = here::here("data_vizs", "images", "temp.tif")
 # )
-elevation_raster <- rast("temp.tif")
+
 
 # Test out the map
 ggplot() +
@@ -128,39 +129,38 @@ Visualization Parameters. Extracting colour palette.
 #| label: viz-params
 
 # Font for titles
-font_add_google("Domine",
+font_add_google("Noto Sans",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Stint Ultra Condensed",
+font_add_google("PT Sans Narrow",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Oranienbaum",
+font_add_google("Merriweather Sans",
   family = "body_font"
 ) 
 
 showtext_auto()
 
-mypal <- c("#A68D6F", "#906A57", "#FCFCFE", 
-           "#521616", "#681A1C", "#7B473D",
-           "#A7976F")
+# Credits: paletteer::paletteer_d("PrettyCols::TangerineBlues")
+mypal <- c("#F5F5F5FF", "#93C6E1FF", "#5F93ACFF", "#2E627AFF", "#00344AFF")
 
 mypal |> 
   seecolor::print_color()
 
 # A base Colour
-bg_col <- mypal[3]
+bg_col <- mypal[1]
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
-text_hil <- mypal[4]
+text_hil <- "grey40"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- colorspace::darken(mypal[4], 0.3)
+text_col <- "grey30"
 seecolor::print_color(text_col)
 
 
@@ -190,9 +190,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "..........................."
+plot_title <- paste0(selected_country)
 
-plot_subtitle <- "..............................."
+plot_subtitle <- "Protests and Riots (Jan 2020 - Nov 2024)"
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -202,7 +202,7 @@ Exploratory Data Analysis and Wrangling
 
 df <- raw_data |> 
   filter(country == selected_country) |> 
-  filter(event_date > as_date("2024-01-01")) |> 
+  filter(event_date > as_date("2020-01-01")) |> 
   filter(event_type == "Protests") |> 
   filter(sub_event_type %in% c("Peaceful protest", "Violent demonstration")) |> 
   filter(str_detect(tags, "crowd size")) |> 
@@ -215,7 +215,7 @@ df <- raw_data |>
       str_detect(tags, "thousand") ~ 1000,
       .default = parse_number(tags)
     )
-  ) |>
+  ) |> 
   select(
     event_id_cnty, event_date, year, 
     latitude, longitude,
@@ -224,10 +224,35 @@ df <- raw_data |>
   st_as_sf(coords = c("longitude", "latitude")) |> 
   st_set_crs(value = 4326) |> 
   st_crop(europe_bbox)
-  
+
+# Data for 1st inset:
+incidents_by_region <- raw_data |> 
+  filter(country == selected_country) |> 
+  filter(event_date > as_date("2020-01-01")) |> 
+  count(admin1, sort = T) |> 
+  mutate(prop = n / sum(n))
+# Generate the layout. Sizetype can be area or radius
+# Credits: https://r-graph-gallery.com/306-custom-circle-packing-with-one-level.html
+library(packcircles)
+packing <- circleProgressiveLayout(incidents_by_region$n, sizetype = 'area')
+incidents_by_region <- cbind(incidents_by_region, packing)
+incidents_circles <- circleLayoutVertices(packing, npoints = 50)
+rm(packing)
+
+# Data for the 2nd inset
+df2 <- raw_data |> 
+  filter(country == selected_country) |> 
+  filter(event_date > as_date("2020-01-01")) |> 
+  mutate(
+    event_month = month(event_date, label = TRUE),
+    event_year = year(event_date)
+  ) |> 
+  count(event_year, event_month) |> 
+  mutate(x_var = make_date(event_year, event_month))
+
 ```
 
-The Base Plot
+The Base Plots
 
 ```{r}
 #| label: base-plot
@@ -260,10 +285,79 @@ ggplot() +
   ) +
   ggthemes::theme_map()
 
-df |> 
-  st_drop_geometry() |> 
-  mutate(event_month = month(event_date)) |> 
-  count(event_month)
+
+
+
+g_inset_1 <- ggplot() +
+  geom_polygon(
+    data = incidents_circles,
+    mapping = aes(x, y, group = id),
+    fill = mypal[3],
+    colour = bg_col
+  ) +
+  geom_text(
+    data = incidents_by_region |> slice_max(order_by = n, n = 6),
+    mapping = aes(
+      x, y, 
+      label = paste0(str_wrap(admin1, 7), "\n", 
+                     round(prop * 100, 0), " %"), 
+      size = prop
+    ),
+    colour = bg_col,
+    lineheight = 0.3,
+    family = "body_font"
+  ) +
+  scale_size_continuous(range = c(bts/30, bts/15)) +
+  coord_equal() +
+  guides(size = "none") +
+  labs(title = "% incidents by region") +
+  theme_void()
+
+df2 |> 
+  ggplot(
+    mapping = aes(
+      x_var, n
+    )
+  ) +
+  geom_col(
+    fill = mypal[2],
+    colour = "transparent"
+  ) +
+  geom_col(
+    fill = mypal[4],
+    colour = "transparent",
+    width = 10
+  ) +
+  geom_text(
+    data = slice_max(df2, order_by = n, n = 5),
+    mapping = aes(
+      label = paste0(event_month, "\n", event_year)
+    ),
+    lineheight = 0.4,
+    family = "body_font",
+    nudge_y = 10,
+    vjust = 0,
+    colour = text_col
+  ) +
+  scale_x_date(
+    breaks = make_date(year = 2020:2024, month = 6),
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 800, 200),
+    expand = expansion(c(0,0.1))
+  ) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts / 10
+  ) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.line = element_line(colour = text_hil, linewidth = 1),
+    panel.grid.minor.y = element_blank()
+  )
 
 ggsave(
   filename = here::here(
