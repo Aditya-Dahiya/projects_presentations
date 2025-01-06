@@ -1,7 +1,7 @@
 ---
 title: "ACLED Data: Protests and Civil Unrest"
 author: "Aditya Dahiya"
-date: "2025-01-04"
+date: "2025-01-06"
 subtitle: "Reproducing maps from J. Luengo-Carbera on protests around different European Countries using ACLED Data"
 categories:
   - "#TidyTuesday"
@@ -33,9 +33,9 @@ comments:
     repo: Aditya-Dahiya/projects_presentations
 ---
 
-...........
+An attempt to re-create the protests size map from [Jose Luengo-Cabrera](https://x.com/J_LuengoCabrera)'s [post](https://x.com/J_LuengoCabrera/status/1874595616942391387?s=03) on X (Twitter) which he created using Mapbox.
 
-![..........................](acled_data_maps.png){#fig-1}
+![A compilation graphic on protests in Spain, location and numbers.](acled_data_maps.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -85,6 +85,15 @@ country_map <- rnaturalearth::ne_countries(
 
 country_bbox <- st_bbox(country_map)
 
+islas_canarias_bbox <- c(-20, -12, 25, 30)
+names(islas_canarias_bbox) <- c("xmin", "xmax", "ymin", "ymax")
+
+islas_canarias <- rnaturalearth::ne_countries(
+  country = selected_country,
+  scale = "large"
+) |> 
+  st_crop(islas_canarias_bbox)
+
 # Taking a smaller country to save data download time
 # elevation_raster <- geodata::elevation_30s(
 #   country = country_map$iso_a3 |> unique(), 
@@ -109,18 +118,6 @@ country_bbox <- st_bbox(country_map)
 #   elevation_raster,
 #   filename = here::here("data_vizs", "images", "temp.tif")
 # )
-
-
-# Test out the map
-ggplot() +
-  geom_spatraster(data = elevation_raster) +
-  geom_sf(data = country_map, fill = "transparent")  +
-  scale_fill_gradient2(
-    low = "white", high = "grey30",
-    na.value = "white"
-  ) +
-  coord_sf() +
-  ggthemes::theme_map()
 ```
 
 Visualization Parameters. Extracting colour palette.
@@ -156,16 +153,16 @@ bg_col <- mypal[1]
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
-text_hil <- "grey40"
+text_hil <- "grey50"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- "grey30"
+text_col <- "grey20"
 seecolor::print_color(text_col)
 
 
 # Define Base Text Size
-bts <- 90 
+bts <- 70 
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -192,7 +189,7 @@ rm(github, github_username, xtwitter,
 # Add text to plot-------------------------------------------------
 plot_title <- paste0(selected_country)
 
-plot_subtitle <- "Protests and Riots (Jan 2020 - Nov 2024)"
+plot_subtitle <- "Protests and Riots\n(Jan 2020 - Nov 2024)"
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -225,6 +222,39 @@ df <- raw_data |>
   st_set_crs(value = 4326) |> 
   st_crop(europe_bbox)
 
+# Labels for the main hotspots
+city_labels <- raw_data |> 
+  filter(country == selected_country) |> 
+  filter(event_date > as_date("2020-01-01")) |> 
+  count(admin2, sort = T) |> 
+  slice_max(order_by = n, n = 15) |> 
+  # Get Data on locations of these cities from ChatGPT
+  # Prompt: Please write the coordinates for the following 
+  # cities in Spain. Give output as an sf object in R:---
+  left_join(
+     tibble(
+        admin2 = c(
+          "Barcelona", "Madrid", "A Coruna", 
+          "Bizkaia", "Asturias", "Cadiz", 
+          "Murcia", "Pontevedra", "Sevilla", 
+          "Gipuzkoa", "Valencia", "Islas Baleares", 
+          "Alicante", "Girona", "Malaga"
+        ),
+        lon = c(
+          2.1734, -3.7038, -8.4078, -2.9335, -5.8618, -6.2926, 
+          -1.1307, -8.6444, -5.9845, -1.9765, -0.3763, 
+          3.0176, -0.4907, 2.8249, -4.4214
+        ),
+        lat = c(
+          41.3851, 40.4168, 43.3713, 43.2630, 43.3619, 36.5164, 
+          37.9847, 42.4305, 37.3891, 43.3128, 39.4699, 
+          39.5696, 38.3452, 41.9794, 36.7213
+        )
+      )
+  ) |> 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+
 # Data for 1st inset:
 incidents_by_region <- raw_data |> 
   filter(country == selected_country) |> 
@@ -250,6 +280,76 @@ df2 <- raw_data |>
   count(event_year, event_month) |> 
   mutate(x_var = make_date(event_year, event_month))
 
+# Data for inset on Islas Canarias
+df_islas_canarias <- raw_data |> 
+  filter(country == selected_country) |> 
+  filter(event_date > as_date("2020-01-01")) |> 
+  filter(str_detect(tags, "crowd size")) |> 
+  filter(tags != "crowd size=no report") |>
+  mutate(
+    crowd_size = case_when(
+      str_detect(tags, "dozen") ~ 20,
+      str_detect(tags, "fifty") ~ 50,
+      str_detect(tags, "hundred") ~ 100,
+      str_detect(tags, "thousand") ~ 1000,
+      .default = parse_number(tags)
+    )
+  ) |> 
+  select(
+    event_id_cnty, event_date, year, 
+    latitude, longitude,
+    crowd_size, admin1, admin2
+  ) |> 
+  st_as_sf(coords = c("longitude", "latitude")) |> 
+  st_set_crs(value = 4326) |> 
+  st_crop(islas_canarias_bbox)
+
+text_labels_islas_canarias <- tibble(
+  city = c("Tenerife", "Gran Canaria"),
+  latitude = c(28.2935, 28.1248),  # Approximate latitudes
+  longitude = c(-16.6218, -15.4363) # Approximate longitudes
+  ) |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+
+Get Inset Road Network Map of Spain
+
+```{r}
+library(ggmap)
+# Register your Stadia Map key
+# ggmap::register_stadiamaps()
+
+stadia_bbox <- country_bbox
+names(stadia_bbox) <- c("left", "bottom", "right", "top")
+stadia_bbox
+
+country_roads <- get_stadiamap(
+  bbox = stadia_bbox,
+  zoom = 7,
+  maptype = "stamen_toner_lines"
+)
+```
+
+Custom Theme for all plots
+
+```{r}
+theme_custom <- function(...){
+  theme(
+    plot.margin = margin(0,0,0,0, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0
+    ),
+    plot.title = element_text(
+      size = 1.5 * bts,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    ...
+  )
+}
 ```
 
 The Base Plots
@@ -257,37 +357,59 @@ The Base Plots
 ```{r}
 #| label: base-plot
 
+# BASE MAP ------------------------------------------------------
 # Test out the map
-ggplot() +
+g_map <- ggplot() +
   geom_spatraster(data = elevation_raster) +
-  geom_sf(data = country_map, fill = "transparent")  +
+  geom_sf(
+    data = country_map, 
+    fill = "transparent",
+    linewidth = 0.7,
+    colour = text_col
+  )  +
   geom_sf(
     data = df,
     mapping = aes(size = crowd_size),
     alpha = 0.2,
-    fill = "blue",
-    pch = 21,
-    colour = "black"
+    colour = mypal[3]
+  ) +
+  scale_size_continuous(
+    range = c(5, 40)
   ) +
   scale_fill_gradient2(
     low = "white", high = "grey50",
     na.value = "white"
   ) +
+  ggnewscale::new_scale("size") +
+  geom_sf_text(
+    data = city_labels,
+    mapping = aes(label = admin2, size = n),
+    colour = text_col,
+    family = "body_font"
+  ) +
   scale_size_continuous(
-    range = c(1, 10)
+    range = c(bts / 5, bts / 2)
   ) +
   guides(
     size = "none",
-    fill = "none"
+    fill = "none",
+    new_size = "none",
+    size_new = "none"
   ) +
   coord_sf(
     crs = "EPSG:3857"
   ) +
-  ggthemes::theme_map()
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    plot.margin = margin(10,0,0,0, "mm"),
+    legend.position = "none"
+  )
 
 
-
-
+# INSET 1:  PACK CIRCLES -----------------------------
 g_inset_1 <- ggplot() +
   geom_polygon(
     data = incidents_circles,
@@ -307,13 +429,19 @@ g_inset_1 <- ggplot() +
     lineheight = 0.3,
     family = "body_font"
   ) +
-  scale_size_continuous(range = c(bts/30, bts/15)) +
+  scale_size_continuous(range = c(bts/10, bts/5)) +
   coord_equal() +
   guides(size = "none") +
   labs(title = "% incidents by region") +
-  theme_void()
+  theme_void(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme_custom()
 
-df2 |> 
+
+# INSET 2: BAR CHART ------------------------------
+g_inset_2 <- df2 |> 
   ggplot(
     mapping = aes(
       x_var, n
@@ -333,44 +461,171 @@ df2 |>
     mapping = aes(
       label = paste0(event_month, "\n", event_year)
     ),
-    lineheight = 0.4,
+    lineheight = 0.3,
     family = "body_font",
     nudge_y = 10,
     vjust = 0,
-    colour = text_col
+    colour = text_col,
+    size = bts / 4
   ) +
   scale_x_date(
     breaks = make_date(year = 2020:2024, month = 6),
-    date_labels = "%Y"
+    date_labels = "%Y",
+    date_minor_breaks = "1 month",
+    # minor_breaks = make_date(
+    #   year = 2020:2024, 
+    #   month = rep(1:12, 5),
+    #   day = 15
+    #   )
   ) +
   scale_y_continuous(
     breaks = seq(0, 800, 200),
     expand = expansion(c(0,0.1))
   ) +
-  labs(x = NULL, y = NULL) +
+  labs(
+    x = NULL, y = NULL,
+    title = "Monthly Incidents"
+  ) +
   theme_minimal(
     base_family = "body_font",
-    base_size = bts / 10
+    base_size = bts
   ) +
   theme(
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank(),
     axis.line = element_line(colour = text_hil, linewidth = 1),
-    panel.grid.minor.y = element_blank()
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_line(
+      linewidth = 0.2,
+      colour = text_hil
+    ),
+    axis.ticks.x = element_line(
+      colour = text_hil
+    ),
+    axis.ticks.length.x = unit(2, "mm")
+  ) +
+  theme_custom() +
+  theme(
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    axis.ticks.length.y = unit(0, "mm")
   )
+
+# INSET 3 - ISLAS CANARIAS -------------------
+g_inset_3 <- ggplot() +
+  geom_sf(
+    data = islas_canarias,
+    fill = "transparent"
+  )  +
+  geom_sf(
+    data = df_islas_canarias,
+    mapping = aes(size = crowd_size),
+    alpha = 0.2,
+    colour = mypal[3]
+  ) +
+  scale_size_continuous(
+    range = c(1, 30)
+  ) +
+  geom_sf_text(
+    data = text_labels_islas_canarias,
+    mapping = aes(label = city),
+    colour = text_hil,
+    family = "body_font",
+    size = bts / 5
+  ) +
+  scale_fill_gradient2(
+    low = "white", high = "grey50",
+    na.value = "white"
+  ) +
+  guides(
+    size = "none",
+    fill = "none"
+  ) +
+  coord_sf(
+    crs = "EPSG:3857"
+  ) +
+  labs(
+    title = "Islas Canarias"
+  ) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  theme_custom()
+
+# INSET 4: Road Network --------------------------------
+g_inset_4 <- ggmap(country_roads) +
+  ggthemes::theme_map(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+  labs(title = paste0("Road Network in ", selected_country)) +
+  theme_custom()
+```
+
+Compiling plots with patchwork
+
+```{r}
+
+library(patchwork)
+
+plot_design <- "
+AAA
+AAA
+AAA
+BEE
+BCC
+DDD
+"
+
+g <- g_map + g_inset_1 + g_inset_3 + g_inset_2 + g_inset_4 +
+  plot_layout(
+    design = plot_design
+  ) +
+  plot_annotation(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    theme = theme(
+      plot.title = element_text(
+        hjust = 1,
+        size = bts * 6,
+        colour = text_hil,
+        margin = margin(0,0,-10,0, "mm")
+      ),
+      plot.subtitle = element_text(
+        hjust = 1,
+        size = bts,
+        colour = text_hil,
+        margin = margin(15,0,-40,0, "mm"),
+        lineheight = 0.3
+      ),
+      plot.caption = element_textbox(
+        margin = margin(10,0,5,0, "mm"),
+        family = "caption_font",
+        colour = text_hil,
+        hjust = 0.5,
+        size = bts
+      ),
+      plot.title.position = "plot",
+      plot.margin = margin(5,5,5,5, "mm")
+    )
+  )
+
 
 ggsave(
   filename = here::here(
-    "data_vizs",
+    "projects",
     "acled_data_maps.png"
   ),
   plot = g,
   width = 400,
-  height = 500,
+  height = 600,
   units = "mm",
   bg = bg_col
 )
-
 ```
 
 Savings the thumbnail for the webpage
@@ -382,14 +637,13 @@ Savings the thumbnail for the webpage
 
 library(magick)
 # Saving a thumbnail for the webpage
-image_read(here::here("data_vizs", 
+image_read(here::here("projects", 
                       "acled_data_maps.png")) |> 
   image_resize(geometry = "x400") |> 
   image_write(
     here::here(
-      "data_vizs", 
-      "thumbnails", 
-      "acled_data_maps.png"
+      "projects", "images",
+      "acled_data_maps_logo.png"
     )
   )
 ```
