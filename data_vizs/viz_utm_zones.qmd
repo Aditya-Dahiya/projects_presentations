@@ -87,20 +87,20 @@ seecolor::print_color(land_col)
 
 # Colour for highlighted text - 1
 text_hil1 <- mypal[2]
-seecolor::print_color(text_hil)
+seecolor::print_color(text_hil1)
 
 # Colour for the text - 1
 text_col1 <- mypal[1]
-seecolor::print_color(text_col)
+seecolor::print_color(text_col1)
 
 
 # Colour for highlighted text - 2
 text_hil2 <- mypal[4]
-seecolor::print_color(text_hil)
+seecolor::print_color(text_hil2)
 
 # Colour for the text - 2
 text_col2 <- mypal[5]
-seecolor::print_color(text_col)
+seecolor::print_color(text_col2)
 
 # Define Base Text Size
 bts <- 80 
@@ -114,8 +114,8 @@ github <- "&#xf09b"
 github_username <- "aditya-dahiya"
 xtwitter <- "&#xe61b"
 xtwitter_username <- "@adityadahiyaias"
-social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
-social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil1}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil1}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
   "**Data:** Open Street Maps; Census of India", 
   " |  **Code:** ", 
@@ -190,6 +190,17 @@ hlines <- tibble(
     utm_lat_breaks$latitude_start)
   ) |> 
   sort()
+)
+
+# Using the power of tidyr::crossing() to generate all zone names
+zone_names <- crossing(
+  utm_lat_breaks |> 
+    select(zone_letter, mid_point_lat) |> 
+    rename(lat_zone  = zone_letter, lat = mid_point_lat),
+
+  utm_long_breaks |> 
+    select(zone_number, mid_point_long) |> 
+    rename(long_zone = zone_number, long = mid_point_long)
 )
 
 ```
@@ -296,6 +307,22 @@ g <- ggplot() +
     alpha = 0.5,
     colour = "white",
     fill = alpha(land_col, 0.4)
+  ) +
+  
+  # Displaying zone names
+  geom_text(
+    data = zone_names,
+    mapping = aes(
+      label = paste0(lat_zone, long_zone),
+      x = long, y = lat
+    ),
+    size = bts / 20,
+    colour = alpha(text_hil2, 0.4),
+    family = "body_font",
+    hjust = 0,
+    vjust = 0,
+    nudge_x = -2.4,
+    nudge_y = -3.4
   ) +
   
   # Coordinates
@@ -431,4 +458,94 @@ sessioninfo::session_info()$packages |>
     use_search = TRUE
   ) |> 
   gtExtras::gt_theme_espn()
+```
+
+An attempt at an Interactive Version
+
+```{r}
+
+# Data Wrangling & Plotting Tools
+library(tidyverse)            # All things tidy
+library(sf)                   # Simple Features in R
+
+world_map <- rnaturalearth::ne_countries(
+  scale = "large",
+  returnclass = "sf"
+) |> 
+  select(name, geometry)
+
+
+# Function to create a polygon for a UTM zone
+create_utm_zone_polygon <- function(zone, band) {
+  lon_min <- (zone - 1) * 6 - 180  # Calculate longitudinal bounds
+  lon_max <- lon_min + 6
+  
+  # Latitude band limits
+  lat_band_limits <- data.frame(
+    Band = LETTERS[3:23],  # 'C' to 'X'
+    Min_Lat = seq(-80, 72, 8),
+    Max_Lat = seq(-72, 80, 8)
+  )
+  
+  # Special cases for zones
+  special_zones <- list(
+    "V32" = list(lon_min = 6, lon_max = 12, lat_min = 56, lat_max = 64),
+    "X33" = list(lon_min = 12, lon_max = 18, lat_min = 72, lat_max = 84),
+    "X35" = list(lon_min = 24, lon_max = 30, lat_min = 72, lat_max = 84),
+    "X37" = list(lon_min = 36, lon_max = 42, lat_min = 72, lat_max = 84)
+  )
+  
+  # Adjust for special cases
+  zone_band <- paste0(band, zone)
+  if (zone_band %in% names(special_zones)) {
+    special <- special_zones[[zone_band]]
+    lon_min <- special$lon_min
+    lon_max <- special$lon_max
+    lat_min <- special$lat_min
+    lat_max <- special$lat_max
+  } else {
+    band_limits <- lat_band_limits %>% filter(Band == band)
+    lat_min <- band_limits$Min_Lat
+    lat_max <- band_limits$Max_Lat
+  }
+  
+  # Create polygon as a matrix of coordinates
+  coords <- matrix(
+    c(
+      lon_min, lat_min,
+      lon_max, lat_min,
+      lon_max, lat_max,
+      lon_min, lat_max,
+      lon_min, lat_min
+    ),
+    ncol = 2, byrow = TRUE
+  )
+  
+  # Convert to sf polygon
+  st_polygon(list(coords))
+}
+
+# Generate polygons for all UTM zones
+generate_utm_zones_sf <- function() {
+  zones <- 1:60
+  bands <- LETTERS[3:23]  # 'C' to 'X'
+  
+  # Create a data frame for all zone-band combinations
+  utm_zone_df <- expand.grid(Zone = zones, Band = bands) %>%
+    rowwise() %>%
+    mutate(
+      Polygon = list(create_utm_zone_polygon(Zone, Band))
+    )
+  
+  # Convert to sf object
+  utm_zones_sf <- st_as_sf(utm_zone_df, geometry = utm_zone_df$Polygon)
+  utm_zones_sf
+}
+
+# Generate the UTM zones sf object
+utm_zones <- generate_utm_zones_sf()
+
+# View the UTM zones sf object
+print(utm_zones)
+
 ```
