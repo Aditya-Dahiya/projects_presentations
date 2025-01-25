@@ -36,7 +36,7 @@ The **Himalayan Dataset** is a rich repository documenting mountaineering expedi
 
 This dataset provides comprehensive insights into Himalayan peaks, expeditions, and climbers, detailing variables such as geographic data, success rates, climbing routes, and the use of supplemental oxygen. This curated dataset is made available by [Nicolas Foss, Ed.D., MS](https://www.linkedin.com/in/nicolas-foss).
 
-![.............................................](tidy_himalayan_mountains.png){#fig-1}
+![This horizontal bar chart displays the percentage of climbers who used supplemental oxygen while climbing eight Himalayan peaks where oxygen usage exceeded 50%. The x-axis represents the percentage of climbers using oxygen, while each bar corresponds to a specific peak, arranged from highest to lowest percentage. Mountain images within the bars visually represent each peak.](tidy_himalayan_mountains.png){#fig-1}
 
 ### **How I made this graphic?**
 
@@ -54,9 +54,9 @@ library(fontawesome)          # Icons display in ggplot2
 library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
-library(patchwork)            # Compiling Plots
-library(tidytext)             # Getting words analysis in R
-library(ggwordcloud)          # Creating Word-Clouds with ggplot2
+library(ggpattern)            # Image patterns in ggplot2 geoms
+library(magick)               # Handling images
+library(httr)                 # Downloading images from Google
 
 exped_tidy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-01-21/exped_tidy.csv') |>  janitor::clean_names()
   
@@ -70,7 +70,7 @@ Visualization Parameters
 
 
 # Font for titles
-font_add_google("M PLUS 1 Code",
+font_add_google("Eagle Lake",
   family = "title_font"
 ) 
 
@@ -80,7 +80,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Nova Mono",
+font_add_google("Quintessential",
   family = "body_font"
 ) 
 
@@ -114,7 +114,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** posit::conf   Rachael Dempsey & Jon Harmon", 
+  "**Data:** Himalayan Database by Elizabeth Hawley", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -125,9 +125,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "posit::conf themes"
+plot_title <- "Breathing Easy? Not on These Peaks!"
 
-plot_subtitle <- "These wordclouds show the most common words, (larger size depicts<br>more common words), occuring in the abstract of talks in posit::conf<br>for 2023 and 2024. <b style='color:orange'>Some words</b> occur only in that year."
+plot_subtitle <- "Everest leads the way as the peak with the highest percentage of climbers relying on supplemental oxygen. These eight towering giants demand Oxygen support from over half their climbers."
 ```
 
 Exploratory Data Analysis and Wrangling
@@ -136,19 +136,74 @@ Exploratory Data Analysis and Wrangling
 #| label: eda-data-wrangling
 
 plotdf <- exped_tidy |>
-  select(
-    peakid, year, season_factor, nation, 
-    smtdate, totmembers, o2used
+  group_by(peakid) |> 
+  summarise(
+    o2 = mean(o2used)
   ) |> 
+  arrange(desc(o2)) |> 
+  filter(o2 > 0.5) |> 
   left_join(
     peaks_tidy |> 
-      select(peakid, pkname, location)
-  )
+      select(peakid, pkname, location, heightm,
+             region_factor)
+  ) |> 
+  mutate(id = row_number()) |> 
+  relocate(id)
+```
 
-plotdf |> 
-  count(pkname, sort = T)
+Get images of the mountains selected
+
+```{r}
+
+# Get a custom google search engine and API key
+# Tutorial: https://developers.google.com/custom-search/v1/overview
+# Tutorial 2: https://programmablesearchengine.google.com/
+
+# From:https://developers.google.com/custom-search/v1/overview
+# google_api_key <- "LOAD YOUR GOOGLE API KEY HERE"
+
+# From: https://programmablesearchengine.google.com/controlpanel/all
+# my_cx <- "GET YOUR CUSTOM SEARCH ENGINE ID HERE"
 
 plotdf
+# Load necessary packages
+library(httr)
+library(magick)
+
+# Define function to download and save movie poster
+download_icons <- function(i) {
+  
+  api_key <- google_api_key
+  cx <- my_cx
+  
+  # Build the API request URL
+  url <- paste0("https://www.googleapis.com/customsearch/v1?q=", 
+                URLencode(paste0(plotdf$pkname[i], " mountain photo HD")), 
+                "&cx=", cx, 
+                "&searchType=image&key=", api_key)
+  
+  # Make the request
+  response <- GET(url)
+  result <- content(response, "parsed")
+  
+  # Get the URL of the first image result
+  image_url <- result$items[[1]]$link
+  
+  im <- magick::image_read(image_url) |> 
+    image_resize("x3000")
+  
+  # set background as white
+  image_write(
+    image = im,
+    path = here::here("data_vizs",
+                      paste0("temp_himalayas_", i,".png")),
+    format = "png"
+    )
+}
+
+for (i in 1:8) {
+  download_icons(i)
+}
 ```
 
 The Base Plot
@@ -156,7 +211,117 @@ The Base Plot
 ```{r}
 #| label: base-plot
 
-
+g <- ggplot(
+  data = plotdf,
+    mapping = aes(
+      x = o2, 
+      y = reorder(peakid, o2)
+    )
+  ) +
+  # geom_col() +
+  geom_col_pattern(
+    mapping = aes(
+      pattern_filename = I(paste0("data_vizs/temp_himalayas_",
+                                id, ".png"))
+    ),
+    pattern = "image",
+    pattern_type = "tile",
+    pattern_scale = -2,
+    linewidth = 0.2,
+    colour = text_col
+  ) +
+  geom_text(
+    mapping = aes(
+      x = -0.02,
+      label = paste0(
+        pkname,
+        "\n(",
+        heightm,
+        " m)"
+      )
+    ),
+    hjust = 1,
+    vjust = 0.5, 
+    lineheight = 0.3,
+    colour = text_hil,
+    family = "caption_font",
+    size = bts / 2
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(round(100*o2, 1), " %")
+    ),
+    hjust = 0,
+    vjust = 0.5, 
+    nudge_x = 0.02,
+    lineheight = 0.3,
+    colour = text_hil,
+    family = "caption_font",
+    fontface = "bold",
+    size = bts / 2
+  ) +
+  scale_x_continuous(
+    labels = scales::label_percent(),
+    expand = expansion(c(0.21, 0.1))
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 100),
+    caption = plot_caption,
+    x = "Percentage climbers that used Oxygen-support",
+    y = NULL
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall Plot
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    panel.grid = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      lineheight = 0.3
+    ),
+    
+    # Axis Text
+    axis.text = element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(
+      margin = margin(0,0,5,0, "mm")
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts * 2.5,
+      lineheight = 0.3,
+      hjust = 0.5,
+      family = "body_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(5,0,0,0, "mm"),
+      size = bts * 0.9,
+      hjust = 0.5,
+      lineheight = 0.3,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5
+    )
+  )
 
 ggsave(
   filename = here::here(
@@ -172,7 +337,7 @@ ggsave(
 
 ```
 
-Savings the thumbnail for the webpage
+Reduce filesize and Savings the thumbnail for the webpage
 
 ```{r}
 #| label: save-image
@@ -180,6 +345,17 @@ Savings the thumbnail for the webpage
 # Saving a thumbnail
 
 library(magick)
+# Reducing Image Size - its 15 Mb plus
+image_read(here::here("data_vizs", 
+                      "tidy_himalayan_mountains.png")) |> 
+  image_resize(geometry = "x2000") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "tidy_himalayan_mountains.png"
+    )
+  )
+
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
                       "tidy_himalayan_mountains.png")) |> 
@@ -191,6 +367,10 @@ image_read(here::here("data_vizs",
       "tidy_himalayan_mountains.png"
     )
   )
+
+# Clean Up: Do no harm and leave the world an untouched place!
+# Remove temporary image files
+unlink(paste0("data_vizs/temp_himalayas_", 1:8, ".png"))
 ```
 
 Session Info
@@ -209,9 +389,9 @@ library(fontawesome)          # Icons display in ggplot2
 library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
-library(patchwork)            # Compiling Plots
-library(tidytext)             # Getting words analysis in R
-library(ggwordcloud)          # Creating Word-Clouds with ggplot2
+library(ggpattern)            # Image patterns in ggplot2 geoms
+library(magick)               # Handling images
+library(httr)                 # Downloading images from Google
 
 sessioninfo::session_info()$packages |> 
   as_tibble() |> 
