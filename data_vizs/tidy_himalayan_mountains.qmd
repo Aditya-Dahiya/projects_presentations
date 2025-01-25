@@ -1,0 +1,230 @@
+---
+title: "tidy_himalayan_mountains"
+author: "Aditya Dahiya"
+date: "2025-01-23"
+subtitle: "tidy_himalayan_mountains"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_himalayan_mountains.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The **Himalayan Dataset** is a rich repository documenting mountaineering expeditions in the Nepal Himalaya, sourced from the [Himalayan Database](https://www.himalayandatabase.com/index.html). This database originates from the pioneering work of [Elizabeth Hawley](https://www.himalayandatabase.com/history.html), a journalist who meticulously chronicled climbing history through records gathered from books, journals, and direct correspondence with climbers. Initially released as a CD-ROM booklet in 2004 by the American Alpine Club, it became an essential tool for the mountaineering community. The project was further institutionalized in 2017 by The Himalayan Database, a non-profit organization that launched Version 2, making the dataset freely available for download [here](https://www.himalayandatabase.com/downloads.html).
+
+This dataset provides comprehensive insights into Himalayan peaks, expeditions, and climbers, detailing variables such as geographic data, success rates, climbing routes, and the use of supplemental oxygen. This curated dataset is made available by [Nicolas Foss, Ed.D., MS](https://www.linkedin.com/in/nicolas-foss).
+
+![.............................................](tidy_himalayan_mountains.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+library(tidytext)             # Getting words analysis in R
+library(ggwordcloud)          # Creating Word-Clouds with ggplot2
+
+exped_tidy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-01-21/exped_tidy.csv') |>  janitor::clean_names()
+  
+peaks_tidy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-01-21/peaks_tidy.csv') |>   janitor::clean_names()
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("M PLUS 1 Code",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Nova Mono",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey15"
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** posit::conf   Rachael Dempsey & Jon Harmon", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "posit::conf themes"
+
+plot_subtitle <- "These wordclouds show the most common words, (larger size depicts<br>more common words), occuring in the abstract of talks in posit::conf<br>for 2023 and 2024. <b style='color:orange'>Some words</b> occur only in that year."
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+plotdf <- exped_tidy |>
+  select(
+    peakid, year, season_factor, nation, 
+    smtdate, totmembers, o2used
+  ) |> 
+  left_join(
+    peaks_tidy |> 
+      select(peakid, pkname, location)
+  )
+
+plotdf |> 
+  count(pkname, sort = T)
+
+plotdf
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_himalayan_mountains.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_himalayan_mountains.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_himalayan_mountains.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(patchwork)            # Compiling Plots
+library(tidytext)             # Getting words analysis in R
+library(ggwordcloud)          # Creating Word-Clouds with ggplot2
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
