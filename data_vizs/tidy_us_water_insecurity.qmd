@@ -1,0 +1,421 @@
+---
+title: "Water Insecurity Across U.S. States: 2022 vs. 2023"
+author: "Aditya Dahiya"
+date: "2025-02-01"
+subtitle: "This faceted graph, arranged in a geo-faceted layout, visually compares the percentage of households without plumbing across all 50 U.S. states, highlighting year-over-year changes from 2022 to 2023."
+categories:
+  - "#TidyTuesday"
+  - "{geofacet}"
+image: "thumbnails/tidy_us_water_insecurity.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The **Water Insecurity** dataset for this week's [TidyTuesday](https://github.com/rfordatascience/tidytuesday) is sourced from the U.S. Census Bureau’s [American Community Survey (ACS)](https://www.census.gov/programs-surveys/acs) and focuses on **households lacking complete indoor plumbing**. The dataset, featured in the article [Mapping water insecurity in R with tidycensus](https://waterdata.usgs.gov/blog/acs-maps/), explores how social vulnerability indicators such as **demographic characteristics, socioeconomic status, and living conditions** contribute to disparities in water access across the U.S. The data is available for both **2022 and 2023**, allowing comparisons of trends over time. It can be accessed using the [`tidytuesdayR`](https://github.com/thebioengineer/tidytuesdayR) package or downloaded directly from [GitHub](https://github.com/rfordatascience/tidytuesday/tree/master/data/2025/2025-01-28). The dataset includes variables such as **county-level geographic boundaries**, **total population**, and **percentage of households lacking plumbing**, with spatial data formatted as [`sfc_MULTIPOLYGON`](https://r-spatial.github.io/sf/reference/sfc.html) objects. The dataset is curated by [Niha Pereira](https://github.com/nnpereira) and encourages **data exploration, visualization, and analysis** using packages like [`tidycensus`](https://walker-data.com/tidycensus/) and [`ggplot2`](https://ggplot2.tidyverse.org/). Participants are invited to analyze **regional disparities in plumbing access** and contribute their findings via the **#TidyTuesday** community.
+
+![This graphic presents a faceted comparison of indoor plumbing access across all 50 U.S. states, arranged in a grid that mirrors their geographic locations. Each facet contains two horizontal bar charts, where the x-axis represents the percentage of households lacking plumbing, and the y-axis differentiates between 2022 (lower bar) and 2023 (upper bar). This layout allows for a clear state-by-state comparison of changes in plumbing access over time, illustrating where conditions have improved, worsened, or remained unchanged.](tidy_us_water_insecurity.png){#fig-1}
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(geofacet)             # Faceted graphs
+
+water_insecurity_2022 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-01-28/water_insecurity_2022.csv')
+water_insecurity_2023 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-01-28/water_insecurity_2023.csv')
+# The geometry columns are saved as text with the code to reproduce them.
+water_insecurity_2022 <- water_insecurity_2022 |> 
+  dplyr::mutate(
+    geometry = purrr::map(
+      geometry, \(geo) {eval(parse(text = geo))}
+    )
+  )
+water_insecurity_2023 <- water_insecurity_2023 |> 
+  dplyr::mutate(
+    geometry = purrr::map(geometry, \(geo) {
+      eval(parse(text = geo))
+    } )
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Bevan",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Stint Ultra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Cormorant Infant",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey15"
+seecolor::print_color(text_col)
+
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** American Community Survey, {tidycensus} & Niha Pereira", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "USA: Water Insecurity\n(2022 vs. 2023)"
+
+plot_subtitle <- glue::glue("Despite efforts to improve access to basic sanitation, <b style='color:#FC7878FF'>22 U.S. states saw an increase</b> in the<br>percentage of households lacking complete indoor plumbing between 2022 and 2023, highlighting<br>persistent disparities in water security. In contrast, <b style='color:#5AAE61FF'>17 states reported improvements</b>, while<br><b style='color:#FFC72CFF'>9 states remained unchanged and 3 states had inconclusive data</b>. This analysis, based on<br>**American Community Survey (ACS) data**, visualizes state-level trends using a geographic facet<br>grid, offering insights into where plumbing access has improved and where challenges remain.")
+```
+
+Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+uscountiesmap <- usmapdata::us_map(regions = "counties")
+ 
+df1 <- bind_rows(
+  water_insecurity_2022 |>
+    # select(geoid, name, year, percent_lacking_plumbing) |>
+    left_join(uscountiesmap, by = join_by(geoid == fips)),
+
+  water_insecurity_2023 |>
+    # select(geoid, name, year, percent_lacking_plumbing) |>
+    left_join(uscountiesmap, by = join_by(geoid == fips))
+)
+
+# tidycensus::fips_codes |>
+#   as_tibble()
+  
+# 
+# vec_map <- usmap$fips 
+# vec_water <- water_insecurity_2022$geoid
+# 
+# length(vec_map)
+# length(vec_water)
+# 
+# intersect(vec_map, vec_water) |> length()
+
+df2 <- df1 |>  
+  group_by(year, abbr) |> 
+  summarise(
+    total_pop = sum(total_pop),
+    plumbing = sum(plumbing)
+  ) |> 
+  mutate(
+    percent_lack_plumbing = round(100 * plumbing / total_pop, 2)
+  ) |> 
+  filter(
+    abbr %in% geofacet::us_state_grid1$code
+  )
+
+# A tibble whether percentage increases or decreases from 2022 to 2023
+df3 <- df2 |>
+  mutate(id = row_number()) |> 
+  pivot_wider(
+    id_cols = abbr,
+    names_from = year,
+    values_from = percent_lack_plumbing
+  ) |> 
+  mutate(
+    change = case_when(
+      `2023` == `2022` ~ "No change", 
+      `2023` > `2022` ~ "Increase", 
+      `2023` < `2022` ~ "Decrease"
+      )
+  ) |> 
+  select(abbr, change)
+
+
+df3 |> 
+  count(change)
+
+plotdf <- df2 |> 
+  left_join(df3) |> 
+  replace_na(list(change = "Unavailable"))
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+# strip_labels <- geofacet::us_state_grid1$name
+ 
+# names(strip_labels) <- geofacet::us_state_grid1$code
+ 
+g <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = percent_lack_plumbing,
+      y = as.character(year),
+      fill = change,
+      colour = as.character(year)
+    )
+  ) +
+  geom_col(linewidth = 0.5) +
+  geom_text(
+    mapping = aes(
+      label = paste0(round(100*percent_lack_plumbing), "%")
+    ),
+    hjust = 1,
+    nudge_x = -0.005,
+    size = bts / 10,
+    colour = text_col,
+    family = "body_font"
+  ) +
+  scale_x_continuous(
+    labels = label_percent(),
+    expand = expansion(c(0, 0.1))
+  ) +
+  coord_cartesian(clip = "off") +
+  scale_fill_manual(
+    values = c("#5AAE61FF", "#FC7878FF", "#FFC72CFF", "#FFC72CFF")
+  ) +
+  scale_colour_manual(
+    values = c("grey80", "black")
+  ) +
+  facet_geo(
+    ~abbr, 
+    grid = "us_state_grid1",
+    scales = "free_x"
+    ) +
+  labs(
+    title = plot_title,
+    caption = plot_caption,
+    subtitle = plot_subtitle,
+    x = "Percentage of population lacking plumbing facilities",
+    fill = "Change from 2022 to 2023 (for each state)"
+  ) +
+  guides(
+    colour = "none"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall Plot
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linewidth = 0.1,
+      linetype = 3,
+      colour = alpha(text_col, 0.5)
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      lineheight = 0.3
+    ),
+    
+    # Axis Text
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.x = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = bts / 3,
+      family = "caption_font"
+    ),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(
+      margin = margin(5,0,0,0, "mm")
+    ),
+    # Labels
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(15,0,5,0, "mm"),
+      size = bts * 2.5,
+      lineheight = 0.3,
+      hjust = 0.5,
+      family = "title_font"
+    ),
+    plot.subtitle = element_textbox(
+      colour = text_hil,
+      margin = margin(5,0,15,0, "mm"),
+      size = bts,
+      hjust = 0.5,
+      halign = 0.5,
+      lineheight = 0.4,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(15,0,5,0, "mm"),
+      hjust = 0.5
+    ),
+    
+    # Facets and Panels
+    strip.text = element_text(
+      family = "title_font",
+      margin = margin(0,0,0,0, "mm"),
+      size = bts,
+      colour = text_hil
+    ),
+    panel.spacing.y = unit(3, "mm"),
+    panel.spacing.x = unit(0, "mm"),
+    
+    # Legend
+    legend.position = "bottom",
+    legend.title.position = "top",
+    legend.direction = "horizontal",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(0,4,0,1, "mm")
+    ),
+    legend.margin = margin(-10,0,0,0, "mm"),
+    legend.box.margin = margin(-10,0,0,0, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_us_water_insecurity.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_us_water_insecurity.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_us_water_insecurity.png"
+    )
+  )
+
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(geofacet)             # Faceted graphs
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
