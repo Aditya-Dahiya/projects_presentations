@@ -1,0 +1,538 @@
+---
+title: "The Simpsons Sweet Spot: Where Ratings and Viewership Meet"
+author: "Aditya Dahiya"
+date: "2025-02-04"
+subtitle: "This visualization was created using {ggplot2} for plotting, {biscale} for the bivariate color scale, and {ggimage} to display each episode's image at its corresponding IMDb rating and viewership position. The bivariate color-coded circumferences classify episodes into tertiles along both axes, blending blue, red, and violet to highlight different rating-viewership combinations. Data wrangling and processing were done in R, making use of the {tidyverse} ecosystem."
+categories:
+  - "#TidyTuesday"
+  - "{ggblend}"
+  - "{magick}"
+image: "thumbnails/tidy_simpsons_feb25.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The Simpsons Dataset provides a comprehensive look into the iconic animated series, covering over 600 episodes. Curated by [Prashant Banerjee](https://www.kaggle.com/prashant111) on [Kaggle](https://www.kaggle.com/datasets/prashant111/the-simpsons-dataset), this dataset includes four key files: characters, locations, episodes, and script lines. Originally, the dataset was scraped by [Todd W. Schneider](https://toddwschneider.com/posts/the-simpsons-by-the-data/) for his analysis, with the scraper made available on [GitHub](https://github.com/toddwschneider). The dataset has since been rehosted and refined for broader accessibility.
+
+The characters dataset (`simpsons_characters.csv`) provides details on individual characters, including gender and name normalization. The episodes dataset (`simpsons_episodes.csv`) captures IMDb ratings, viewership in millions, and air dates, enabling insights into episode popularity. The locations dataset (`simpsons_locations.csv`) records frequently featured places, while the script lines dataset (`simpsons_script_lines.csv`) documents spoken words, character dialogues, and word counts.
+
+![This graphic visualizes the relationship between IMDb ratings (X-axis) and U.S. viewership in millions (Y-axis) for 151 episodes of The Simpsons. Each episode is represented by its official image, placed according to its rating and viewership, with a bivariate color-coded circumference created using the {biscale} package. The colors reflect a 3×3 tertile classification, blending blue, red, and violet to indicate different combinations of high, medium, and low ratings and viewership. Data was processed and visualized in R using {ggplot2}, {biscale}, and {ggimage} for image integration.](tidy_simpsons_feb25.png){#fig-1}
+
+## **How I made this graphic?**
+
+### Key Learnings
+
+1.  Getting a specialized Simpsons palette from {ggsci} [@ggsci]
+
+2.  Showing colour palettes using {scales} [@scales] function `scales::show_col()`
+
+3.  Making bivariate colour scales using {biscale} - [inspiration](https://cran.r-project.org/web/packages/biscale/vignettes/bivariate_palettes.html) article.
+
+### Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(magick)               # Image manipulation
+library(httr)                 # Downloading Google images
+library(biscale)              # Bivariate Scales in R
+library(patchwork)            # Composing gpglot2 plots
+
+simpsons_episodes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-02-04/simpsons_episodes.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Rock Salt",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Titillium Web",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# Get a specialized Simpsons Palette from {ggsci}
+library("scales")
+
+mypal <- ggsci::pal_simpsons("springfield")(16)
+seecolor::print_color(mypal)
+
+# Using scales::show_col() to display a palette
+mypal |> scales::show_col(ncol = 4)
+
+# A base Colour
+bg_col <- mypal[1]
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[13]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[7]
+seecolor::print_color(text_col)
+
+blend_cols <- c(mypal[11], mypal[15])
+seecolor::print_color(blend_cols)
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Todd W. Schneider & Prashant Banerjee", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "The Simpsons:\nRatings vs. Viewership"
+
+plot_subtitle <- "While some Simpsons episodes boast sky-high IMDb ratings, they aren’t necessarily the most-watched. Overall, there appears to be little to no correlation between viewership numbers and episode ratings."
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda-data-wrangling
+
+# Prepare the data for the bivariate scale
+df1 <- simpsons_episodes |> 
+  arrange(number_in_season, number_in_series) |> 
+  mutate(id = row_number()) |> 
+  rename(viewers = us_viewers_in_millions) |> 
+  select(id, imdb_rating, viewers, number_in_season, image_url, 
+         title, season) |> 
+  biscale::bi_class(
+    x = imdb_rating, y = viewers,
+    dim = 3,
+    style = "quantile"
+  )
+
+# Creating a bivariate palette: view the palette
+biscale::bi_pal("DkViolet", dim = 3)
+
+# Draw a legend as a {ggplot2} object
+biscale::bi_legend(
+  pal = "DkViolet",
+  xlab = "Higher % White ",
+  ylab = "Higher Income ",
+  size = 12,
+  arrows = T
+  )
+
+
+# Draw a legend as a {ggplot2} object
+g_legend <- biscale::bi_legend(
+  pal = "DkViolet",
+  xlab = "Higher Ratings on IMDb",
+  ylab = "Higher viewership in USA",
+  size = bts * 0.7,
+  pad_color = bg_col,
+  pad_width = 0.5,
+  arrows = T
+  ) +
+  theme(
+    axis.title = element_text(
+      family = "caption_font",
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
+  )
+```
+
+### Downloading images for the selected episodes
+
+```{r}
+# Few outlier episodes to display the photo
+selected_ids <- c(60, 61, 57, 69, 65, 59, 55, 
+                  39, 36, 134, 146, 5, 102, 
+                  127, 115, 1, 41)
+
+df2 <- df1 |> 
+  filter(id %in% selected_ids) |> 
+  mutate(
+    image_path = paste0("data_vizs/temp_simpsons_", id, ".png")
+  )
+
+# Get a custom google search engine and API key
+# Tutorial: https://developers.google.com/custom-search/v1/overview
+# Tutorial 2: https://programmablesearchengine.google.com/
+
+# From:https://developers.google.com/custom-search/v1/overview
+# google_api_key <- "LOAD YOUR GOOGLE API KEY HERE"
+
+# From: https://programmablesearchengine.google.com/controlpanel/all
+# my_cx <- "GET YOUR CUSTOM SEARCH ENGINE ID HERE"
+
+# Improved function to download and save food images
+download_simpsons <- function(i) {
+  
+  api_key <- google_api_key
+  cx <- my_cx
+  
+  # Build the API request URL with additional filters
+  url <- paste0(
+    "https://www.googleapis.com/customsearch/v1?q=",
+    URLencode(paste0("Simpsons episode ", df2$title[i], " image")),
+    "&cx=", cx,
+    "&searchType=image",
+    "&key=", api_key,
+    "&num=1"                 # Fetch only one result
+  )
+  
+  # Make the request
+  response <- GET(url)
+  if (response$status_code != 200) {
+    warning("Failed to fetch data for: ", 
+            dfww2$country[i])
+    return(NULL)
+  }
+  
+  # Parse the response
+  result <- content(response, "parsed")
+  
+  # Extract the image URL
+  if (!is.null(result$items)) {
+    image_url <- result$items[[1]]$link
+  } else {
+    warning("No results found for: ", dfww2$country[i])
+    return(NULL)
+  }
+  
+  # Process the image
+  im <- magick::image_read(image_url) |> 
+    # Crop the image into a circle 
+    # (Credits: https://github.com/doehm/cropcircles)
+    cropcircles::circle_crop(
+      border_colour = "black",
+      border_size = 0.1
+    ) |>
+    image_read() |> 
+    image_background(color = bg_col) |> 
+    image_resize("x300") |> 
+    # Save or display the result
+    image_write(
+      here::here(
+        "data_vizs", 
+        paste0("temp_simpsons_", df2$id[i], ".png")
+        )
+    )
+}
+
+# Iterate through each state and download images
+for (i in 1:nrow(df2)) {
+  download_simpsons(i)
+}
+```
+
+### The Base Plot
+
+```{r}
+#| label: base-plot
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = imdb_rating,
+      y = viewers
+    )
+  ) +
+  geom_point(
+    mapping = aes(colour = bi_class),
+    position = position_jitter(
+      width = 0.1
+    ),
+    size = 6
+  ) +
+  
+  # Selected episodes
+  ggimage::geom_image(
+    data = df2,
+    mapping = aes(
+      image = image_path
+    ),
+    size = 0.08
+  ) +
+  geom_point(
+    mapping = aes(colour = bi_class),
+    data = df2,
+    pch = 21,
+    size = 30,
+    stroke = 4,
+    fill = "transparent"
+  ) +
+  geom_text(
+    data = df2,
+    mapping = aes(
+      label = paste0(
+        title,
+        "\nSeason ", 
+        season,
+        ",  Ep.", 
+        number_in_season
+      )
+    ),
+    size = 12,
+    nudge_y = -0.8,
+    lineheight = 0.25,
+    family = "caption_font",
+    colour = darken(text_hil, 0.5)
+  ) +
+  biscale::bi_scale_color(
+    pal = "DkViolet", 
+    dim = 3
+  ) +
+  scale_y_continuous(
+    labels = label_number(suffix = " M"),
+    breaks = seq(0, 16, 2)
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 80),
+    caption = plot_caption,
+    x = "Rating of each episode on IMDb",
+    y = "Viewership in Millions (USA)"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall Plot
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    panel.grid = element_line(
+      colour = alpha(mypal[5], 0.5),
+      linewidth = 0.6,
+      linetype = 3
+    ),
+    axis.line = element_line(
+      colour = mypal[5],
+      linetype = 1,
+      linewidth = 0.9,
+      arrow = arrow(angle = 30, length = unit(10, "mm"))
+    ),
+    axis.ticks = element_line(
+      colour = mypal[5],
+      linewidth = 0.6
+    ),
+    axis.ticks.length = unit(2, "mm"),
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      lineheight = 0.3
+    ),
+    
+    # Axis Text
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col
+    ),
+    axis.title = element_text(
+      margin = margin(0.5,0.5,0.5,0.5, "mm"), 
+      face = "bold"
+    ),
+    
+    # Labels
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts * 2.5,
+      lineheight = 0.3,
+      hjust = 0.5,
+      family = "title_font"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(5,0,0,0, "mm"),
+      size = bts * 1.2,
+      hjust = 0.5,
+      lineheight = 0.3,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      family = "caption_font",
+      margin = margin(5,0,2,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil
+    ),
+    legend.position = "none"
+  )
+
+g_full <- g +
+  inset_element(
+    g_legend,
+    left = 0.02, right = 0.35,
+    bottom = 0.6, top = 1,
+    align_to = "panel"
+  ) +
+  plot_annotation(
+    theme = theme(
+    panel.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_simpsons_feb25.png"
+  ),
+  plot = g_full,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_simpsons_feb25.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_simpsons_feb25.png"
+    )
+  )
+
+# Define the folder path
+folder_path <- file.path(getwd(), "data_vizs")
+
+# List all files in the folder that start with "temp_simpsons_"
+files_to_delete <- list.files(folder_path, pattern = "^temp_simpsons_", full.names = TRUE)
+
+# Delete the files
+file.remove(files_to_delete)
+
+# Print confirmation
+cat(length(files_to_delete), "files deleted.\n")
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+library(magick)               # Image manipulation
+library(httr)                 # Downloading Google images
+library(biscale)              # Bivariate Scales in R
+library(patchwork)            # Composing gpglot2 plots
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
