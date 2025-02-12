@@ -28,23 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.classList.add("cr-removeheaderspace")
   }
 
-  // attach layout classes to parents of `.cr-section`s up to main.content
-  /* this replicates quarto <= 1.6 functionality:
-    https://github.com/quarto-dev/quarto-cli/blob/
-      d85467627aae71c96e3d1e9718a3b47289329cde/src/format/html/
-      format-html-bootstrap.ts#L1163C1-L1186C7 */
-  const ensureInGrid = el => {
-    const parent = el.parentElement
-    parent.classList.add("page-columns", "page-full")
-    if (isDocumentMain(parent)) {
-      return
-    } else {
-      ensureInGrid(parent)
-    }
-  }  
-  const crSections = Array.from(document.querySelectorAll(".cr-section"))
-  crSections.map(ensureInGrid)
-
+  // define ojs variables if the connector module is available
   const ojsModule = window._ojs?.ojsConnector?.mainModule
   const ojsStickyName = ojsModule?.variable()
   const ojsTriggerIndex = ojsModule?.variable()
@@ -74,109 +58,101 @@ document.addEventListener("DOMContentLoaded", () => {
   // collect all sticky elements
   const allStickies = Array.from(document.querySelectorAll(".sticky"));
   
+  
   // === Set up scrolling event listeners === //
-  // scrollama() is accessible because scrollama.min.js is attached
-  // via closeread.lua
-  const triggerScrollerConfig = {
-    step: triggerSelector,
-    offset: 0.5,
-    progress: true,
-    debug: debugMode
-  }
-  const progressScrollerConfig = {
-    step: progressBlockSelector,
-    offset: 0.5,
-    progress: true,
-    debug: debugMode
-  }
-
-  function crTriggerStepEnter(trigger) {
-    focusedStickyName = trigger.element.getAttribute("data-focus-on")
-        
-    // update ojs variables
-    ojsTriggerIndex?.define("crTriggerIndex", trigger.index)
-    ojsStickyName?.define("crActiveSticky", focusedStickyName)
-      
-    updateStickies(allStickies, focusedStickyName, trigger)
-  }
+  // scrollama() is accessible because scrollama.min.js is attached via closeread.lua
   
-  function crTriggerStepProgress(trigger) {
-    ojsTriggerProgress?.define("crTriggerProgress", trigger.progress)
-    ojsDirection?.define("crDirection", trigger.direction)
-  }
-  
-  function crProgressStepEnter(progressBlock) {
-    ojsProgressBlock?.define("crProgressBlock", progressBlock.progress)
-  }
-  
-  // set up scrollers on document load, and reset them when window zoom changes
-  // (they seem to misbehave on zoom change: see issue #101)
-
   // primary scroller
-  const triggerScroller = scrollama()
+  const triggerScroller = scrollama();
   triggerScroller
-    .setup(triggerScrollerConfig)
-    .onStepEnter(crTriggerStepEnter)
-    .onStepProgress(crTriggerStepProgress)
+    .setup({
+      step: triggerSelector,
+      offset: 0.5,
+      progress: true,
+      debug: debugMode
+    })
+    .onStepEnter((trigger) => {
+      
+      focusedStickyName = trigger.element.getAttribute("data-focus-on");
+      
+      // update ojs variables
+      ojsTriggerIndex?.define("crTriggerIndex", trigger.index);
+      ojsStickyName?.define("crActiveSticky", focusedStickyName);
+        
+      updateStickies(allStickies, focusedStickyName, trigger);
+      
+    })
+    .onStepProgress((trigger) => {
+      
+      // update ojs variables
+      ojsTriggerProgress?.define("crTriggerProgress", trigger.progress);
+      ojsDirection?.define("crDirection", trigger.direction);
+      
+    });
     
-  // secondary scroller used for making progress blocks
-  const progressBlockScroller = scrollama()
-  progressBlockScroller
-    .setup(progressScrollerConfig)
-    .onStepProgress(crProgressStepEnter)
-
-  window.addEventListener("resize", (event) => {
-    setTimeout(() => triggerScroller.resize(), 1000)
-    setTimeout(() => progressBlockScroller.resize(), 1000)
-  })
-
-  // === Hotkey Listeners === //
-  // Add a listener for scrolling between new triggers
-  let currentIndex = -1; // Start before the first element
-  
-  function scrollToNewTrigger(direction) {
-    const triggers = document.querySelectorAll('.new-trigger');
+    // secondary scroller used for making progress blocks
+    const progressBlockScroller = scrollama();
+    progressBlockScroller
+      .setup({
+        step: progressBlockSelector,
+        offset: 0.5,
+        progress: true,
+        debug: debugMode
+      })
+      .onStepProgress((progressBlock) => {
+      // update ojs variable
+      ojsProgressBlock?.define("crProgressBlock", progressBlock.progress);
+    });
     
-    if (triggers.length === 0) return; // do nothing if there's no triggers
+    // Add a listener for scrolling between new triggers
+    let currentIndex = -1; // Start before the first element
     
-    if (direction === "next") {
-      if (currentIndex >= triggers.length - 1) return; // exit if at end
-      currentIndex += 1;
+    function scrollToNewTrigger(direction) {
+      const triggers = document.querySelectorAll('.new-trigger');
+      
+      if (triggers.length === 0) return; // do nothing if there's no triggers
+      
+      if (direction === "next") {
+        if (currentIndex >= triggers.length - 1) return; // exit if at end
+        currentIndex += 1;
+      }
+      
+      if (direction === "previous") {
+        if (currentIndex === 0) return; // exit if at start
+        currentIndex -= 1;
+      }
+      
+      const nextTrigger = triggers[currentIndex];
+      nextTrigger.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     
-    if (direction === "previous") {
-      if (currentIndex === 0) return; // exit if at start
-      currentIndex -= 1;
-    }
-    
-    const nextTrigger = triggers[currentIndex];
-    nextTrigger.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-  
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowRight') {
-        scrollToNewTrigger("next");
-    }
-    if (event.key === 'ArrowLeft') {
-        scrollToNewTrigger("previous");
-    }
-  });
-
-  // toggle presentation mode
-  document.addEventListener('keydown', (event) => {
-    const crSections = document.querySelectorAll('.cr-section');
-    crSections.forEach((el) => {
-      if (event.key === "p") {
-        if (el.classList.contains("presentation-mode")) {
-            el.classList.remove("presentation-mode");
-        } else {
-            el.classList.add("presentation-mode");
-        }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') {
+          scrollToNewTrigger("next");
+      }
+      if (event.key === 'ArrowLeft') {
+          scrollToNewTrigger("previous");
       }
     });
-  });
 
  });
+ 
+// === Other Hotkey Listeners === //
+
+// toggle presentation mode
+document.addEventListener('keydown', (event) => {
+  const crSections = document.querySelectorAll('.cr-section');
+  crSections.forEach((el) => {
+    if (event.key === "p") {
+      if (el.classList.contains("presentation-mode")) {
+          el.classList.remove("presentation-mode");
+      } else {
+          el.classList.add("presentation-mode");
+      }
+    }
+  });
+});
+
  
  
 //===============//
@@ -418,7 +394,3 @@ function getBooleanConfig(metaFlag) {
   return option === "true"
 }
 
-function isDocumentMain(el) {
-  return el === null ||
-      (el.tagName == "MAIN" && el.classList.contains("content"))
-}
