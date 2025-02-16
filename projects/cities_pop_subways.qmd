@@ -1,0 +1,684 @@
+---
+title: "Public Transport and Population Density in select cities"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: ".................."
+categories:
+  - "Data Visualization"
+  - "Maps"
+  - "{sf}"
+  - "{osmdata}"
+  - "Open Street Maps"
+  - "Gecomputation"
+  - "{rnaturalearth}"
+date: "2025-02-16"
+image: "images/hy_health_buffer_zones_thumbnail.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects/hy_health_buffer_zones.html"
+  description: "Visualizations"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+Introduction
+
+```{r}
+#| label: setup
+
+# Data wrangling & visualization
+library(tidyverse)  # Data manipulation & visualization
+
+# Spatial data handling
+library(sf)         # Import, export, and manipulate vector data
+library(terra)      # Import, export, and manipulate raster data
+
+# ggplot2 extensions
+library(tidyterra)  # Helper functions for using terra with ggplot2
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text in ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(patchwork)            # Composing Plots
+
+bts = 24 # Base Text Size
+sysfonts::font_add_google("Roboto Condensed", "body_font")
+sysfonts::font_add_google("Oswald", "title_font")
+sysfonts::font_add_google("Saira Extra Condensed", "caption_font")
+showtext::showtext_auto()
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+theme_set(
+  theme_minimal(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+    theme(
+      text = element_text(
+        colour = "grey30",
+        lineheight = 0.3,
+        margin = margin(0,0,0,0, "pt")
+      ),
+      plot.title = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "pt")
+      ),
+      plot.subtitle = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "pt")
+      )
+    )
+)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data**:  Open Street Maps and CIESIN (Columbia University)",
+  "  |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+```
+
+Get administrative boundaries of the 5 select cities: London, Tokyo, New York City, Mumbai, and Delhi
+
+**Option 1: Using {rnaturalearth}**
+
+```{r}
+library(rnaturalearth)
+library(sf)
+
+selected_cities <- c("New York", "Tokyo", "London", "Mumbai", "Delhi")
+
+# Get large-scale urban areas Maps
+world_cities <- ne_download(
+  scale = 10, 
+  type = "urban_areas", 
+  category = "cultural", 
+  returnclass = "sf"
+  )
+
+# Filter for the cities
+metropolitan_boundaries <- world_cities[world_cities$name %in% c(), ]
+
+# Plot an example
+plot(metropolitan_boundaries["name"])
+
+```
+
+Option 2
+
+```{r}
+library(geodata)
+library(sf)
+
+# Download GADM data for countries where these cities are located
+countries <- c("USA", "JPN", "GBR", "IND")
+gadm_data <- lapply(countries, function(iso) {
+  gadm(country = iso, level = 2, path = tempdir()) %>%
+    st_as_sf()
+})
+
+# Filter for cities based on known region names
+nyc <- gadm_data[[1]][gadm_data[[1]]$NAME_1 %in% c("New York"), ]
+tokyo <- gadm_data[[2]][gadm_data[[2]]$NAME_1 %in% c("Tōkyō"), ]
+london <- gadm_data[[3]][gadm_data[[3]]$NAME_1 %in% c("Greater London"), ]
+shanghai <- gadm_data[[4]][gadm_data[[4]]$NAME_1 %in% c("Mumbai"), ]
+delhi <- gadm_data[[5]][gadm_data[[4]]$NAME_1 %in% c("Delhi"), ]
+
+# Combine results
+boundaries_gadm <- list(
+  "New York City" = nyc,
+  "Tokyo" = tokyo,
+  "London" = london,
+  "Mumbai" = mumbai,
+  "Delhi" = delhi
+)
+
+# Plot an example
+plot(boundaries_gadm[["Delhi"]]["NAME_1"])
+
+```
+
+Option 3: Open Street Maps
+
+```{r}
+library(osmdata)
+library(sf)
+
+# Define cities
+cities <- c("New York City", "Tokyo", "London", "Mumbai", "Delhi")
+
+# Function to get boundaries from OSM
+get_osm_boundary <- function(city) {
+  opq(bbox = city) %>%
+    add_osm_feature(key = "boundary", value = "administrative") %>%
+    osmdata_sf() %>%
+    .$osm_multipolygons
+}
+
+# Get boundaries
+boundaries <- lapply(cities, get_osm_boundary)
+names(boundaries) <- cities
+
+```
+
+Get metro-lines in New Delhi, and the metro stations using data from Open Street Maps using {osmextract}
+
+```{r}
+
+# Get Delhi Map from GADM / {geodata} with geodata::gadm()
+# District Wise Map
+delhi_map <- geodata::gadm(
+  country = "India",
+  level = 2,
+  path = tempdir()
+) |> 
+  st_as_sf() |> 
+  janitor::clean_names() |> 
+  filter(name_1 == "NCT of Delhi") |> 
+  select(name_1, geometry)
+
+
+lines_delhi <- osmextract::oe_get(
+  place = "Delhi",
+  layer = "lines",
+  download_directory = "C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"
+  #download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"
+)
+
+points_delhi <- osmextract::oe_get(
+  place = "Delhi",
+  layer = "points",
+  download_directory = "C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"
+  #download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"
+)
+
+polygons_delhi <- osmextract::oe_get(
+  place = "Delhi",
+  layer = "multipolygons",
+  download_directory = "C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"
+  #download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"
+)
+
+points_delhi |> 
+  names()
+
+subway_stops1 <- points_delhi |> 
+  select(osm_id, name, other_tags, geometry) |> 
+  # st_drop_geometry() |>
+  # as_tibble() |>
+  filter(str_detect(other_tags, 'railway"=>"stop","subway"=>"yes"')) |> 
+  select(-other_tags)
+
+
+subway_stops2 <- polygons_delhi |> 
+  # st_drop_geometry() |> 
+  # as_tibble() |> 
+  filter(str_detect(other_tags, "subway")) |> 
+  select(osm_id, name, geometry) |> 
+  mutate(geometry = st_centroid(geometry))
+
+subway_stops <- bind_rows(
+  subway_stops1,
+  subway_stops2
+) |> 
+  st_intersection(delhi_map)
+
+rm(subway_stops1, subway_stops2)
+
+subway_lines <- lines_delhi |> 
+  # st_drop_geometry() |> 
+  # as_tibble() |> 
+  filter(str_detect(railway, "subway")) |> 
+  select(osm_id, name, railway, geometry) |> 
+  st_intersection(delhi_map)
+
+subway_stops_buffer_1km <- subway_stops |> 
+  st_union() |> 
+  st_buffer(dist = 1000) |> 
+  st_intersection(delhi_map)
+
+subway_stops_buffer_2km <- subway_stops |> 
+  st_union() |> 
+  st_buffer(dist = 2000) |> 
+  st_intersection(delhi_map)
+```
+
+An initial basic plot
+
+```{r}
+
+g <- ggplot() +
+  geom_sf(data = delhi_map) +
+  geom_sf(
+    data = subway_stops,
+    colour = "blue",
+    size = 1,
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = subway_lines,
+    colour = "grey20",
+    linewidth = 0.2
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_2km,
+    fill = alpha("red", 0.3), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_1km,
+    fill = alpha("red", 0.3), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  labs(
+    title = "Delhi: Subway Stops and Lines",
+    subtitle = "Areas within 1 km and 2 km of subway stops are shaded"
+  ) +
+  theme(
+    panel.grid = element_line(
+      linewidth = 0.2
+    )
+  )
+
+ggsave(
+  plot = g, 
+  filename = here::here(
+    "projects", "images",
+    "cities_pop_subway_1.png"
+  ),
+  height = 1200,
+  width = 1200,
+  units = "px",
+  bg = "white"
+)
+```
+
+![](images/cities_pop_subway_1.png)
+
+### Population Density Raster for New Delhi
+
+Full article and code on how to get these population density rasters for any city in the world is **here**.
+
+Code for single year
+
+```{r}
+# output_file <- paste0("GlobPOP_Count_30arc_", i, "_I32.tiff")
+# 
+# # ALERT: Downloads Massive amounts of Data ---------------------------
+# for (i in year_ranges) {
+#   url <- paste0(
+#     "https://zenodo.org/records/11179644/files/GlobPOP_Count_30arc_", 
+#     i, 
+#     "_I32.tiff"
+#   )
+#   
+#   output_file <- paste0("GlobPOP_Count_30arc_", i, "_I32.tiff")
+#   
+#   # Attempt to download the file with error handling
+#   tryCatch({
+#     download.file(url, output_file, mode = "wb")
+#     cat("Successfully downloaded:", output_file, "\n")
+#   }, error = function(e) {
+#     cat("Error downloading:", output_file, "-", conditionMessage(e), "\n")
+#   })
+# }
+# --------------------------------------------------------------------
+
+# A 2022 population raster of Delhi
+rast_2022 <- rast("GlobPOP_Count_30arc_2022_I32.tiff") |> 
+  terra::crop(delhi_map) |> 
+  terra::mask(delhi_map, touches = FALSE)
+
+rast_2022[rast_2022 <= 0] <- 0.001
+
+names(rast_2022) <- c("year_2022")
+  
+total_rast_pop <- rast_2022 |> 
+  values() |> 
+  as_tibble() |> 
+  filter(!is.na(year_2022)) |> 
+  summarise(
+    n = n(),
+    mean_pop = mean(year_2022, na.rm = T),
+    total_pop = n * mean_pop
+  )
+  
+pop_compute <- rast_2022 |> 
+  terra::extract(
+    c(subway_stops_buffer_1km, subway_stops_buffer_2km) |> 
+        st_as_sf() |> 
+        rename(geometry = x)
+  ) |> 
+  as_tibble() |> 
+  group_by(ID) |> 
+  summarise(
+    n = n(),
+    mean_pop = mean(year_2022, na.rm = T)
+  ) |> 
+  mutate(
+  year = 2022,
+  zone = c("1 km", "2 km"),
+  total_pop = n * mean_pop,
+  perc_pop = total_pop / total_rast_pop$total_pop
+)
+
+g <- ggplot() +
+  geom_spatraster(
+    data = rast_2022
+  ) +
+  scale_fill_gradient2(
+    low = "white",
+    high = "grey20",
+    na.value = "transparent",
+    transform = "sqrt",
+    name = "Population density\n(persons / sq. km.)",
+    breaks = c(0, 100, 2000, 1e4, 3e4, 5e4),
+    labels = scales::label_number(scale_cut = cut_short_scale())
+  ) +
+  geom_sf(
+    data = delhi_map,
+    fill = NA
+  ) +
+  geom_sf(
+    data = subway_stops,
+    colour = "blue",
+    size = 1,
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = subway_lines,
+    colour = "blue",
+    linewidth = 0.2
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_2km,
+    fill = alpha("red", 0.1), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_1km,
+    fill = alpha("red", 0.1), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  labs(
+    title = "Delhi: Population Density vs. Subway Stops (Year: 2022)",
+    subtitle = "Areas within 1 km and 2 km of a Metro (Subway) stop are coloured in red.",
+    caption = plot_caption
+  ) +
+  theme(
+    legend.position = "inside",
+    plot.caption = element_textbox(
+      halign = 0.5, 
+      hjust = 0.5,
+      size = bts * 0.6
+    ),
+    panel.grid = element_line(linewidth = 0.6),
+    legend.position.inside = c(0, 0),
+    legend.justification = c(0, 0),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "pt"),
+      lineheight = 0.3
+    ),
+    legend.text = element_text(
+      margin = margin(1,0,0,0, "pt")
+    ),
+    legend.key.height = unit(2, "pt"),
+    plot.margin = margin(5,0,5,0, "pt"),
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "pt")
+    )
+  )
+
+ggsave(
+  plot = g, 
+  filename = here::here(
+    "projects", "images",
+    "cities_pop_subway_2.png"
+  ),
+  height = 1200,
+  width = 1200,
+  units = "px",
+  bg = "white"
+)
+```
+
+![](images/cities_pop_subway_2.png)
+
+Code for multiple years
+
+```{r}
+# Years to plot
+selected_year = seq(1991, 2022, 3)
+
+# a blank tibble to start with
+pop_compute <- tibble()
+
+# Buffer Zones of 1 km and 2 km around the Subway Stations
+compute_areas <- c(subway_stops_buffer_1km, subway_stops_buffer_2km) |> 
+            st_as_sf() |> 
+            rename(geometry = x)
+
+for(i in selected_year) {
+  rast <- rast(paste0("GlobPOP_Count_30arc_", i, "_I32.tiff")) |> 
+     terra::crop(delhi_map) |> 
+     terra::mask(delhi_map, touches = FALSE)
+  
+  rast[rast <= 0] <- 0.001
+  
+  names(rast) <- "year_vals"
+    
+  total_rast_pop <- rast |> 
+    values() |> 
+    as_tibble() |> 
+    filter(!is.na(year_vals)) |> 
+    summarise(
+      n = n(),
+      mean_pop = mean(year_vals, na.rm = T),
+      total_pop = n * mean_pop
+    )
+    
+  pop_compute <- bind_rows(
+    pop_compute,
+    
+    rast |> 
+      terra::extract(compute_areas) |> 
+      as_tibble() |> 
+      group_by(ID) |> 
+      summarise(
+        n = n(),
+        mean_pop = mean(year_vals, na.rm = T)
+      ) |> 
+      mutate(
+      year = i,
+      zone = c("1 km", "2 km"),
+      total_pop = n * mean_pop,
+      perc_pop = total_pop / total_rast_pop$total_pop
+    )
+  )
+  
+  paste0("rast_", i) |> 
+    assign(rast)
+    
+}
+
+## Compile into a one multi-layered raster -----------------------------
+# Initialize an empty SpatRaster object
+rast_stack <- NULL
+# Loop through each year and add the raster if it exists
+for (y in selected_year) {
+  rast_name <- paste0("rast_", y)  # Construct variable name
+  
+  if (exists(rast_name)) {  # Check if raster exists
+    rast <- get(rast_name)  # Retrieve raster
+    
+    if (is.null(rast_stack)) {
+      rast_stack <- rast  # Initialize with first available raster
+    } else {
+      rast_stack <- c(rast_stack, rast)  # Append to SpatRaster
+    }
+  } else {
+    message(paste("Skipping year", y, "as raster is missing"))
+  }
+}
+
+names(rast_stack) <- as.character(selected_year)
+varnames(rast_stack) <- as.character(selected_year)
+
+pop_compute |> 
+  ggplot(
+    aes(
+      x = year,
+      y = perc_pop
+    )
+  ) +
+  geom_col() +
+  scale_x_continuous(
+    breaks = selected_year
+  ) +
+  facet_wrap(~zone) +
+  theme(
+    axis.text.x = element_text(
+      angle = 90
+    )
+  )
+
+
+g <- ggplot() +
+  geom_spatraster(
+    data = rast_stack
+  ) +
+  scale_fill_gradient2(
+    low = "white",
+    high = "grey20",
+    na.value = "transparent",
+    transform = "sqrt",
+    name = "Population density\n(persons / sq. km.)",
+    breaks = c(0, 100, 2000, 1e4, 3e4, 5e4),
+    limits = c(100, 6e4),
+    oob = scales::squish,
+    labels = scales::label_number(scale_cut = cut_short_scale())
+  ) +
+  geom_sf(
+    data = delhi_map,
+    fill = NA
+  ) +
+  geom_sf(
+    data = subway_stops,
+    colour = "blue",
+    size = 1,
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = subway_lines,
+    colour = "blue",
+    linewidth = 0.2
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_2km,
+    fill = alpha("blue", 0.1), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_1km,
+    fill = alpha("red", 0.2), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  facet_wrap(
+    ~lyr,
+    ncol = 3
+  ) +
+  labs(
+    title = "Delhi: Population Density vs. Subway Stops",
+    caption = plot_caption
+  ) +
+  theme(
+    legend.position = "inside",
+    plot.caption = element_textbox(
+      halign = 0.5, 
+      hjust = 0.5,
+      size = bts * 0.6
+    ),
+    panel.grid = element_line(linewidth = 0.6),
+    legend.position.inside = c(0, 0),
+    legend.justification = c(0, 0),
+    legend.direction = "horizontal",
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "pt"),
+      lineheight = 0.3
+    ),
+    legend.text = element_text(
+      margin = margin(1,0,0,0, "pt")
+    ),
+    legend.key.height = unit(2, "pt"),
+    plot.margin = margin(5,0,5,0, "pt"),
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "pt")
+    ),
+    panel.spacing = unit(0, "pt")
+  )
+
+ggsave(
+  plot = g, 
+  filename = here::here(
+    "projects", "images",
+    "cities_pop_subway_3.png"
+  ),
+  height = 1200 * 4,
+  width = 1200 * 3,
+  units = "px",
+  bg = "white"
+)
+```
+
+![](images/cities_pop_subway_3.png)
