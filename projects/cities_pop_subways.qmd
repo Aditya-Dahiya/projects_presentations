@@ -191,12 +191,25 @@ cities <- c("New York City", "Tokyo", "London", "Mumbai", "Delhi")
 
 # Function to get boundaries from OSM
 get_osm_boundary <- function(city) {
-  opq(bbox = city) %>%
-    add_osm_feature(key = "boundary", value = "administrative") %>%
-    osmdata_sf() %>%
+  opq(bbox = city) |> 
+    add_osm_feature(
+      key = "boundary", 
+      value = "administrative"
+    ) |> 
+    osmdata_sf() |> 
     .$osm_multipolygons
-}
+  }
 
+london <- get_osm_boundary("London")
+
+object.size(london) |> print(units = "Mb")
+
+london |> 
+  select(osm_id, name, geometry)
+  
+ggplot() +
+  geom_sf()
+  
 # Get boundaries
 boundaries <- lapply(cities, get_osm_boundary)
 names(boundaries) <- cities
@@ -241,8 +254,8 @@ polygons_delhi <- osmextract::oe_get(
   #download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"
 )
 
-points_delhi |> 
-  names()
+# points_delhi |> 
+#   names()
 
 subway_stops1 <- points_delhi |> 
   select(osm_id, name, other_tags, geometry) |> 
@@ -283,6 +296,8 @@ subway_stops_buffer_2km <- subway_stops |>
   st_union() |> 
   st_buffer(dist = 2000) |> 
   st_intersection(delhi_map)
+
+rm(lines_delhi, points_delhi, polygons_delhi)
 ```
 
 An initial basic plot
@@ -426,13 +441,14 @@ g <- ggplot() +
   geom_sf(
     data = subway_stops,
     colour = "blue",
-    size = 1,
+    size = 0.4,
     alpha = 0.5
   ) +
   geom_sf(
     data = subway_lines,
     colour = "blue",
-    linewidth = 0.2
+    linewidth = 0.1,
+    linetype = "longdash"
   ) +
   geom_sf(
     data = subway_stops_buffer_2km,
@@ -442,7 +458,7 @@ g <- ggplot() +
   ) +
   geom_sf(
     data = subway_stops_buffer_1km,
-    fill = alpha("red", 0.1), 
+    fill = alpha("red", 0.2), 
     colour = "transparent",
     linewidth = 0.1
   ) +
@@ -496,7 +512,7 @@ Code for multiple years
 
 ```{r}
 # Years to plot
-selected_year = seq(1991, 2022, 3)
+selected_year = c(seq(1991, 2018, 3), 2020)
 
 # a blank tibble to start with
 pop_compute <- tibble()
@@ -572,6 +588,64 @@ for (y in selected_year) {
 names(rast_stack) <- as.character(selected_year)
 varnames(rast_stack) <- as.character(selected_year)
 
+plotdf1 <- pop_compute |> 
+  mutate(
+    lyr = as.character(year)
+  ) |> 
+  mutate(
+    x_var = case_when(
+      zone == "1 km" ~ 76.9,
+      zone == "2 km" ~ 77.0,
+      .default = NA
+    ),
+    y_var = 28.4 + ((0.1 * perc_pop) * 1 / 0.75)
+  )
+  
+
+ggplot() +
+  geom_col(
+    data = plotdf1,
+    mapping = aes(
+      y = y_var,
+      x = x_var,
+      fill = zone
+    ),
+    colour = "grey30",
+    linewidth = 0.3
+  ) +
+  geom_text(
+    data = plotdf1,
+    mapping = aes(
+      label = paste0(round(perc_pop * 100, 1),"%",
+                     "\n<", zone),
+      y = y_var,
+      x = x_var
+    ),
+    colour = "grey30",
+    vjust = 1.2,
+    hjust = 0.5,
+    size = 2,
+    lineheight = 0.45
+  ) +
+  facet_wrap(
+    ~lyr
+  ) +
+  scale_fill_manual(
+    name = "Distance to nearest\nMetro Station",
+    values = c(
+      alpha("red", 0.3),
+      alpha("yellow", 0.3)
+    )
+  ) +
+  coord_sf(
+    default_crs = "EPSG:4326",
+    ylim = c(28.4, 28.9),
+    xlim = c(76.85, 77.33)
+  ) +
+  theme_minimal(
+    base_size = 12
+  )
+
 pop_compute |> 
   ggplot(
     aes(
@@ -590,8 +664,10 @@ pop_compute |>
     )
   )
 
+# Convert 2021 and 2022 rasters to integer class, instead of double
+# rast_stack$`2021` <- as.int(rast_stack$`2021`)
 
-g <- ggplot() +
+g1 <- ggplot() +
   geom_spatraster(
     data = rast_stack
   ) +
@@ -600,7 +676,7 @@ g <- ggplot() +
     high = "grey20",
     na.value = "transparent",
     transform = "sqrt",
-    name = "Population density\n(persons / sq. km.)",
+    name = "Population\ndensity (persons\n/ sq. km.)",
     breaks = c(0, 100, 2000, 1e4, 3e4, 5e4),
     limits = c(100, 6e4),
     oob = scales::squish,
@@ -608,7 +684,20 @@ g <- ggplot() +
   ) +
   geom_sf(
     data = delhi_map,
-    fill = NA
+    fill = NA,
+    linewidth = 0.9
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_2km,
+    fill = alpha("yellow", 0.3), 
+    colour = "transparent",
+    linewidth = 0.1
+  ) +
+  geom_sf(
+    data = subway_stops_buffer_1km,
+    fill = alpha("red", 0.3), 
+    colour = "transparent",
+    linewidth = 0.1
   ) +
   geom_sf(
     data = subway_stops,
@@ -621,51 +710,190 @@ g <- ggplot() +
     colour = "blue",
     linewidth = 0.2
   ) +
-  geom_sf(
-    data = subway_stops_buffer_2km,
-    fill = alpha("blue", 0.1), 
-    colour = "transparent",
-    linewidth = 0.1
+  
+  ggnewscale::new_scale_fill()+
+  geom_col(
+    data = plotdf1,
+    mapping = aes(
+      y = y_var,
+      x = x_var,
+      fill = zone
+    ),
+    colour = "grey30",
+    linewidth = 0.3
   ) +
-  geom_sf(
-    data = subway_stops_buffer_1km,
-    fill = alpha("red", 0.2), 
-    colour = "transparent",
-    linewidth = 0.1
+  geom_text(
+    data = plotdf1,
+    mapping = aes(
+      label = paste0(round(perc_pop * 100, 1),"%",
+                     "\n<", zone),
+      y = y_var,
+      x = x_var
+    ),
+    colour = "grey30",
+    vjust = 1.2,
+    hjust = 0.5,
+    size = 11,
+    lineheight = 0.3,
+    family = "caption_font"
   ) +
+  scale_fill_manual(
+    name = "Distance to\nnearest Metro\nStation",
+    values = c(
+      alpha("red", 0.3),
+      alpha("yellow", 0.3)
+    )
+  ) +
+  
   facet_wrap(
     ~lyr,
-    ncol = 3
+    ncol = 4
   ) +
+  coord_sf(
+    default_crs = "EPSG:4326",
+    ylim = c(28.4, 28.9),
+    xlim = c(76.8, 77.35),
+    expand = FALSE
+  ) +
+  
   labs(
-    title = "Delhi: Population Density vs. Subway Stops",
-    caption = plot_caption
+    title = "What percent of Delhi's population lives close to a metro station?",
+    subtitle = str_wrap("Delhi Metro (Subway) was started in 2002, First phase was completed in 2006, phase II in 2011, and phase III in 2021. Surprisingly, the percentage of population that lives in areas that are now within 1-2 km of metro stations has not changed since early 1990s!", 100),
+    caption = plot_caption,
+    x = NULL, 
+    y = NULL
   ) +
   theme(
-    legend.position = "inside",
-    plot.caption = element_textbox(
-      halign = 0.5, 
-      hjust = 0.5,
-      size = bts * 0.6
+    text = element_text(
+      colour = "grey30"
     ),
-    panel.grid = element_line(linewidth = 0.6),
-    legend.position.inside = c(0, 0),
-    legend.justification = c(0, 0),
-    legend.direction = "horizontal",
+    legend.position = "inside",
+    panel.grid = element_line(
+      linewidth = 0.6,
+      linetype = 3
+    ),
+    
+    # Customizing the Legend
+    legend.position.inside = c(1, 0),
+    legend.justification = c(1, 0),
+    legend.direction = "vertical",
+    legend.box = "horizontal",
+    legend.box.margin = margin(0,1,0,0, "pt"),
+    legend.margin = margin(0,0,0,0, "pt"),
     legend.title.position = "top",
     legend.title = element_text(
       margin = margin(0,0,2,0, "pt"),
-      lineheight = 0.3
+      lineheight = 0.3,
+      size = bts * 1.7
     ),
     legend.text = element_text(
-      margin = margin(1,0,0,0, "pt")
+      margin = margin(0,0,0,2, "pt"),
+      size = bts * 1.2
     ),
-    legend.key.height = unit(2, "pt"),
+    legend.key.height = unit(30, "pt"),
+    legend.key.width = unit(10, "pt"),
+    
+    
     plot.margin = margin(5,0,5,0, "pt"),
     plot.title = element_text(
-      margin = margin(5,0,5,0, "pt")
+      margin = margin(15,0,5,0, "pt"),
+      size = 4 * bts,
+      hjust = 0.5
     ),
-    panel.spacing = unit(0, "pt")
+    plot.subtitle = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      lineheight = 0.3,
+      hjust = 0.5,
+      size = 2.5 * bts
+    ),
+    plot.caption = element_textbox(
+      halign = 0.5, 
+      hjust = 0.5,
+      size = bts * 1.2,
+      margin = margin(150,0,0,0, "pt")
+    ),
+    panel.spacing = unit(0, "pt"),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    strip.text = element_text(
+      margin = margin(5,0,0,0, "pt"),
+      hjust = 0.5,
+      size = bts * 3
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "pt")
+  )
+
+# An inset graph of changes over years
+strip_labels <- c(
+  "% Population within 1 km",
+  "% Population within 2 km"
+)
+names(strip_labels) <- unique(plotdf1$zone)
+
+g2 <- ggplot(
+  data = plotdf1,
+  mapping = aes(
+    x = as.character(year), 
+    y = perc_pop,
+    fill = zone
+    )
+  ) +
+  geom_col(
+    colour = "grey20",
+    linewidth = 0.2
+  ) +
+  geom_text(
+    mapping = aes(
+      label = paste0(round(100 * perc_pop, 1), "%")
+    ),
+    hjust = 0.5,
+    vjust = -0.35,
+    size = 12,
+    colour = "grey30",
+    family = "caption_font"
+  ) +
+  scale_y_continuous(
+    labels = label_percent(),
+    expand = expansion(c(0, 0.2))
+  ) +
+  scale_fill_manual(
+    values = c(
+      alpha("red", 0.3),
+      alpha("yellow", 0.3)
+    )
+  ) +
+  facet_wrap(
+    ~zone,
+    labeller = labeller(zone = strip_labels)
+  ) +
+  labs(x = NULL, y = NULL) +
+  theme(
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      linewidth = 0.3, linetype = "longdash",
+      colour = "grey50"
+    ),
+    legend.position = "none",
+    axis.ticks.length = unit(0, "pt"),
+    axis.text = element_text(
+      size = 36
+    ),
+    strip.text = element_text(
+      size = 66,
+      margin = margin(0,0,0,0, "pt"),
+      colour = "grey30"
+    )
+  )
+
+g <- g1 +
+  inset_element(
+    p = g2,
+    left = 0, right = 1,
+    bottom = 0.02, top = 0.17,
+    align_to = "full"
   )
 
 ggsave(
@@ -674,11 +902,11 @@ ggsave(
     "projects", "images",
     "cities_pop_subway_3.png"
   ),
-  height = 1200 * 4,
+  height = 1200 * (3 * 5 / 4),
   width = 1200 * 3,
   units = "px",
   bg = "white"
 )
 ```
 
-![](images/cities_pop_subway_3.png)
+![](images/cities_pop_subway_3.png){#fig-3}
