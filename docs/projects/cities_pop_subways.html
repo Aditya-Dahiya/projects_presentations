@@ -9,7 +9,7 @@
 <meta name="author" content="Aditya Dahiya">
 <meta name="dcterms.date" content="2025-02-16">
 
-<title>Public Transport and Population Density in select cities – Data Viz Collective</title>
+<title>What percentage of population lives near a metro station? – Data Viz Collective</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -56,7 +56,27 @@ div.sourceCode
 @media screen {
 pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
-</style>
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
 
 
 <script src="../site_libs/quarto-nav/quarto-nav.js"></script>
@@ -182,7 +202,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#population-density-raster-for-new-delhi" id="toc-population-density-raster-for-new-delhi" class="nav-link active" data-scroll-target="#population-density-raster-for-new-delhi">Population Density Raster for New Delhi</a></li>
+  <li><a href="#loading-required-packages" id="toc-loading-required-packages" class="nav-link active" data-scroll-target="#loading-required-packages">Loading required packages</a></li>
+  <li><a href="#get-administrative-boundaries-of-selected-cities" id="toc-get-administrative-boundaries-of-selected-cities" class="nav-link" data-scroll-target="#get-administrative-boundaries-of-selected-cities">Get administrative boundaries of selected cities</a></li>
+  <li><a href="#get-metro-lines-metro-stations-and-buffer-zones-in-delhi-capital-of-india" id="toc-get-metro-lines-metro-stations-and-buffer-zones-in-delhi-capital-of-india" class="nav-link" data-scroll-target="#get-metro-lines-metro-stations-and-buffer-zones-in-delhi-capital-of-india">Get metro-lines, metro stations and buffer zones in Delhi (capital of India)</a></li>
+  <li><a href="#an-initial-basic-plot" id="toc-an-initial-basic-plot" class="nav-link" data-scroll-target="#an-initial-basic-plot">An initial basic plot</a></li>
+  <li><a href="#population-density-raster-for-new-delhi" id="toc-population-density-raster-for-new-delhi" class="nav-link" data-scroll-target="#population-density-raster-for-new-delhi">Population Density Raster for New Delhi</a></li>
+  <li><a href="#code-for-plotting-and-comparing-multiple-years-1990-2022" id="toc-code-for-plotting-and-comparing-multiple-years-1990-2022" class="nav-link" data-scroll-target="#code-for-plotting-and-comparing-multiple-years-1990-2022">Code for plotting and comparing multiple years (1990-2022)</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/Aditya-Dahiya/projects_presentations/edit/main/projects/cities_pop_subways.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Aditya-Dahiya/projects_presentations/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -191,8 +216,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Public Transport and Population Density in select cities</h1>
-<p class="subtitle lead">………………</p>
+<h1 class="title">What percentage of population lives near a metro station?</h1>
+<p class="subtitle lead">An analysis for various cities, over time, on population density near metro stations and analysis using rsater data and Open Street Maps data</p>
   <div class="quarto-categories">
     <div class="quarto-category">Data Visualization</div>
     <div class="quarto-category">Maps</div>
@@ -230,7 +255,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>Introduction</p>
+<section id="loading-required-packages" class="level3">
+<h3 class="anchored" data-anchor-id="loading-required-packages">Loading required packages</h3>
+<p>The <a href="https://www.tidyverse.org/"><code>tidyverse</code></a> package is loaded for data manipulation and visualization, while <a href="https://r-spatial.github.io/sf/"><code>sf</code></a> and <a href="https://rspatial.org/terra/"><code>terra</code></a> handle spatial vector and raster data, respectively. The <a href="https://dieghernan.github.io/tidyterra/"><code>tidyterra</code></a> package acts as a bridge between <code>terra</code> and <code>ggplot2</code>, enabling raster visualization in a tidy framework. For enhanced plot aesthetics, the script utilizes several <code>ggplot2</code> extensions. <a href="https://scales.r-lib.org/"><code>scales</code></a> provides improved axis scaling, <a href="https://github.com/rstudio/fontawesome"><code>fontawesome</code></a> adds icons, and <a href="https://wilkelab.org/ggtext/"><code>ggtext</code></a> enables markdown formatting in text elements. Custom fonts are incorporated using <a href="https://github.com/wch/sysfonts"><code>sysfonts</code></a> and displayed via <a href="https://github.com/yixuan/showtext"><code>showtext</code></a>, ensuring that Google Fonts (e.g., <em>Roboto Condensed</em>, <em>Oswald</em>, <em>Saira Extra Condensed</em>) are seamlessly integrated. The <a href="https://patchwork.data-imaginist.com/"><code>patchwork</code></a> package facilitates the composition of multiple plots.</p>
+<p>A minimalist theme is established using <code>theme_minimal()</code> with a <code>base_size</code> of <code>24</code> and a <code>body_font</code> for text. Colors are defined and printed with <a href="https://github.com/clauswilke/seecolor"><code>seecolor</code></a>, ensuring consistency in highlighted text and background colors. Additionally, custom captions incorporating Font Awesome icons are created using <a href="https://glue.tidyverse.org/"><code>glue</code></a>, dynamically styling GitHub and Twitter/X handles within the plot caption.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -313,7 +341,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a>   social_caption_2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>Get administrative boundaries of the 5 select cities: London, Tokyo, New York City, Mumbai, and Delhi</p>
+</section>
+<section id="get-administrative-boundaries-of-selected-cities" class="level3">
+<h3 class="anchored" data-anchor-id="get-administrative-boundaries-of-selected-cities">Get administrative boundaries of selected cities</h3>
+<p>London, Tokyo, New York City, Mumbai, and Delhi</p>
 <p><strong>Option 1: Using {rnaturalearth}</strong></p>
 <div class="cell">
 <details class="code-fold">
@@ -338,7 +369,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(metropolitan_boundaries[<span class="st">"name"</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>Option 2</p>
+<p><strong>Option 2: Using {geodata}</strong></p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -372,7 +403,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(boundaries_gadm[[<span class="st">"Delhi"</span>]][<span class="st">"NAME_1"</span>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>Option 3: Open Street Maps</p>
+<p><strong>Option 3: {osmdata} Open Street Maps</strong></p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -408,91 +439,105 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(boundaries) <span class="ot">&lt;-</span> cities</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>Get metro-lines in New Delhi, and the metro stations using data from Open Street Maps using {osmextract}</p>
+</section>
+<section id="get-metro-lines-metro-stations-and-buffer-zones-in-delhi-capital-of-india" class="level3">
+<h3 class="anchored" data-anchor-id="get-metro-lines-metro-stations-and-buffer-zones-in-delhi-capital-of-india">Get metro-lines, metro stations and buffer zones in Delhi (capital of India)</h3>
+<p>This R script retrieves and processes metro lines and stations in New Delhi using data from OpenStreetMap (OSM) via the <a href="https://github.com/ropensci/osmextract"><code>osmextract</code></a> package and administrative boundaries from the <a href="https://github.com/rspatial/geodata"><code>geodata</code></a> package. First, a district-level map of Delhi is obtained with <code>geodata::gadm()</code>, filtered for the “NCT of Delhi” region. Next, the script extracts different spatial layers from OSM:</p>
+<ul>
+<li><p>Metro lines using <code>osmextract::oe_get(place = "Delhi", layer = "lines")</code></p></li>
+<li><p>Metro stations (point data) using <code>osmextract::oe_get(layer = "points")</code></p></li>
+<li><p>Metro station polygons using <code>osmextract::oe_get(layer = "multipolygons")</code></p></li>
+</ul>
+<p>The metro station points are filtered from <code>points_delhi</code> based on OSM tags (<code>"railway"=&gt;"stop","subway"=&gt;"yes"</code>), while metro station polygons are identified from <code>polygons_delhi</code> and their centroids are calculated with <code>st_centroid()</code>.</p>
+<p>Finally, buffer zones of 1 km and 2 km around metro stations are created using <code>st_buffer()</code>, helping analyze areas within walkable distances to metro stops. These buffers are spatially clipped to Delhi’s boundaries.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get Delhi Map from GADM / {geodata} with geodata::gadm()</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># District Wise Map</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>delhi_map <span class="ot">&lt;-</span> geodata<span class="sc">::</span><span class="fu">gadm</span>(</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">country =</span> <span class="st">"India"</span>,</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">level =</span> <span class="dv">2</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">path =</span> <span class="fu">tempdir</span>()</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  janitor<span class="sc">::</span><span class="fu">clean_names</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(name_1 <span class="sc">==</span> <span class="st">"NCT of Delhi"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(name_1, geometry)</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get metro-lines in New Delhi, and the metro stations using data from Open Street Maps using {osmextract}</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Get Delhi Map from GADM / {geodata} with geodata::gadm()</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># District Wise Map</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>delhi_map <span class="ot">&lt;-</span> geodata<span class="sc">::</span><span class="fu">gadm</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">country =</span> <span class="st">"India"</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">level =</span> <span class="dv">2</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">path =</span> <span class="fu">tempdir</span>()</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  janitor<span class="sc">::</span><span class="fu">clean_names</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(name_1 <span class="sc">==</span> <span class="st">"NCT of Delhi"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(name_1, geometry)</span>
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>lines_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"lines"</span>,</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>points_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"points"</span>,</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>polygons_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"multipolygons"</span>,</span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="co"># points_delhi |&gt; </span></span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="co">#   names()</span></span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>subway_stops1 <span class="ot">&lt;-</span> points_delhi <span class="sc">|&gt;</span> </span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, other_tags, geometry) <span class="sc">|&gt;</span> </span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt;</span></span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt;</span></span>
-<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(other_tags, <span class="st">'railway"=&gt;"stop","subway"=&gt;"yes"'</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>other_tags)</span>
-<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>lines_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"lines"</span>,</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>points_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"points"</span>,</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>polygons_delhi <span class="ot">&lt;-</span> osmextract<span class="sc">::</span><span class="fu">oe_get</span>(</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">place =</span> <span class="st">"Delhi"</span>,</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">layer =</span> <span class="st">"multipolygons"</span>,</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>  <span class="at">download_directory =</span> <span class="st">"C:/Users/dradi/OneDrive/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>  <span class="co">#download_directory = "C:/Users/dradi/Desktop/pop_raster_data_temp"</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="co"># points_delhi |&gt; </span></span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="co">#   names()</span></span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>subway_stops1 <span class="ot">&lt;-</span> points_delhi <span class="sc">|&gt;</span> </span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, other_tags, geometry) <span class="sc">|&gt;</span> </span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt;</span></span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt;</span></span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(other_tags, <span class="st">'railway"=&gt;"stop","subway"=&gt;"yes"'</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>other_tags)</span>
 <span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>subway_stops2 <span class="ot">&lt;-</span> polygons_delhi <span class="sc">|&gt;</span> </span>
-<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt; </span></span>
-<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt; </span></span>
-<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(other_tags, <span class="st">"subway"</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, geometry) <span class="sc">|&gt;</span> </span>
-<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">geometry =</span> <span class="fu">st_centroid</span>(geometry))</span>
-<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a>subway_stops <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
-<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>  subway_stops1,</span>
-<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>  subway_stops2</span>
-<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
-<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
-<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(subway_stops1, subway_stops2)</span>
-<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>subway_lines <span class="ot">&lt;-</span> lines_delhi <span class="sc">|&gt;</span> </span>
-<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt; </span></span>
-<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt; </span></span>
-<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(railway, <span class="st">"subway"</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, railway, geometry) <span class="sc">|&gt;</span> </span>
-<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
-<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a>subway_stops_buffer_1km <span class="ot">&lt;-</span> subway_stops <span class="sc">|&gt;</span> </span>
-<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_union</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">1000</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
-<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a>subway_stops_buffer_2km <span class="ot">&lt;-</span> subway_stops <span class="sc">|&gt;</span> </span>
-<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_union</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">2000</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
-<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(lines_delhi, points_delhi, polygons_delhi)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>subway_stops2 <span class="ot">&lt;-</span> polygons_delhi <span class="sc">|&gt;</span> </span>
+<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt; </span></span>
+<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt; </span></span>
+<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(other_tags, <span class="st">"subway"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, geometry) <span class="sc">|&gt;</span> </span>
+<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">geometry =</span> <span class="fu">st_centroid</span>(geometry))</span>
+<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a>subway_stops <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a>  subway_stops1,</span>
+<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>  subway_stops2</span>
+<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
+<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(subway_stops1, subway_stops2)</span>
+<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>subway_lines <span class="ot">&lt;-</span> lines_delhi <span class="sc">|&gt;</span> </span>
+<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>  <span class="co"># st_drop_geometry() |&gt; </span></span>
+<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>  <span class="co"># as_tibble() |&gt; </span></span>
+<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">str_detect</span>(railway, <span class="st">"subway"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(osm_id, name, railway, geometry) <span class="sc">|&gt;</span> </span>
+<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
+<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>subway_stops_buffer_1km <span class="ot">&lt;-</span> subway_stops <span class="sc">|&gt;</span> </span>
+<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_union</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">1000</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
+<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>subway_stops_buffer_2km <span class="ot">&lt;-</span> subway_stops <span class="sc">|&gt;</span> </span>
+<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_union</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(<span class="at">dist =</span> <span class="dv">2000</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(delhi_map)</span>
+<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(lines_delhi, points_delhi, polygons_delhi)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p>An initial basic plot</p>
+</section>
+<section id="an-initial-basic-plot" class="level3">
+<h3 class="anchored" data-anchor-id="an-initial-basic-plot">An initial basic plot</h3>
+<p>This R code creates a spatial visualization of Delhi’s subway system using the <a href="https://ggplot2.tidyverse.org/"><code>ggplot2</code></a> package and its <code>geom_sf()</code> function to handle spatial features. The base map (<code>delhi_map</code>) is plotted first, followed by layers representing subway stops (<code>subway_stops</code> in blue), subway lines (<code>subway_lines</code> in dark grey), and buffer zones around subway stops at 1 km and 2 km (<code>subway_stops_buffer_1km</code> and <code>subway_stops_buffer_2km</code>, shaded in semi-transparent red). The <code>alpha()</code> function from <a href="https://scales.r-lib.org/"><code>scales</code></a> is used to set transparency levels for better visualization.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -544,11 +589,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p><img src="images/cities_pop_subway_1.png" class="img-fluid"></p>
+<div id="fig-1" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/cities_pop_subway_1.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-1-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: A basic map of Delhi, with metro stations and 1-km and 2-km buffer zones around metro stations.
+</figcaption>
+</figure>
+</div>
+</section>
 <section id="population-density-raster-for-new-delhi" class="level3">
 <h3 class="anchored" data-anchor-id="population-density-raster-for-new-delhi">Population Density Raster for New Delhi</h3>
-<p>Full article and code on how to get these population density rasters for any city in the world is <strong>here</strong>.</p>
-<p>Code for single year</p>
+<p>Full article and code on how to get these population density rasters for any city in the world is <a href="https://aditya-dahiya.github.io/visage/geocomputation/population_density_rasters.html"><strong>here</strong></a>.</p>
+<p>This R script processes and visualizes population density data for New Delhi using raster data from <span class="citation" data-cites="liu2024">(<a href="#ref-liu2024" role="doc-biblioref">Liu et al. 2024</a>)</span> focusing on areas near subway stops. The script employs the <a href="https://rspatial.github.io/terra/"><code>terra</code></a> package to handle raster operations and the <a href="https://r-spatial.github.io/sf/"><code>sf</code></a> package for spatial vector data. The 2022 population density raster is then loaded with <code>rast()</code>, cropped, and masked to fit the <code>delhi_map</code> boundary. Negative values are replaced with a small constant (<code>0.001</code>) to avoid computational issues. The script extracts non-missing values from the raster, calculates summary statistics (<code>mean</code>, <code>total_pop</code>), and estimates population distribution within 1 km and 2 km buffers around subway stops using <code>terra::extract()</code>. A ggplot2-based map visualizes population density with <code>geom_spatraster()</code> (from <a href="https://cran.r-project.org/package=ggspatial"><code>ggspatial</code></a>). A <code>scale_fill_gradient2()</code> function transforms density values with a square root scale for better readability. The map overlays:</p>
+<ul>
+<li><p><strong>Delhi’s boundary</strong> (<code>geom_sf(delhi_map)</code>)</p></li>
+<li><p><strong>Subway stops &amp; lines</strong> (<code>geom_sf(subway_stops, subway_lines)</code>)</p></li>
+<li><p><strong>Population buffers</strong> (<code>geom_sf(subway_stops_buffer_1km, subway_stops_buffer_2km)</code>)</p></li>
+</ul>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -697,8 +757,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-143"><a href="#cb7-143" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<p><img src="images/cities_pop_subway_2.png" class="img-fluid"></p>
-<p>Code for multiple years</p>
+<div id="fig-2" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/cities_pop_subway_2.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: A map, like earlier figure, but with a population density raster map of Delhi, in grayscale.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="code-for-plotting-and-comparing-multiple-years-1990-2022" class="level3">
+<h3 class="anchored" data-anchor-id="code-for-plotting-and-comparing-multiple-years-1990-2022">Code for plotting and comparing multiple years (1990-2022)</h3>
+<p>This R script analyzes population distribution around subway stations in Delhi over time using raster and vector spatial data. It utilizes the <strong>{terra}</strong> package (<a href="https://rspatial.github.io/terra/">terra</a>) for raster data processing, <strong>{sf}</strong> (<a href="https://r-spatial.github.io/sf/">sf</a>) for handling vector spatial data, and <strong>{ggplot2}</strong> (<a href="https://ggplot2.tidyverse.org/">ggplot2</a>) for visualization. The script begins by selecting years to analyze and defining buffer zones of 1 km and 2 km around subway stations. It then iterates through each year, loading and cropping population raster data to match the Delhi map boundaries, replacing zero values with a small positive value to avoid computational errors. The raster is masked to exclude areas outside Delhi, and population values are extracted within the defined buffer zones.</p>
+<p>The extracted population data is summarized using <strong>{dplyr}</strong> (<a href="https://dplyr.tidyverse.org/">dplyr</a>) functions such as <code>group_by()</code>, <code>summarise()</code>, and <code>mutate()</code>, calculating mean and total population within each buffer. The script constructs a multi-layered raster stack to store population data across years and visualizes the results with <strong>{ggplot2}</strong>. A bar chart compares the proportion of Delhi’s population within 1 km and 2 km of metro stations over time, highlighting the relatively stable percentage despite metro expansion.</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -1103,18 +1176,37 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div id="fig-3" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/cities_pop_subway_3.png" id="fig-3" class="img-fluid figure-img">
+<img src="images/cities_pop_subway_3.png" class="img-fluid figure-img">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-3-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: The graphic illustrates the proportion of Delhi’s population residing within 1 km and 2 km of a metro station across multiple years. Each facet represents a different year, showing how population distribution relative to metro accessibility has evolved over time. The bar heights indicate the percentage of the total population within the respective buffer zones, while the background map provides spatial context for metro stations, lines, and population density. An inset chart further summarizes the temporal trends for both buffer zones.
 </figcaption>
 </figure>
 </div>
+<p><strong>Save a thumbnail for the page</strong></p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(magick)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">image_read</span>(</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  here<span class="sc">::</span><span class="fu">here</span>(<span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>             <span class="st">"cities_pop_subway_2.png"</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">image_resize</span>(<span class="st">"x400"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">image_write</span>(<span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>              <span class="st">"cities_pop_subways.png"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+
 
 
 </section>
 
-</main> <!-- /main -->
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="ref-liu2024" class="csl-entry" role="listitem">
+Liu, Luling, Xin Cao, Shijie Li, and Na Jie. 2024. <span>“A 31-Year (1990<span></span>2020) Global Gridded Population Dataset Generated by Cluster Analysis and Statistical Learning.”</span> <em>Scientific Data</em> 11 (1). <a href="https://doi.org/10.1038/s41597-024-02913-0">https://doi.org/10.1038/s41597-024-02913-0</a>.
+</div>
+</div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

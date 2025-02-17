@@ -1,8 +1,8 @@
 ---
-title: "Public Transport and Population Density in select cities"
+title: "What percentage of population lives near a metro station?"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: ".................."
+subtitle: "An analysis for various cities, over time, on population density near metro stations and analysis using rsater data and Open Street Maps data"
 categories:
   - "Data Visualization"
   - "Maps"
@@ -12,7 +12,7 @@ categories:
   - "Gecomputation"
   - "{rnaturalearth}"
 date: "2025-02-16"
-image: "images/hy_health_buffer_zones_thumbnail.png"
+image: "images/cities_pop_subways.png"
 format:
   html:
     code-fold: true
@@ -35,7 +35,11 @@ share:
   mastodon: true
 ---
 
-Introduction
+### Loading required packages
+
+The [`tidyverse`](https://www.tidyverse.org/) package is loaded for data manipulation and visualization, while [`sf`](https://r-spatial.github.io/sf/) and [`terra`](https://rspatial.org/terra/) handle spatial vector and raster data, respectively. The [`tidyterra`](https://dieghernan.github.io/tidyterra/) package acts as a bridge between `terra` and `ggplot2`, enabling raster visualization in a tidy framework. For enhanced plot aesthetics, the script utilizes several `ggplot2` extensions. [`scales`](https://scales.r-lib.org/) provides improved axis scaling, [`fontawesome`](https://github.com/rstudio/fontawesome) adds icons, and [`ggtext`](https://wilkelab.org/ggtext/) enables markdown formatting in text elements. Custom fonts are incorporated using [`sysfonts`](https://github.com/wch/sysfonts) and displayed via [`showtext`](https://github.com/yixuan/showtext), ensuring that Google Fonts (e.g., *Roboto Condensed*, *Oswald*, *Saira Extra Condensed*) are seamlessly integrated. The [`patchwork`](https://patchwork.data-imaginist.com/) package facilitates the composition of multiple plots.
+
+A minimalist theme is established using `theme_minimal()` with a `base_size` of `24` and a `body_font` for text. Colors are defined and printed with [`seecolor`](https://github.com/clauswilke/seecolor), ensuring consistency in highlighted text and background colors. Additionally, custom captions incorporating Font Awesome icons are created using [`glue`](https://glue.tidyverse.org/), dynamically styling GitHub and Twitter/X handles within the plot caption.
 
 ```{r}
 #| label: setup
@@ -120,7 +124,9 @@ rm(github, github_username, xtwitter,
 
 ```
 
-Get administrative boundaries of the 5 select cities: London, Tokyo, New York City, Mumbai, and Delhi
+### Get administrative boundaries of selected cities
+
+London, Tokyo, New York City, Mumbai, and Delhi
 
 **Option 1: Using {rnaturalearth}**
 
@@ -146,7 +152,7 @@ plot(metropolitan_boundaries["name"])
 
 ```
 
-Option 2
+**Option 2: Using {geodata}**
 
 ```{r}
 library(geodata)
@@ -180,7 +186,7 @@ plot(boundaries_gadm[["Delhi"]]["NAME_1"])
 
 ```
 
-Option 3: Open Street Maps
+**Option 3: {osmdata} Open Street Maps**
 
 ```{r}
 library(osmdata)
@@ -216,10 +222,23 @@ names(boundaries) <- cities
 
 ```
 
-Get metro-lines in New Delhi, and the metro stations using data from Open Street Maps using {osmextract}
+### Get metro-lines, metro stations and buffer zones in Delhi (capital of India)
+
+This R script retrieves and processes metro lines and stations in New Delhi using data from OpenStreetMap (OSM) via the [`osmextract`](https://github.com/ropensci/osmextract) package and administrative boundaries from the [`geodata`](https://github.com/rspatial/geodata) package. First, a district-level map of Delhi is obtained with `geodata::gadm()`, filtered for the "NCT of Delhi" region. Next, the script extracts different spatial layers from OSM:
+
+-   Metro lines using `osmextract::oe_get(place = "Delhi", layer = "lines")`
+
+-   Metro stations (point data) using `osmextract::oe_get(layer = "points")`
+
+-   Metro station polygons using `osmextract::oe_get(layer = "multipolygons")`
+
+The metro station points are filtered from `points_delhi` based on OSM tags (`"railway"=>"stop","subway"=>"yes"`), while metro station polygons are identified from `polygons_delhi` and their centroids are calculated with `st_centroid()`.
+
+Finally, buffer zones of 1 km and 2 km around metro stations are created using `st_buffer()`, helping analyze areas within walkable distances to metro stops. These buffers are spatially clipped to Delhi’s boundaries.
 
 ```{r}
 
+# Get metro-lines in New Delhi, and the metro stations using data from Open Street Maps using {osmextract}
 # Get Delhi Map from GADM / {geodata} with geodata::gadm()
 # District Wise Map
 delhi_map <- geodata::gadm(
@@ -300,7 +319,9 @@ subway_stops_buffer_2km <- subway_stops |>
 rm(lines_delhi, points_delhi, polygons_delhi)
 ```
 
-An initial basic plot
+### An initial basic plot
+
+This R code creates a spatial visualization of Delhi's subway system using the [`ggplot2`](https://ggplot2.tidyverse.org/) package and its `geom_sf()` function to handle spatial features. The base map (`delhi_map`) is plotted first, followed by layers representing subway stops (`subway_stops` in blue), subway lines (`subway_lines` in dark grey), and buffer zones around subway stops at 1 km and 2 km (`subway_stops_buffer_1km` and `subway_stops_buffer_2km`, shaded in semi-transparent red). The `alpha()` function from [`scales`](https://scales.r-lib.org/) is used to set transparency levels for better visualization.
 
 ```{r}
 
@@ -352,13 +373,19 @@ ggsave(
 )
 ```
 
-![](images/cities_pop_subway_1.png)
+![A basic map of Delhi, with metro stations and 1-km and 2-km buffer zones around metro stations.](images/cities_pop_subway_1.png){#fig-1}
 
 ### Population Density Raster for New Delhi
 
-Full article and code on how to get these population density rasters for any city in the world is **here**.
+Full article and code on how to get these population density rasters for any city in the world is [**here**](https://aditya-dahiya.github.io/visage/geocomputation/population_density_rasters.html).
 
-Code for single year
+This R script processes and visualizes population density data for New Delhi using raster data from [@liu2024] focusing on areas near subway stops. The script employs the [`terra`](https://rspatial.github.io/terra/) package to handle raster operations and the [`sf`](https://r-spatial.github.io/sf/) package for spatial vector data. The 2022 population density raster is then loaded with `rast()`, cropped, and masked to fit the `delhi_map` boundary. Negative values are replaced with a small constant (`0.001`) to avoid computational issues. The script extracts non-missing values from the raster, calculates summary statistics (`mean`, `total_pop`), and estimates population distribution within 1 km and 2 km buffers around subway stops using `terra::extract()`. A ggplot2-based map visualizes population density with `geom_spatraster()` (from [`ggspatial`](https://cran.r-project.org/package=ggspatial)). A `scale_fill_gradient2()` function transforms density values with a square root scale for better readability. The map overlays:
+
+-   **Delhi’s boundary** (`geom_sf(delhi_map)`)
+
+-   **Subway stops & lines** (`geom_sf(subway_stops, subway_lines)`)
+
+-   **Population buffers** (`geom_sf(subway_stops_buffer_1km, subway_stops_buffer_2km)`)
 
 ```{r}
 # output_file <- paste0("GlobPOP_Count_30arc_", i, "_I32.tiff")
@@ -506,9 +533,13 @@ ggsave(
 )
 ```
 
-![](images/cities_pop_subway_2.png)
+![A map, like earlier figure, but with a population density raster map of Delhi, in grayscale.](images/cities_pop_subway_2.png){#fig-2}
 
-Code for multiple years
+### Code for plotting and comparing multiple years (1990-2022)
+
+This R script analyzes population distribution around subway stations in Delhi over time using raster and vector spatial data. It utilizes the **{terra}** package ([terra](https://rspatial.github.io/terra/)) for raster data processing, **{sf}** ([sf](https://r-spatial.github.io/sf/)) for handling vector spatial data, and **{ggplot2}** ([ggplot2](https://ggplot2.tidyverse.org/)) for visualization. The script begins by selecting years to analyze and defining buffer zones of 1 km and 2 km around subway stations. It then iterates through each year, loading and cropping population raster data to match the Delhi map boundaries, replacing zero values with a small positive value to avoid computational errors. The raster is masked to exclude areas outside Delhi, and population values are extracted within the defined buffer zones.
+
+The extracted population data is summarized using **{dplyr}** ([dplyr](https://dplyr.tidyverse.org/)) functions such as `group_by()`, `summarise()`, and `mutate()`, calculating mean and total population within each buffer. The script constructs a multi-layered raster stack to store population data across years and visualizes the results with **{ggplot2}**. A bar chart compares the proportion of Delhi's population within 1 km and 2 km of metro stations over time, highlighting the relatively stable percentage despite metro expansion.
 
 ```{r}
 # Years to plot
@@ -909,4 +940,17 @@ ggsave(
 )
 ```
 
-![](images/cities_pop_subway_3.png){#fig-3}
+![The graphic illustrates the proportion of Delhi's population residing within 1 km and 2 km of a metro station across multiple years. Each facet represents a different year, showing how population distribution relative to metro accessibility has evolved over time. The bar heights indicate the percentage of the total population within the respective buffer zones, while the background map provides spatial context for metro stations, lines, and population density. An inset chart further summarizes the temporal trends for both buffer zones.](images/cities_pop_subway_3.png){#fig-3}
+
+**Save a thumbnail for the page**
+
+```{r}
+library(magick)
+image_read(
+  here::here("projects", "images",
+             "cities_pop_subway_2.png")
+) |> 
+  image_resize("x400") |> 
+  image_write("projects", "images",
+              "cities_pop_subways.png")
+```
