@@ -772,6 +772,7 @@ Figure&nbsp;2: A map, like earlier figure, but with a population density raster 
 <h3 class="anchored" data-anchor-id="code-for-plotting-and-comparing-multiple-years-1990-2022">Code for plotting and comparing multiple years (1990-2022)</h3>
 <p>This R script analyzes population distribution around subway stations in Delhi over time using raster and vector spatial data. It utilizes the <strong>{terra}</strong> package (<a href="https://rspatial.github.io/terra/">terra</a>) for raster data processing, <strong>{sf}</strong> (<a href="https://r-spatial.github.io/sf/">sf</a>) for handling vector spatial data, and <strong>{ggplot2}</strong> (<a href="https://ggplot2.tidyverse.org/">ggplot2</a>) for visualization. The script begins by selecting years to analyze and defining buffer zones of 1 km and 2 km around subway stations. It then iterates through each year, loading and cropping population raster data to match the Delhi map boundaries, replacing zero values with a small positive value to avoid computational errors. The raster is masked to exclude areas outside Delhi, and population values are extracted within the defined buffer zones.</p>
 <p>The extracted population data is summarized using <strong>{dplyr}</strong> (<a href="https://dplyr.tidyverse.org/">dplyr</a>) functions such as <code>group_by()</code>, <code>summarise()</code>, and <code>mutate()</code>, calculating mean and total population within each buffer. The script constructs a multi-layered raster stack to store population data across years and visualizes the results with <strong>{ggplot2}</strong>. A bar chart compares the proportion of Delhi’s population within 1 km and 2 km of metro stations over time, highlighting the relatively stable percentage despite metro expansion.</p>
+<p><em>The analysis shows that the Delhi Metro did not significantly increase population density around metro stations over time. Instead, the metro appears to have been built to connect already densely populated areas rather than driving new population growth in those locations. This suggests that metro development follows existing population patterns, rather than causing major demographic shifts.</em></p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
@@ -820,357 +821,366 @@ Figure&nbsp;2: A map, like earlier figure, but with a population density raster 
 <span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>      <span class="at">year =</span> i,</span>
 <span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>      <span class="at">zone =</span> <span class="fu">c</span>(<span class="st">"1 km"</span>, <span class="st">"2 km"</span>),</span>
 <span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>      <span class="at">total_pop =</span> n <span class="sc">*</span> mean_pop,</span>
-<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>      <span class="at">perc_pop =</span> total_pop <span class="sc">/</span> total_rast_pop<span class="sc">$</span>total_pop</span>
-<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">"rast_"</span>, i) <span class="sc">|&gt;</span> </span>
-<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>    <span class="fu">assign</span>(rast)</span>
-<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a><span class="do">## Compile into a one multi-layered raster -----------------------------</span></span>
-<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize an empty SpatRaster object</span></span>
-<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a>rast_stack <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a><span class="co"># Loop through each year and add the raster if it exists</span></span>
-<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (y <span class="cf">in</span> selected_year) {</span>
-<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a>  rast_name <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"rast_"</span>, y)  <span class="co"># Construct variable name</span></span>
-<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">exists</span>(rast_name)) {  <span class="co"># Check if raster exists</span></span>
-<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a>    rast <span class="ot">&lt;-</span> <span class="fu">get</span>(rast_name)  <span class="co"># Retrieve raster</span></span>
-<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(rast_stack)) {</span>
-<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a>      rast_stack <span class="ot">&lt;-</span> rast  <span class="co"># Initialize with first available raster</span></span>
-<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
-<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>      rast_stack <span class="ot">&lt;-</span> <span class="fu">c</span>(rast_stack, rast)  <span class="co"># Append to SpatRaster</span></span>
-<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
-<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a>    <span class="fu">message</span>(<span class="fu">paste</span>(<span class="st">"Skipping year"</span>, y, <span class="st">"as raster is missing"</span>))</span>
-<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(rast_stack) <span class="ot">&lt;-</span> <span class="fu">as.character</span>(selected_year)</span>
-<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a><span class="fu">varnames</span>(rast_stack) <span class="ot">&lt;-</span> <span class="fu">as.character</span>(selected_year)</span>
-<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>plotdf1 <span class="ot">&lt;-</span> pop_compute <span class="sc">|&gt;</span> </span>
-<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a>    <span class="at">lyr =</span> <span class="fu">as.character</span>(year)</span>
-<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
-<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a>    <span class="at">x_var =</span> <span class="fu">case_when</span>(</span>
-<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>      zone <span class="sc">==</span> <span class="st">"1 km"</span> <span class="sc">~</span> <span class="fl">76.9</span>,</span>
-<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a>      zone <span class="sc">==</span> <span class="st">"2 km"</span> <span class="sc">~</span> <span class="fl">77.0</span>,</span>
-<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a>      <span class="at">.default =</span> <span class="cn">NA</span></span>
-<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a>    <span class="at">y_var =</span> <span class="fl">28.4</span> <span class="sc">+</span> ((<span class="fl">0.1</span> <span class="sc">*</span> perc_pop) <span class="sc">*</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fl">0.75</span>)</span>
-<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
-<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
-<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
-<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var,</span>
-<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> zone</span>
-<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
-<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.3</span></span>
-<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
-<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
-<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(perc_pop <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>),<span class="st">"%"</span>,</span>
-<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"</span><span class="sc">\n</span><span class="st">&lt;"</span>, zone),</span>
-<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
-<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var</span>
-<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
-<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="fl">1.2</span>,</span>
-<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">2</span>,</span>
-<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.45</span></span>
-<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
-<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>lyr</span>
-<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
-<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Distance to nearest</span><span class="sc">\n</span><span class="st">Metro Station"</span>,</span>
-<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
-<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
-<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
-<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
-<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a>    <span class="at">default_crs =</span> <span class="st">"EPSG:4326"</span>,</span>
-<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fl">28.4</span>, <span class="fl">28.9</span>),</span>
-<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(<span class="fl">76.85</span>, <span class="fl">77.33</span>)</span>
-<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(</span>
-<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_size =</span> <span class="dv">12</span></span>
-<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a>pop_compute <span class="sc">|&gt;</span> </span>
-<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(</span>
-<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(</span>
-<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> year,</span>
-<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> perc_pop</span>
-<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
-<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(</span>
-<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> selected_year</span>
-<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>zone) <span class="sc">+</span></span>
-<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.x =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a>      <span class="at">angle =</span> <span class="dv">90</span></span>
-<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert 2021 and 2022 rasters to integer class, instead of double</span></span>
-<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a><span class="co"># rast_stack$`2021` &lt;- as.int(rast_stack$`2021`)</span></span>
-<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a>g1 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_spatraster</span>(</span>
-<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> rast_stack</span>
-<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradient2</span>(</span>
-<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a>    <span class="at">low =</span> <span class="st">"white"</span>,</span>
-<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a>    <span class="at">high =</span> <span class="st">"grey20"</span>,</span>
-<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a>    <span class="at">na.value =</span> <span class="st">"transparent"</span>,</span>
-<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a>    <span class="at">transform =</span> <span class="st">"sqrt"</span>,</span>
-<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Population</span><span class="sc">\n</span><span class="st">density (persons</span><span class="sc">\n</span><span class="st">/ sq. km.)"</span>,</span>
-<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>, <span class="dv">2000</span>, <span class="fl">1e4</span>, <span class="fl">3e4</span>, <span class="fl">5e4</span>),</span>
-<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">100</span>, <span class="fl">6e4</span>),</span>
-<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a>    <span class="at">oob =</span> scales<span class="sc">::</span>squish,</span>
-<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">scale_cut =</span> <span class="fu">cut_short_scale</span>())</span>
-<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
-<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> delhi_map,</span>
-<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="cn">NA</span>,</span>
-<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.9</span></span>
-<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
-<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops_buffer_2km,</span>
-<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>), </span>
-<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"transparent"</span>,</span>
-<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.1</span></span>
-<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
-<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops_buffer_1km,</span>
-<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>), </span>
-<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"transparent"</span>,</span>
-<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.1</span></span>
-<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-189"><a href="#cb8-189" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
-<span id="cb8-190"><a href="#cb8-190" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops,</span>
-<span id="cb8-191"><a href="#cb8-191" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"blue"</span>,</span>
-<span id="cb8-192"><a href="#cb8-192" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">1</span>,</span>
-<span id="cb8-193"><a href="#cb8-193" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.5</span></span>
-<span id="cb8-194"><a href="#cb8-194" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-195"><a href="#cb8-195" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
-<span id="cb8-196"><a href="#cb8-196" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_lines,</span>
-<span id="cb8-197"><a href="#cb8-197" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"blue"</span>,</span>
-<span id="cb8-198"><a href="#cb8-198" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.2</span></span>
-<span id="cb8-199"><a href="#cb8-199" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-200"><a href="#cb8-200" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-201"><a href="#cb8-201" aria-hidden="true" tabindex="-1"></a>  ggnewscale<span class="sc">::</span><span class="fu">new_scale_fill</span>()<span class="sc">+</span></span>
-<span id="cb8-202"><a href="#cb8-202" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
-<span id="cb8-203"><a href="#cb8-203" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
-<span id="cb8-204"><a href="#cb8-204" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-205"><a href="#cb8-205" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
-<span id="cb8-206"><a href="#cb8-206" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var,</span>
-<span id="cb8-207"><a href="#cb8-207" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> zone</span>
-<span id="cb8-208"><a href="#cb8-208" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-209"><a href="#cb8-209" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
-<span id="cb8-210"><a href="#cb8-210" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.3</span></span>
-<span id="cb8-211"><a href="#cb8-211" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-212"><a href="#cb8-212" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
-<span id="cb8-213"><a href="#cb8-213" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
-<span id="cb8-214"><a href="#cb8-214" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-215"><a href="#cb8-215" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(perc_pop <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>),<span class="st">"%"</span>,</span>
-<span id="cb8-216"><a href="#cb8-216" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"</span><span class="sc">\n</span><span class="st">&lt;"</span>, zone),</span>
-<span id="cb8-217"><a href="#cb8-217" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
-<span id="cb8-218"><a href="#cb8-218" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var</span>
-<span id="cb8-219"><a href="#cb8-219" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-220"><a href="#cb8-220" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
-<span id="cb8-221"><a href="#cb8-221" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="fl">1.2</span>,</span>
-<span id="cb8-222"><a href="#cb8-222" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-223"><a href="#cb8-223" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">11</span>,</span>
-<span id="cb8-224"><a href="#cb8-224" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
-<span id="cb8-225"><a href="#cb8-225" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span></span>
-<span id="cb8-226"><a href="#cb8-226" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-227"><a href="#cb8-227" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
-<span id="cb8-228"><a href="#cb8-228" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Distance to</span><span class="sc">\n</span><span class="st">nearest Metro</span><span class="sc">\n</span><span class="st">Station"</span>,</span>
-<span id="cb8-229"><a href="#cb8-229" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
-<span id="cb8-230"><a href="#cb8-230" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
-<span id="cb8-231"><a href="#cb8-231" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
-<span id="cb8-232"><a href="#cb8-232" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-233"><a href="#cb8-233" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-234"><a href="#cb8-234" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-235"><a href="#cb8-235" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
-<span id="cb8-236"><a href="#cb8-236" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>lyr,</span>
-<span id="cb8-237"><a href="#cb8-237" aria-hidden="true" tabindex="-1"></a>    <span class="at">ncol =</span> <span class="dv">4</span></span>
-<span id="cb8-238"><a href="#cb8-238" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
-<span id="cb8-240"><a href="#cb8-240" aria-hidden="true" tabindex="-1"></a>    <span class="at">default_crs =</span> <span class="st">"EPSG:4326"</span>,</span>
-<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fl">28.4</span>, <span class="fl">28.9</span>),</span>
-<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(<span class="fl">76.8</span>, <span class="fl">77.35</span>),</span>
-<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="cn">FALSE</span></span>
-<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"What percent of Delhi's population lives close to a metro station?"</span>,</span>
-<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="fu">str_wrap</span>(<span class="st">"Delhi Metro (Subway) was started in 2002, First phase was completed in 2006, phase II in 2011, and phase III in 2021. Surprisingly, the percentage of population that lives in areas that are now within 1-2 km of metro stations has not changed since early 1990s!"</span>, <span class="dv">100</span>),</span>
-<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> plot_caption,</span>
-<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, </span>
-<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="cn">NULL</span></span>
-<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a>    <span class="at">text =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey30"</span></span>
-<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-257"><a href="#cb8-257" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"inside"</span>,</span>
-<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_line</span>(</span>
-<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a>      <span class="at">linewidth =</span> <span class="fl">0.6</span>,</span>
-<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a>      <span class="at">linetype =</span> <span class="dv">3</span></span>
-<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Customizing the Legend</span></span>
-<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position.inside =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.justification =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb8-266"><a href="#cb8-266" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.direction =</span> <span class="st">"vertical"</span>,</span>
-<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box =</span> <span class="st">"horizontal"</span>,</span>
-<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-269"><a href="#cb8-269" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-270"><a href="#cb8-270" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title.position =</span> <span class="st">"top"</span>,</span>
-<span id="cb8-271"><a href="#cb8-271" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-272"><a href="#cb8-272" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">2</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-273"><a href="#cb8-273" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
-<span id="cb8-274"><a href="#cb8-274" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.7</span></span>
-<span id="cb8-275"><a href="#cb8-275" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-276"><a href="#cb8-276" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-277"><a href="#cb8-277" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">2</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-278"><a href="#cb8-278" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.2</span></span>
-<span id="cb8-279"><a href="#cb8-279" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-280"><a href="#cb8-280" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.key.height =</span> <span class="fu">unit</span>(<span class="dv">30</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-281"><a href="#cb8-281" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.key.width =</span> <span class="fu">unit</span>(<span class="dv">10</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-282"><a href="#cb8-282" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb8-283"><a href="#cb8-283" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb8-284"><a href="#cb8-284" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-285"><a href="#cb8-285" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-286"><a href="#cb8-286" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">15</span>,<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-287"><a href="#cb8-287" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">4</span> <span class="sc">*</span> bts,</span>
-<span id="cb8-288"><a href="#cb8-288" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span></span>
-<span id="cb8-289"><a href="#cb8-289" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-290"><a href="#cb8-290" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-291"><a href="#cb8-291" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-292"><a href="#cb8-292" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
-<span id="cb8-293"><a href="#cb8-293" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-294"><a href="#cb8-294" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="fl">2.5</span> <span class="sc">*</span> bts</span>
-<span id="cb8-295"><a href="#cb8-295" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-296"><a href="#cb8-296" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption =</span> <span class="fu">element_textbox</span>(</span>
-<span id="cb8-297"><a href="#cb8-297" aria-hidden="true" tabindex="-1"></a>      <span class="at">halign =</span> <span class="fl">0.5</span>, </span>
-<span id="cb8-298"><a href="#cb8-298" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-299"><a href="#cb8-299" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.2</span>,</span>
-<span id="cb8-300"><a href="#cb8-300" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">150</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>)</span>
-<span id="cb8-301"><a href="#cb8-301" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-302"><a href="#cb8-302" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.spacing =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-303"><a href="#cb8-303" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.background =</span> <span class="fu">element_rect</span>(</span>
-<span id="cb8-304"><a href="#cb8-304" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> <span class="st">"transparent"</span>,</span>
-<span id="cb8-305"><a href="#cb8-305" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"transparent"</span></span>
-<span id="cb8-306"><a href="#cb8-306" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-307"><a href="#cb8-307" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-308"><a href="#cb8-308" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-309"><a href="#cb8-309" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-310"><a href="#cb8-310" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="dv">3</span></span>
-<span id="cb8-311"><a href="#cb8-311" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-312"><a href="#cb8-312" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(),</span>
-<span id="cb8-313"><a href="#cb8-313" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks.length =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>)</span>
-<span id="cb8-314"><a href="#cb8-314" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-315"><a href="#cb8-315" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-316"><a href="#cb8-316" aria-hidden="true" tabindex="-1"></a><span class="co"># An inset graph of changes over years</span></span>
-<span id="cb8-317"><a href="#cb8-317" aria-hidden="true" tabindex="-1"></a>strip_labels <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb8-318"><a href="#cb8-318" aria-hidden="true" tabindex="-1"></a>  <span class="st">"% Population within 1 km"</span>,</span>
-<span id="cb8-319"><a href="#cb8-319" aria-hidden="true" tabindex="-1"></a>  <span class="st">"% Population within 2 km"</span></span>
-<span id="cb8-320"><a href="#cb8-320" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-321"><a href="#cb8-321" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(strip_labels) <span class="ot">&lt;-</span> <span class="fu">unique</span>(plotdf1<span class="sc">$</span>zone)</span>
-<span id="cb8-322"><a href="#cb8-322" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-323"><a href="#cb8-323" aria-hidden="true" tabindex="-1"></a>g2 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
-<span id="cb8-324"><a href="#cb8-324" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> plotdf1,</span>
-<span id="cb8-325"><a href="#cb8-325" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-326"><a href="#cb8-326" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="fu">as.character</span>(year), </span>
-<span id="cb8-327"><a href="#cb8-327" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> perc_pop,</span>
-<span id="cb8-328"><a href="#cb8-328" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> zone</span>
-<span id="cb8-329"><a href="#cb8-329" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-330"><a href="#cb8-330" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-331"><a href="#cb8-331" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
-<span id="cb8-332"><a href="#cb8-332" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey20"</span>,</span>
-<span id="cb8-333"><a href="#cb8-333" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.2</span></span>
-<span id="cb8-334"><a href="#cb8-334" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-335"><a href="#cb8-335" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
-<span id="cb8-336"><a href="#cb8-336" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-337"><a href="#cb8-337" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(<span class="dv">100</span> <span class="sc">*</span> perc_pop, <span class="dv">1</span>), <span class="st">"%"</span>)</span>
-<span id="cb8-338"><a href="#cb8-338" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-339"><a href="#cb8-339" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
-<span id="cb8-340"><a href="#cb8-340" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="sc">-</span><span class="fl">0.35</span>,</span>
-<span id="cb8-341"><a href="#cb8-341" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">12</span>,</span>
-<span id="cb8-342"><a href="#cb8-342" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
-<span id="cb8-343"><a href="#cb8-343" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span></span>
-<span id="cb8-344"><a href="#cb8-344" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-345"><a href="#cb8-345" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(</span>
-<span id="cb8-346"><a href="#cb8-346" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">label_percent</span>(),</span>
-<span id="cb8-347"><a href="#cb8-347" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="fu">expansion</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.2</span>))</span>
-<span id="cb8-348"><a href="#cb8-348" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-349"><a href="#cb8-349" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
-<span id="cb8-350"><a href="#cb8-350" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
-<span id="cb8-351"><a href="#cb8-351" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
-<span id="cb8-352"><a href="#cb8-352" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
-<span id="cb8-353"><a href="#cb8-353" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-354"><a href="#cb8-354" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-355"><a href="#cb8-355" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
-<span id="cb8-356"><a href="#cb8-356" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>zone,</span>
-<span id="cb8-357"><a href="#cb8-357" aria-hidden="true" tabindex="-1"></a>    <span class="at">labeller =</span> <span class="fu">labeller</span>(<span class="at">zone =</span> strip_labels)</span>
-<span id="cb8-358"><a href="#cb8-358" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb8-359"><a href="#cb8-359" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
-<span id="cb8-360"><a href="#cb8-360" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb8-361"><a href="#cb8-361" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>(),</span>
-<span id="cb8-362"><a href="#cb8-362" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid.major.y =</span> <span class="fu">element_line</span>(</span>
-<span id="cb8-363"><a href="#cb8-363" aria-hidden="true" tabindex="-1"></a>      <span class="at">linewidth =</span> <span class="fl">0.3</span>, <span class="at">linetype =</span> <span class="st">"longdash"</span>,</span>
-<span id="cb8-364"><a href="#cb8-364" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey50"</span></span>
-<span id="cb8-365"><a href="#cb8-365" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-366"><a href="#cb8-366" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"none"</span>,</span>
-<span id="cb8-367"><a href="#cb8-367" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks.length =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-368"><a href="#cb8-368" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-369"><a href="#cb8-369" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">36</span></span>
-<span id="cb8-370"><a href="#cb8-370" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb8-371"><a href="#cb8-371" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text =</span> <span class="fu">element_text</span>(</span>
-<span id="cb8-372"><a href="#cb8-372" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">66</span>,</span>
-<span id="cb8-373"><a href="#cb8-373" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
-<span id="cb8-374"><a href="#cb8-374" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey30"</span></span>
-<span id="cb8-375"><a href="#cb8-375" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-376"><a href="#cb8-376" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-377"><a href="#cb8-377" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-378"><a href="#cb8-378" aria-hidden="true" tabindex="-1"></a>g <span class="ot">&lt;-</span> g1 <span class="sc">+</span></span>
-<span id="cb8-379"><a href="#cb8-379" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inset_element</span>(</span>
-<span id="cb8-380"><a href="#cb8-380" aria-hidden="true" tabindex="-1"></a>    <span class="at">p =</span> g2,</span>
-<span id="cb8-381"><a href="#cb8-381" aria-hidden="true" tabindex="-1"></a>    <span class="at">left =</span> <span class="dv">0</span>, <span class="at">right =</span> <span class="dv">1</span>,</span>
-<span id="cb8-382"><a href="#cb8-382" aria-hidden="true" tabindex="-1"></a>    <span class="at">bottom =</span> <span class="fl">0.02</span>, <span class="at">top =</span> <span class="fl">0.17</span>,</span>
-<span id="cb8-383"><a href="#cb8-383" aria-hidden="true" tabindex="-1"></a>    <span class="at">align_to =</span> <span class="st">"full"</span></span>
-<span id="cb8-384"><a href="#cb8-384" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-385"><a href="#cb8-385" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-386"><a href="#cb8-386" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
-<span id="cb8-387"><a href="#cb8-387" aria-hidden="true" tabindex="-1"></a>  <span class="at">plot =</span> g, </span>
-<span id="cb8-388"><a href="#cb8-388" aria-hidden="true" tabindex="-1"></a>  <span class="at">filename =</span> here<span class="sc">::</span><span class="fu">here</span>(</span>
-<span id="cb8-389"><a href="#cb8-389" aria-hidden="true" tabindex="-1"></a>    <span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
-<span id="cb8-390"><a href="#cb8-390" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cities_pop_subway_3.png"</span></span>
-<span id="cb8-391"><a href="#cb8-391" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb8-392"><a href="#cb8-392" aria-hidden="true" tabindex="-1"></a>  <span class="at">height =</span> <span class="dv">1200</span> <span class="sc">*</span> (<span class="dv">3</span> <span class="sc">*</span> <span class="dv">5</span> <span class="sc">/</span> <span class="dv">4</span>),</span>
-<span id="cb8-393"><a href="#cb8-393" aria-hidden="true" tabindex="-1"></a>  <span class="at">width =</span> <span class="dv">1200</span> <span class="sc">*</span> <span class="dv">3</span>,</span>
-<span id="cb8-394"><a href="#cb8-394" aria-hidden="true" tabindex="-1"></a>  <span class="at">units =</span> <span class="st">"px"</span>,</span>
-<span id="cb8-395"><a href="#cb8-395" aria-hidden="true" tabindex="-1"></a>  <span class="at">bg =</span> <span class="st">"white"</span></span>
-<span id="cb8-396"><a href="#cb8-396" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>      <span class="at">tot_del_pop =</span> total_rast_pop<span class="sc">$</span>total_pop,</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>      <span class="at">perc_pop =</span> total_pop <span class="sc">/</span> total_rast_pop<span class="sc">$</span>total_pop</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">"rast_"</span>, i) <span class="sc">|&gt;</span> </span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>    <span class="fu">assign</span>(rast)</span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a><span class="do">## Compile into a one multi-layered raster -----------------------------</span></span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize an empty SpatRaster object</span></span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a>rast_stack <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a><span class="co"># Loop through each year and add the raster if it exists</span></span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (y <span class="cf">in</span> selected_year) {</span>
+<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a>  rast_name <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"rast_"</span>, y)  <span class="co"># Construct variable name</span></span>
+<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">exists</span>(rast_name)) {  <span class="co"># Check if raster exists</span></span>
+<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a>    rast <span class="ot">&lt;-</span> <span class="fu">get</span>(rast_name)  <span class="co"># Retrieve raster</span></span>
+<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(rast_stack)) {</span>
+<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a>      rast_stack <span class="ot">&lt;-</span> rast  <span class="co"># Initialize with first available raster</span></span>
+<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a>      rast_stack <span class="ot">&lt;-</span> <span class="fu">c</span>(rast_stack, rast)  <span class="co"># Append to SpatRaster</span></span>
+<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a>    <span class="fu">message</span>(<span class="fu">paste</span>(<span class="st">"Skipping year"</span>, y, <span class="st">"as raster is missing"</span>))</span>
+<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(rast_stack) <span class="ot">&lt;-</span> <span class="fu">as.character</span>(selected_year)</span>
+<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a><span class="fu">varnames</span>(rast_stack) <span class="ot">&lt;-</span> <span class="fu">as.character</span>(selected_year)</span>
+<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>pop_compute <span class="sc">|&gt;</span> </span>
+<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(</span>
+<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> tot_del_pop)</span>
+<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>zone) <span class="sc">+</span></span>
+<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> <span class="fu">label_number</span>(<span class="at">scale_cut =</span> <span class="fu">cut_short_scale</span>()))</span>
+<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>plotdf1 <span class="ot">&lt;-</span> pop_compute <span class="sc">|&gt;</span> </span>
+<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a>    <span class="at">lyr =</span> <span class="fu">as.character</span>(year)</span>
+<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a>    <span class="at">x_var =</span> <span class="fu">case_when</span>(</span>
+<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a>      zone <span class="sc">==</span> <span class="st">"1 km"</span> <span class="sc">~</span> <span class="fl">76.9</span>,</span>
+<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>      zone <span class="sc">==</span> <span class="st">"2 km"</span> <span class="sc">~</span> <span class="fl">77.0</span>,</span>
+<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a>      <span class="at">.default =</span> <span class="cn">NA</span></span>
+<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a>    <span class="at">y_var =</span> <span class="fl">28.4</span> <span class="sc">+</span> ((<span class="fl">0.1</span> <span class="sc">*</span> perc_pop) <span class="sc">*</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fl">0.75</span>)</span>
+<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
+<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
+<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
+<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var,</span>
+<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> zone</span>
+<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
+<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.3</span></span>
+<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
+<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
+<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(perc_pop <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>),<span class="st">"%"</span>,</span>
+<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"</span><span class="sc">\n</span><span class="st">&lt;"</span>, zone),</span>
+<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
+<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var</span>
+<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
+<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="fl">1.2</span>,</span>
+<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">2</span>,</span>
+<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.45</span></span>
+<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
+<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>lyr</span>
+<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Distance to nearest</span><span class="sc">\n</span><span class="st">Metro Station"</span>,</span>
+<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
+<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
+<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a>    <span class="at">default_crs =</span> <span class="st">"EPSG:4326"</span>,</span>
+<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fl">28.4</span>, <span class="fl">28.9</span>),</span>
+<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(<span class="fl">76.85</span>, <span class="fl">77.33</span>)</span>
+<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(</span>
+<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_size =</span> <span class="dv">12</span></span>
+<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a>pop_compute <span class="sc">|&gt;</span> </span>
+<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(</span>
+<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(</span>
+<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> year,</span>
+<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> perc_pop</span>
+<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(</span>
+<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> selected_year</span>
+<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>zone) <span class="sc">+</span></span>
+<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.x =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a>      <span class="at">angle =</span> <span class="dv">90</span></span>
+<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert 2021 and 2022 rasters to integer class, instead of double</span></span>
+<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a><span class="co"># rast_stack$`2021` &lt;- as.int(rast_stack$`2021`)</span></span>
+<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a>g1 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_spatraster</span>(</span>
+<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> rast_stack</span>
+<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradient2</span>(</span>
+<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a>    <span class="at">low =</span> <span class="st">"white"</span>,</span>
+<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a>    <span class="at">high =</span> <span class="st">"grey20"</span>,</span>
+<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>    <span class="at">na.value =</span> <span class="st">"transparent"</span>,</span>
+<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a>    <span class="at">transform =</span> <span class="st">"sqrt"</span>,</span>
+<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Population</span><span class="sc">\n</span><span class="st">density (persons</span><span class="sc">\n</span><span class="st">/ sq. km.)"</span>,</span>
+<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a>    <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">100</span>, <span class="dv">2000</span>, <span class="fl">1e4</span>, <span class="fl">3e4</span>, <span class="fl">5e4</span>),</span>
+<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a>    <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">100</span>, <span class="fl">6e4</span>),</span>
+<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a>    <span class="at">oob =</span> scales<span class="sc">::</span>squish,</span>
+<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> scales<span class="sc">::</span><span class="fu">label_number</span>(<span class="at">scale_cut =</span> <span class="fu">cut_short_scale</span>())</span>
+<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> delhi_map,</span>
+<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="cn">NA</span>,</span>
+<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.9</span></span>
+<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops_buffer_2km,</span>
+<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>), </span>
+<span id="cb8-189"><a href="#cb8-189" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"transparent"</span>,</span>
+<span id="cb8-190"><a href="#cb8-190" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.1</span></span>
+<span id="cb8-191"><a href="#cb8-191" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-192"><a href="#cb8-192" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb8-193"><a href="#cb8-193" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops_buffer_1km,</span>
+<span id="cb8-194"><a href="#cb8-194" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>), </span>
+<span id="cb8-195"><a href="#cb8-195" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"transparent"</span>,</span>
+<span id="cb8-196"><a href="#cb8-196" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.1</span></span>
+<span id="cb8-197"><a href="#cb8-197" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-198"><a href="#cb8-198" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb8-199"><a href="#cb8-199" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_stops,</span>
+<span id="cb8-200"><a href="#cb8-200" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"blue"</span>,</span>
+<span id="cb8-201"><a href="#cb8-201" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">1</span>,</span>
+<span id="cb8-202"><a href="#cb8-202" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.5</span></span>
+<span id="cb8-203"><a href="#cb8-203" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-204"><a href="#cb8-204" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb8-205"><a href="#cb8-205" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> subway_lines,</span>
+<span id="cb8-206"><a href="#cb8-206" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"blue"</span>,</span>
+<span id="cb8-207"><a href="#cb8-207" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.2</span></span>
+<span id="cb8-208"><a href="#cb8-208" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-209"><a href="#cb8-209" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-210"><a href="#cb8-210" aria-hidden="true" tabindex="-1"></a>  ggnewscale<span class="sc">::</span><span class="fu">new_scale_fill</span>()<span class="sc">+</span></span>
+<span id="cb8-211"><a href="#cb8-211" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
+<span id="cb8-212"><a href="#cb8-212" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
+<span id="cb8-213"><a href="#cb8-213" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-214"><a href="#cb8-214" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
+<span id="cb8-215"><a href="#cb8-215" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var,</span>
+<span id="cb8-216"><a href="#cb8-216" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> zone</span>
+<span id="cb8-217"><a href="#cb8-217" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-218"><a href="#cb8-218" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
+<span id="cb8-219"><a href="#cb8-219" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.3</span></span>
+<span id="cb8-220"><a href="#cb8-220" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-221"><a href="#cb8-221" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
+<span id="cb8-222"><a href="#cb8-222" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> plotdf1,</span>
+<span id="cb8-223"><a href="#cb8-223" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-224"><a href="#cb8-224" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(perc_pop <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">1</span>),<span class="st">"%"</span>,</span>
+<span id="cb8-225"><a href="#cb8-225" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"</span><span class="sc">\n</span><span class="st">&lt;"</span>, zone),</span>
+<span id="cb8-226"><a href="#cb8-226" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> y_var,</span>
+<span id="cb8-227"><a href="#cb8-227" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> x_var</span>
+<span id="cb8-228"><a href="#cb8-228" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-229"><a href="#cb8-229" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
+<span id="cb8-230"><a href="#cb8-230" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="fl">1.2</span>,</span>
+<span id="cb8-231"><a href="#cb8-231" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-232"><a href="#cb8-232" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">11</span>,</span>
+<span id="cb8-233"><a href="#cb8-233" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb8-234"><a href="#cb8-234" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span></span>
+<span id="cb8-235"><a href="#cb8-235" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-236"><a href="#cb8-236" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb8-237"><a href="#cb8-237" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="st">"Distance to</span><span class="sc">\n</span><span class="st">nearest Metro</span><span class="sc">\n</span><span class="st">Station"</span>,</span>
+<span id="cb8-238"><a href="#cb8-238" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb8-239"><a href="#cb8-239" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
+<span id="cb8-240"><a href="#cb8-240" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
+<span id="cb8-241"><a href="#cb8-241" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-242"><a href="#cb8-242" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-243"><a href="#cb8-243" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-244"><a href="#cb8-244" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
+<span id="cb8-245"><a href="#cb8-245" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>lyr,</span>
+<span id="cb8-246"><a href="#cb8-246" aria-hidden="true" tabindex="-1"></a>    <span class="at">ncol =</span> <span class="dv">4</span></span>
+<span id="cb8-247"><a href="#cb8-247" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-248"><a href="#cb8-248" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb8-249"><a href="#cb8-249" aria-hidden="true" tabindex="-1"></a>    <span class="at">default_crs =</span> <span class="st">"EPSG:4326"</span>,</span>
+<span id="cb8-250"><a href="#cb8-250" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(<span class="fl">28.4</span>, <span class="fl">28.9</span>),</span>
+<span id="cb8-251"><a href="#cb8-251" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(<span class="fl">76.8</span>, <span class="fl">77.35</span>),</span>
+<span id="cb8-252"><a href="#cb8-252" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="cn">FALSE</span></span>
+<span id="cb8-253"><a href="#cb8-253" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-254"><a href="#cb8-254" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-255"><a href="#cb8-255" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb8-256"><a href="#cb8-256" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"What percent of Delhi's population lives close to a metro station?"</span>,</span>
+<span id="cb8-257"><a href="#cb8-257" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="fu">str_wrap</span>(<span class="st">"Delhi Metro (Subway) was started in 2002, First phase was completed in 2006, phase II in 2011, and phase III in 2021. Surprisingly, the percentage of population that lives in areas that are now within 1-2 km of metro stations has not changed since early 1990s!"</span>, <span class="dv">100</span>),</span>
+<span id="cb8-258"><a href="#cb8-258" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> plot_caption,</span>
+<span id="cb8-259"><a href="#cb8-259" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, </span>
+<span id="cb8-260"><a href="#cb8-260" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="cn">NULL</span></span>
+<span id="cb8-261"><a href="#cb8-261" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-262"><a href="#cb8-262" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb8-263"><a href="#cb8-263" aria-hidden="true" tabindex="-1"></a>    <span class="at">text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-264"><a href="#cb8-264" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey30"</span></span>
+<span id="cb8-265"><a href="#cb8-265" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-266"><a href="#cb8-266" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"inside"</span>,</span>
+<span id="cb8-267"><a href="#cb8-267" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_line</span>(</span>
+<span id="cb8-268"><a href="#cb8-268" aria-hidden="true" tabindex="-1"></a>      <span class="at">linewidth =</span> <span class="fl">0.6</span>,</span>
+<span id="cb8-269"><a href="#cb8-269" aria-hidden="true" tabindex="-1"></a>      <span class="at">linetype =</span> <span class="dv">3</span></span>
+<span id="cb8-270"><a href="#cb8-270" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-271"><a href="#cb8-271" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb8-272"><a href="#cb8-272" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Customizing the Legend</span></span>
+<span id="cb8-273"><a href="#cb8-273" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position.inside =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>),</span>
+<span id="cb8-274"><a href="#cb8-274" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.justification =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">0</span>),</span>
+<span id="cb8-275"><a href="#cb8-275" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.direction =</span> <span class="st">"vertical"</span>,</span>
+<span id="cb8-276"><a href="#cb8-276" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box =</span> <span class="st">"horizontal"</span>,</span>
+<span id="cb8-277"><a href="#cb8-277" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">1</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-278"><a href="#cb8-278" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-279"><a href="#cb8-279" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title.position =</span> <span class="st">"top"</span>,</span>
+<span id="cb8-280"><a href="#cb8-280" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-281"><a href="#cb8-281" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">2</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-282"><a href="#cb8-282" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb8-283"><a href="#cb8-283" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.7</span></span>
+<span id="cb8-284"><a href="#cb8-284" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-285"><a href="#cb8-285" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-286"><a href="#cb8-286" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">2</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-287"><a href="#cb8-287" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.2</span></span>
+<span id="cb8-288"><a href="#cb8-288" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-289"><a href="#cb8-289" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.key.height =</span> <span class="fu">unit</span>(<span class="dv">30</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-290"><a href="#cb8-290" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.key.width =</span> <span class="fu">unit</span>(<span class="dv">10</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-291"><a href="#cb8-291" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb8-292"><a href="#cb8-292" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb8-293"><a href="#cb8-293" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-294"><a href="#cb8-294" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-295"><a href="#cb8-295" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">15</span>,<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-296"><a href="#cb8-296" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">4</span> <span class="sc">*</span> bts,</span>
+<span id="cb8-297"><a href="#cb8-297" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span></span>
+<span id="cb8-298"><a href="#cb8-298" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-299"><a href="#cb8-299" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-300"><a href="#cb8-300" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-301"><a href="#cb8-301" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb8-302"><a href="#cb8-302" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-303"><a href="#cb8-303" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="fl">2.5</span> <span class="sc">*</span> bts</span>
+<span id="cb8-304"><a href="#cb8-304" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-305"><a href="#cb8-305" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption =</span> <span class="fu">element_textbox</span>(</span>
+<span id="cb8-306"><a href="#cb8-306" aria-hidden="true" tabindex="-1"></a>      <span class="at">halign =</span> <span class="fl">0.5</span>, </span>
+<span id="cb8-307"><a href="#cb8-307" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-308"><a href="#cb8-308" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">1.2</span>,</span>
+<span id="cb8-309"><a href="#cb8-309" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">150</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>)</span>
+<span id="cb8-310"><a href="#cb8-310" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-311"><a href="#cb8-311" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.spacing =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-312"><a href="#cb8-312" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.background =</span> <span class="fu">element_rect</span>(</span>
+<span id="cb8-313"><a href="#cb8-313" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> <span class="st">"transparent"</span>,</span>
+<span id="cb8-314"><a href="#cb8-314" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"transparent"</span></span>
+<span id="cb8-315"><a href="#cb8-315" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-316"><a href="#cb8-316" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-317"><a href="#cb8-317" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-318"><a href="#cb8-318" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-319"><a href="#cb8-319" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="dv">3</span></span>
+<span id="cb8-320"><a href="#cb8-320" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-321"><a href="#cb8-321" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb8-322"><a href="#cb8-322" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks.length =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>)</span>
+<span id="cb8-323"><a href="#cb8-323" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-324"><a href="#cb8-324" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-325"><a href="#cb8-325" aria-hidden="true" tabindex="-1"></a><span class="co"># An inset graph of changes over years</span></span>
+<span id="cb8-326"><a href="#cb8-326" aria-hidden="true" tabindex="-1"></a>strip_labels <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb8-327"><a href="#cb8-327" aria-hidden="true" tabindex="-1"></a>  <span class="st">"% Population within 1 km"</span>,</span>
+<span id="cb8-328"><a href="#cb8-328" aria-hidden="true" tabindex="-1"></a>  <span class="st">"% Population within 2 km"</span></span>
+<span id="cb8-329"><a href="#cb8-329" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-330"><a href="#cb8-330" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(strip_labels) <span class="ot">&lt;-</span> <span class="fu">unique</span>(plotdf1<span class="sc">$</span>zone)</span>
+<span id="cb8-331"><a href="#cb8-331" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-332"><a href="#cb8-332" aria-hidden="true" tabindex="-1"></a>g2 <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb8-333"><a href="#cb8-333" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> plotdf1,</span>
+<span id="cb8-334"><a href="#cb8-334" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-335"><a href="#cb8-335" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="fu">as.character</span>(year), </span>
+<span id="cb8-336"><a href="#cb8-336" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> perc_pop,</span>
+<span id="cb8-337"><a href="#cb8-337" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> zone</span>
+<span id="cb8-338"><a href="#cb8-338" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-339"><a href="#cb8-339" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-340"><a href="#cb8-340" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(</span>
+<span id="cb8-341"><a href="#cb8-341" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey20"</span>,</span>
+<span id="cb8-342"><a href="#cb8-342" aria-hidden="true" tabindex="-1"></a>    <span class="at">linewidth =</span> <span class="fl">0.2</span></span>
+<span id="cb8-343"><a href="#cb8-343" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-344"><a href="#cb8-344" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(</span>
+<span id="cb8-345"><a href="#cb8-345" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb8-346"><a href="#cb8-346" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(<span class="fu">round</span>(<span class="dv">100</span> <span class="sc">*</span> perc_pop, <span class="dv">1</span>), <span class="st">"%"</span>)</span>
+<span id="cb8-347"><a href="#cb8-347" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-348"><a href="#cb8-348" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb8-349"><a href="#cb8-349" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="sc">-</span><span class="fl">0.35</span>,</span>
+<span id="cb8-350"><a href="#cb8-350" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">12</span>,</span>
+<span id="cb8-351"><a href="#cb8-351" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"grey30"</span>,</span>
+<span id="cb8-352"><a href="#cb8-352" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span></span>
+<span id="cb8-353"><a href="#cb8-353" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-354"><a href="#cb8-354" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(</span>
+<span id="cb8-355"><a href="#cb8-355" aria-hidden="true" tabindex="-1"></a>    <span class="at">labels =</span> <span class="fu">label_percent</span>(),</span>
+<span id="cb8-356"><a href="#cb8-356" aria-hidden="true" tabindex="-1"></a>    <span class="at">expand =</span> <span class="fu">expansion</span>(<span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.2</span>))</span>
+<span id="cb8-357"><a href="#cb8-357" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-358"><a href="#cb8-358" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(</span>
+<span id="cb8-359"><a href="#cb8-359" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb8-360"><a href="#cb8-360" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"red"</span>, <span class="fl">0.3</span>),</span>
+<span id="cb8-361"><a href="#cb8-361" aria-hidden="true" tabindex="-1"></a>      <span class="fu">alpha</span>(<span class="st">"yellow"</span>, <span class="fl">0.3</span>)</span>
+<span id="cb8-362"><a href="#cb8-362" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-363"><a href="#cb8-363" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-364"><a href="#cb8-364" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
+<span id="cb8-365"><a href="#cb8-365" aria-hidden="true" tabindex="-1"></a>    <span class="sc">~</span>zone,</span>
+<span id="cb8-366"><a href="#cb8-366" aria-hidden="true" tabindex="-1"></a>    <span class="at">labeller =</span> <span class="fu">labeller</span>(<span class="at">zone =</span> strip_labels)</span>
+<span id="cb8-367"><a href="#cb8-367" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb8-368"><a href="#cb8-368" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb8-369"><a href="#cb8-369" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb8-370"><a href="#cb8-370" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb8-371"><a href="#cb8-371" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid.major.y =</span> <span class="fu">element_line</span>(</span>
+<span id="cb8-372"><a href="#cb8-372" aria-hidden="true" tabindex="-1"></a>      <span class="at">linewidth =</span> <span class="fl">0.3</span>, <span class="at">linetype =</span> <span class="st">"longdash"</span>,</span>
+<span id="cb8-373"><a href="#cb8-373" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey50"</span></span>
+<span id="cb8-374"><a href="#cb8-374" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-375"><a href="#cb8-375" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"none"</span>,</span>
+<span id="cb8-376"><a href="#cb8-376" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks.length =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-377"><a href="#cb8-377" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-378"><a href="#cb8-378" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">36</span></span>
+<span id="cb8-379"><a href="#cb8-379" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb8-380"><a href="#cb8-380" aria-hidden="true" tabindex="-1"></a>    <span class="at">strip.text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb8-381"><a href="#cb8-381" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="dv">66</span>,</span>
+<span id="cb8-382"><a href="#cb8-382" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"pt"</span>),</span>
+<span id="cb8-383"><a href="#cb8-383" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="st">"grey30"</span></span>
+<span id="cb8-384"><a href="#cb8-384" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-385"><a href="#cb8-385" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-386"><a href="#cb8-386" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-387"><a href="#cb8-387" aria-hidden="true" tabindex="-1"></a>g <span class="ot">&lt;-</span> g1 <span class="sc">+</span></span>
+<span id="cb8-388"><a href="#cb8-388" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inset_element</span>(</span>
+<span id="cb8-389"><a href="#cb8-389" aria-hidden="true" tabindex="-1"></a>    <span class="at">p =</span> g2,</span>
+<span id="cb8-390"><a href="#cb8-390" aria-hidden="true" tabindex="-1"></a>    <span class="at">left =</span> <span class="dv">0</span>, <span class="at">right =</span> <span class="dv">1</span>,</span>
+<span id="cb8-391"><a href="#cb8-391" aria-hidden="true" tabindex="-1"></a>    <span class="at">bottom =</span> <span class="fl">0.02</span>, <span class="at">top =</span> <span class="fl">0.17</span>,</span>
+<span id="cb8-392"><a href="#cb8-392" aria-hidden="true" tabindex="-1"></a>    <span class="at">align_to =</span> <span class="st">"full"</span></span>
+<span id="cb8-393"><a href="#cb8-393" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-394"><a href="#cb8-394" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-395"><a href="#cb8-395" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
+<span id="cb8-396"><a href="#cb8-396" aria-hidden="true" tabindex="-1"></a>  <span class="at">plot =</span> g, </span>
+<span id="cb8-397"><a href="#cb8-397" aria-hidden="true" tabindex="-1"></a>  <span class="at">filename =</span> here<span class="sc">::</span><span class="fu">here</span>(</span>
+<span id="cb8-398"><a href="#cb8-398" aria-hidden="true" tabindex="-1"></a>    <span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
+<span id="cb8-399"><a href="#cb8-399" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cities_pop_subway_3.png"</span></span>
+<span id="cb8-400"><a href="#cb8-400" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb8-401"><a href="#cb8-401" aria-hidden="true" tabindex="-1"></a>  <span class="at">height =</span> <span class="dv">1200</span> <span class="sc">*</span> (<span class="dv">3</span> <span class="sc">*</span> <span class="dv">5</span> <span class="sc">/</span> <span class="dv">4</span>),</span>
+<span id="cb8-402"><a href="#cb8-402" aria-hidden="true" tabindex="-1"></a>  <span class="at">width =</span> <span class="dv">1200</span> <span class="sc">*</span> <span class="dv">3</span>,</span>
+<span id="cb8-403"><a href="#cb8-403" aria-hidden="true" tabindex="-1"></a>  <span class="at">units =</span> <span class="st">"px"</span>,</span>
+<span id="cb8-404"><a href="#cb8-404" aria-hidden="true" tabindex="-1"></a>  <span class="at">bg =</span> <span class="st">"white"</span></span>
+<span id="cb8-405"><a href="#cb8-405" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <div id="fig-3" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -1193,8 +1203,12 @@ Figure&nbsp;3: The graphic illustrates the proportion of Delhi’s population re
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>             <span class="st">"cities_pop_subway_2.png"</span>)</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span> </span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">image_resize</span>(<span class="st">"x400"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">image_write</span>(<span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>              <span class="st">"cities_pop_subways.png"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">image_write</span>(</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    here<span class="sc">::</span><span class="fu">here</span>(</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>      <span class="st">"projects"</span>, <span class="st">"images"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>      <span class="st">"cities_pop_subways.png"</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 

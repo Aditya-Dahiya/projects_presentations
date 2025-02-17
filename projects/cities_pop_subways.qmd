@@ -541,6 +541,8 @@ This R script analyzes population distribution around subway stations in Delhi o
 
 The extracted population data is summarized using **{dplyr}** ([dplyr](https://dplyr.tidyverse.org/)) functions such as `group_by()`, `summarise()`, and `mutate()`, calculating mean and total population within each buffer. The script constructs a multi-layered raster stack to store population data across years and visualizes the results with **{ggplot2}**. A bar chart compares the proportion of Delhi's population within 1 km and 2 km of metro stations over time, highlighting the relatively stable percentage despite metro expansion.
 
+*The analysis shows that the Delhi Metro did not significantly increase population density around metro stations over time. Instead, the metro appears to have been built to connect already densely populated areas rather than driving new population growth in those locations. This suggests that metro development follows existing population patterns, rather than causing major demographic shifts.*
+
 ```{r}
 # Years to plot
 selected_year = c(seq(1991, 2018, 3), 2020)
@@ -587,6 +589,7 @@ for(i in selected_year) {
       year = i,
       zone = c("1 km", "2 km"),
       total_pop = n * mean_pop,
+      tot_del_pop = total_rast_pop$total_pop,
       perc_pop = total_pop / total_rast_pop$total_pop
     )
   )
@@ -618,6 +621,14 @@ for (y in selected_year) {
 
 names(rast_stack) <- as.character(selected_year)
 varnames(rast_stack) <- as.character(selected_year)
+
+pop_compute |> 
+  ggplot(
+    aes(x = year, y = tot_del_pop)
+  ) +
+  geom_col() +
+  facet_wrap(~zone) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()))
 
 plotdf1 <- pop_compute |> 
   mutate(
@@ -951,6 +962,10 @@ image_read(
              "cities_pop_subway_2.png")
 ) |> 
   image_resize("x400") |> 
-  image_write("projects", "images",
-              "cities_pop_subways.png")
+  image_write(
+    here::here(
+      "projects", "images",
+      "cities_pop_subways.png"
+    )
+  )
 ```
