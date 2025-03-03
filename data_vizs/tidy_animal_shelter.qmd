@@ -1,0 +1,353 @@
+---
+title: "tidy_animal_shelter"
+author: "Aditya Dahiya"
+date: "2025-03-01"
+subtitle: "tidy_animal_shelter."
+categories:
+  - "#TidyTuesday"
+  - "Donut Chart"
+image: "thumbnails/tidy_acad_lit_med.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+The [Long Beach Animal Shelter Data](https://data.longbeach.gov/explore/dataset/animal-shelter-intakes-and-outcomes/information/) provides a comprehensive dataset detailing the intake and outcome records of animals at the [City of Long Beach Animal Care Services](https://www.longbeach.gov/acs/), made accessible through the [{animalshelter}](https://emilhvitfeldt.github.io/animalshelter/) R package. Curated by [Lydia Gibson](https://github.com/lgibson7) for the TidyTuesday challenge on March 4, 2025, this dataset allows enthusiasts to explore trends such as how pet adoptions have evolved over time and which types of pets—ranging from cats and dogs to other species—are most frequently adopted. Available in both R and Python, the data can be accessed via packages like `tidytuesdayR` or `PyDyTuesday`, or directly from GitHub, offering variables like `animal_type`, `intake_date`, and `outcome_type` to analyze shelter dynamics. Participants are encouraged to create visualizations or models and share them with hashtags #TidyTuesday and #PydyTuesday, while being mindful not to infer causation due to untracked moderating variables.
+
+![.............](tidy_animal_shelter.png){#fig-1}
+
+## **How I made this graphic?**
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-03-04/longbeach.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Rambla",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Overlock",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "grey92"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** ............", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "................."
+
+plot_subtitle <- str_wrap("...............", 30)
+
+str_view(plot_subtitle)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes/scatterpie.html)} package [@scatterpie] for pie-charts.
+
+```{r}
+#| label: eda-data-wrangling
+
+library(summarytools)
+library(sf)
+longbeach |> 
+  dfSummary() |> 
+  view()
+
+longbeach |> names()
+
+longbeach |> 
+  st_as_sf(
+    coords = c("longitude", "latitude"),
+    crs = "EPSG:4326"
+  ) |> 
+  filter((animal_type %in% c("cat", "dog", "bird", "wild"))) |> 
+  ggplot() +
+  geom_sf(
+    aes(colour = animal_type),
+    alpha = 0.5
+  ) +
+  geom_sf(
+    data = temp1,
+    fill = NA
+  ) +
+  # paletteer::scale_color_paletteer_c(
+  #   "ggthemes::Sunset-Sunrise Diverging"
+  #   ) +
+  coord_sf(
+    xlim = c(-118.22, -118.06),
+    ylim = c(33.74, 33.88),
+    expand = TRUE,
+    default_crs = "EPSG:4326"
+  )
+
+
+longbeach_counties <- geodata::gadm(
+  country = "USA",
+  path = tempdir()
+)
+
+longbeach_bb <- osmdata::getbb("Long Beach")
+
+library(tigris)
+temp1 <- school_districts(
+  year = 2020, 
+  state = "CA",
+  filter_by = longbeach_bb
+  )
+
+# Get administrative boundaries for Long Beach
+osmextract::oe_get(
+  "Long Beach"
+)
+
+```
+
+### The Base Plots
+
+```{r}
+#| label: base-plot
+
+
+
+
+
+
+
+  labs(
+    x = NULL,
+    y = NULL,
+    colour = NULL,
+    subtitle = plot_subtitle,
+    title = plot_title,
+    caption = plot_caption,
+    fill = "Race of\nthe study\nparticipants"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall Plot
+    plot.title.position = "plot",
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_hil,
+      hjust = 0.5,
+      vjust = 0.5
+    ),
+    plot.title = element_text(
+        margin = margin(0,0,15,0, "mm"),
+        colour = text_hil,
+        hjust = 0.5,
+        size = bts * 1.75,
+        family = "title_font",
+        face = "bold",
+        lineheight = 0.3
+      ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      size = bts,
+      hjust = 1, 
+      vjust = 1,
+      lineheight = 0.3,
+      margin = margin(0,0,-200,0, "mm"),
+      family = "caption_font"
+    ),
+    plot.caption = element_textbox(
+      halign = 0,
+      hjust = 0,
+      family = "caption_font",
+      margin = margin(0,0,0,0, "mm"),
+      size = 0.75 * bts
+    ),
+    plot.margin = margin(15,5,10,5, "mm"),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    
+    # Axis and Strips
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    panel.spacing.y = unit(-3.5, "mm"),
+    panel.spacing.x = unit(20, "mm"),
+    strip.text.x = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      angle = 0,
+      face = "bold",
+      family = "caption_font",
+      size = bts,
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    strip.text.y.left = element_text(
+      angle = 0,
+      margin = margin(0,20,0,0, "mm"),
+      face = "bold",
+      size = bts,
+      colour = text_col
+    ),
+    
+    # Legend
+    legend.position = "right",
+    legend.justification = c(1, 0.1),
+    legend.text = element_text(
+      margin = margin(4,0,4,2, "mm"),
+      size = bts
+    ),
+    legend.key.height = unit(5, "mm"),
+    legend.key.width = unit(15, "mm"),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.title = element_text(
+      lineheight = 0.3,
+      margin = margin(0,0,5,0, "mm")
+    )
+    
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_animal_shelter.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_animal_shelter.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_animal_shelter.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
