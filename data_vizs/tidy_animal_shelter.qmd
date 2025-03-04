@@ -31,7 +31,7 @@ comments:
     repo: Aditya-Dahiya/projects_presentations
 ---
 
-The [Long Beach Animal Shelter Data](https://data.longbeach.gov/explore/dataset/animal-shelter-intakes-and-outcomes/information/) provides a comprehensive dataset detailing the intake and outcome records of animals at the [City of Long Beach Animal Care Services](https://www.longbeach.gov/acs/), made accessible through the [{animalshelter}](https://emilhvitfeldt.github.io/animalshelter/) R package. Curated by [Lydia Gibson](https://github.com/lgibson7) for the TidyTuesday challenge on March 4, 2025, this dataset allows enthusiasts to explore trends such as how pet adoptions have evolved over time and which types of pets—ranging from cats and dogs to other species—are most frequently adopted. Available in both R and Python, the data can be accessed via packages like `tidytuesdayR` or `PyDyTuesday`, or directly from GitHub, offering variables like `animal_type`, `intake_date`, and `outcome_type` to analyze shelter dynamics. Participants are encouraged to create visualizations or models and share them with hashtags #TidyTuesday and #PydyTuesday, while being mindful not to infer causation due to untracked moderating variables.
+The [Long Beach Animal Shelter Data](https://data.longbeach.gov/explore/dataset/animal-shelter-intakes-and-outcomes/information/) provides a comprehensive dataset detailing the intake and outcome records of animals at the [City of Long Beach Animal Care Services](https://www.longbeach.gov/acs/), made accessible through the [{animalshelter}](https://emilhvitfeldt.github.io/animalshelter/) R package. Curated by [Lydia Gibson](https://github.com/lgibson7) for the TidyTuesday challenge on March 4, 2025, this dataset allows enthusiasts to explore trends such as how pet adoptions have evolved over time and which types of pets—ranging from cats and dogs to other species—are most frequently adopted.
 
 ![.............](tidy_animal_shelter.png){#fig-1}
 
@@ -52,6 +52,10 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 
+# Geocomputation
+library(sf)                   # Simple features / maps in R
+library(osmdata)              # Getting Open Street Maps data
+
 longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-03-04/longbeach.csv')
 ```
 
@@ -61,7 +65,7 @@ longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/
 #| label: viz-params
 
 # Font for titles
-font_add_google("Rambla",
+font_add_google("Dosis",
   family = "title_font"
 ) 
 
@@ -71,7 +75,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Overlock",
+font_add_google("Dosis",
   family = "body_font"
 ) 
 
@@ -104,7 +108,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** ............", 
+  "**Data:** Lydia Gibson & City of Long Beach Animal Care Services", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -124,33 +128,127 @@ str_view(plot_subtitle)
 
 ### Exploratory Data Analysis and Wrangling
 
-Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes/scatterpie.html)} package [@scatterpie] for pie-charts.
+Get City of Long Beach district boundaries from [official website](https://data.longbeach.gov/explore/dataset/colb-council-districts/export/).
+
+```{r}
+#| label: get-city-districts
+
+# Try {geodata} to get district boundaries
+# longbeach_counties <- geodata::gadm(
+#   country = "USA",
+#   path = tempdir()
+# )
+
+# Trying {tigris} to get districts boundaries  
+# library(tigris)
+# temp1 <- school_districts(
+#   year = 2020, 
+#   state = "CA",
+#   filter_by = longbeach_bb
+#   )
+
+# Try {osmdata} to get district boundaries
+# longbeach_bb <- osmdata::getbb("Long Beach")
+# 
+# longbeach_districts <- opq(bbox = longbeach_bb) |> 
+#   add_osm_feature(
+#     key = "boundary",
+#     value = c("administrative")
+#   ) |> 
+#   osmdata_sf()
+
+library(httr)
+
+# Define the URL
+shapefile_url <- "https://data.longbeach.gov/api/explore/v2.1/catalog/datasets/colb-council-districts/exports/shp?lang=en&timezone=Asia%2FKolkata"
+
+# Create a temporary directory
+temp_dir <- tempdir()
+zip_file <- file.path(tempdir(), "shapefile.zip")
+
+# Download the ZIP file
+GET(shapefile_url, write_disk(zip_file, overwrite = TRUE))
+
+# Unzip the downloaded file
+unzip(zip_file, exdir = temp_dir)
+
+# Identify the .shp file (assuming it is named 'colb-council-districts.shp')
+
+# Identify the .shp file (assuming it is named 'colb-council-districts.shp')
+shp_file <- file.path(temp_dir, "colb-council-districts.shp")
+
+# Read the shapefile into an sf object
+council_districts <- st_read(shp_file)
+
+rm(temp_dir, shapefile_url, shp_file, zip_file)
+
+longbeach_districts <- council_districts |>
+  mutate(
+    district = council_num,
+    pop = population,
+    area = shape_area,
+    geometry = geometry,
+    .keep = "none"
+  )
+```
 
 ```{r}
 #| label: eda-data-wrangling
 
-library(summarytools)
-library(sf)
-longbeach |> 
-  dfSummary() |> 
-  view()
+# library(summarytools)
 
-longbeach |> names()
+# longbeach |> 
+#   dfSummary() |> 
+#   view()
+# 
+# longbeach |> names()
 
-longbeach |> 
+# gEt only few types of animals which we can plot
+df1 <- longbeach |> 
+  mutate(
+    animal_type = case_when(
+      animal_type == "cat" ~ "Cat",
+      animal_type == "dog" ~ "Dog",
+      animal_type == "bird" ~ "Bird",
+      animal_type == "wild" ~ "Wild",
+      .default = "Others"
+    ),
+    animal_type = fct(
+      animal_type,
+      levels = c(
+        "Cat", "Dog", "Bird", "Wild", "Others"
+    ))
+  ) |>
   st_as_sf(
     coords = c("longitude", "latitude"),
     crs = "EPSG:4326"
   ) |> 
-  filter((animal_type %in% c("cat", "dog", "bird", "wild"))) |> 
-  ggplot() +
+  select(animal_type, geometry) |> 
+  st_join(longbeach_districts)
+
+# Animal Type per district
+df2 <- df1 |> 
+  st_drop_geometry() |> 
+  group_by(district) |> 
+  count(animal_type) |> 
+  filter(!is.na(district))
+
+# A comparison chart
+df2 |> 
+  ggplot(
+    aes(
+      x = district, y = n, fill = animal_type
+    )
+  ) +
+  geom_col(
+    position = "fill"
+  )
+
+
+ggplot(df1) +
   geom_sf(
     aes(colour = animal_type),
     alpha = 0.5
-  ) +
-  geom_sf(
-    data = temp1,
-    fill = NA
   ) +
   # paletteer::scale_color_paletteer_c(
   #   "ggthemes::Sunset-Sunrise Diverging"
@@ -162,19 +260,21 @@ longbeach |>
     default_crs = "EPSG:4326"
   )
 
-
-longbeach_counties <- geodata::gadm(
-  country = "USA",
-  path = tempdir()
-)
-
-longbeach_bb <- osmdata::getbb("Long Beach")
-
-library(tigris)
-temp1 <- school_districts(
-  year = 2020, 
-  state = "CA",
-  filter_by = longbeach_bb
+council_districts |> 
+  ggplot() +
+  geom_sf(fill = NA) +
+  geom_sf(
+    data = df1,
+    mapping = aes(
+      colour = animal_type
+    ),
+    alpha = 0.1
+  ) +
+  coord_sf(
+    xlim = c(-118.22, -118.06),
+    ylim = c(33.74, 33.88),
+    expand = TRUE,
+    default_crs = "EPSG:4326"
   )
 
 # Get administrative boundaries for Long Beach
@@ -185,6 +285,8 @@ osmextract::oe_get(
 ```
 
 ### The Base Plots
+
+Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes/scatterpie.html)} package [@scatterpie] for pie-charts.
 
 ```{r}
 #| label: base-plot
