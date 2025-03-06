@@ -55,6 +55,7 @@ library(colorspace)           # Lighten and Darken colours
 # Geocomputation
 library(sf)                   # Simple features / maps in R
 library(osmdata)              # Getting Open Street Maps data
+library(ggmap)                # Get background maps
 
 longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-03-04/longbeach.csv')
 ```
@@ -81,8 +82,11 @@ font_add_google("Dosis",
 
 showtext_auto()
 
+mypal <- c("#6388B4", "#FFAE34", "#EF6F6A", "#8CC2CA", "#55AD89")
+# cols4all::c4a_gui()
+
 # A base Colour
-bg_col <- "grey92"
+bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
@@ -148,7 +152,7 @@ Get City of Long Beach district boundaries from [official website](https://data.
 #   )
 
 # Try {osmdata} to get district boundaries
-# longbeach_bb <- osmdata::getbb("Long Beach")
+longbeach_bb <- osmdata::getbb("Long Beach")
 # 
 # longbeach_districts <- opq(bbox = longbeach_bb) |> 
 #   add_osm_feature(
@@ -190,6 +194,8 @@ longbeach_districts <- council_districts |>
     geometry = geometry,
     .keep = "none"
   )
+
+
 ```
 
 ```{r}
@@ -244,43 +250,95 @@ df2 |>
     position = "fill"
   )
 
+# Convert df2 into a tibble that {scatterpie} can understand
+df3 <- df2 |> 
+  pivot_wider(
+    id_cols = district,
+    names_from = animal_type,
+    values_from = n
+  ) |> 
+  mutate(
+    total  = Cat + Dog + Bird + Wild + Others
+  ) |> 
+  
+  # Add latitude and longitude from centroids of districts
+  left_join(
+    council_districts |> 
+      mutate(district = council_num) |> 
+      select(district, geometry) |> 
+      st_centroid() |> 
+      mutate(
+        longitude = st_coordinates(geometry)[,1],
+        latitude = st_coordinates(geometry)[,2]
+        ) |> 
+      st_drop_geometry()
 
-ggplot(df1) +
-  geom_sf(
-    aes(colour = animal_type),
-    alpha = 0.5
-  ) +
-  # paletteer::scale_color_paletteer_c(
-  #   "ggthemes::Sunset-Sunrise Diverging"
-  #   ) +
-  coord_sf(
-    xlim = c(-118.22, -118.06),
-    ylim = c(33.74, 33.88),
-    expand = TRUE,
-    default_crs = "EPSG:4326"
   )
 
-council_districts |> 
-  ggplot() +
-  geom_sf(fill = NA) +
-  geom_sf(
-    data = df1,
-    mapping = aes(
-      colour = animal_type
-    ),
-    alpha = 0.1
-  ) +
-  coord_sf(
-    xlim = c(-118.22, -118.06),
-    ylim = c(33.74, 33.88),
-    expand = TRUE,
-    default_crs = "EPSG:4326"
-  )
 
-# Get administrative boundaries for Long Beach
-osmextract::oe_get(
-  "Long Beach"
+ggplot() +
+   +
+  coord_equal()
+
+
+```
+
+```{r}
+#| label: get-base-map-from-ggmap
+
+
+# Required packages
+library(ggmap)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+
+# Get the map from ggmap
+register_stadiamaps("YOUR-API-KEY-HERE")
+
+# Define the bounding box (assuming longbeach_bb is defined elsewhere)
+# Example: longbeach_bb <- c(left = -118.25, bottom = 33.75, right = -118.10, top = 33.85)
+longbeach_basemap <- get_stadiamap(
+  bbox = longbeach_bb,
+  zoom = 10,
+  maptype = "stamen_toner_lines"
 )
+
+# Plot the basemap
+ggmap(longbeach_basemap)
+
+# Get the map from ggmap
+longbeach_basemap <- get_stadiamap(
+  bbox = longbeach_bb,
+  zoom = 10,
+  maptype = "stamen_toner_lines"
+)
+
+# Extract the raster data (RGB) and coordinates from the ggmap object
+raster_data <- as.raster(longbeach_basemap)  # Convert ggmap object to raster
+bbox <- attr(longbeach_basemap, "bb")        # Get bounding box attributes
+
+# Convert the raster to a matrix of RGB values
+rgb_matrix <- as.array(raster_data)
+
+# Create a SpatRaster from the RGB matrix
+spat_raster <- rast(rgb_matrix)
+
+# Set the extent of the SpatRaster using the bounding box
+ext(spat_raster) <- c(bbox$left, bbox$right, bbox$bottom, bbox$top)
+
+# Set the coordinate reference system (CRS) - Stadia Maps typically uses WGS84 (EPSG:4326)
+crs(spat_raster) <- "EPSG:4326"
+
+# Name the layers for RGB channels
+names(spat_raster) <- c("red", "green", "blue")
+
+# Plot with ggplot2 and tidyterra
+ggplot() +
+  geom_spatraster_rgb(data = spat_raster) +  # Use tidyterra to plot RGB
+  coord_sf(crs = "EPSG:4326") +                      # Ensure correct CRS for plotting
+  labs(title = "Long Beach Stamen Toner Lines Map") +
+  theme_minimal()
 
 ```
 
@@ -291,12 +349,41 @@ Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes
 ```{r}
 #| label: base-plot
 
-
-
-
-
-
-
+g <- ggplot(df1) +
+  geom_sf(
+    aes(colour = animal_type),
+    alpha = 0.1,
+    size = 0.2
+  ) +
+  geom_sf(
+    data = longbeach_districts,
+    colour = "grey20",
+    fill = NA
+  ) +
+  scatterpie::geom_scatterpie(
+    data = df3,
+    aes(
+      x = longitude, 
+      y = latitude, 
+      group = district
+    ),
+    cols = c(
+      "Cat", "Dog", "Bird", "Wild", "Others"
+    ),
+    colour = bg_col,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(values = mypal) +
+  coord_sf(
+    xlim = c(-118.22, -118.06),
+    ylim = c(33.74, 33.88),
+    expand = TRUE,
+    default_crs = "EPSG:4326"
+  ) +
+  guides(
+    alpha = "none",
+    colour = "none"
+  ) +
   labs(
     x = NULL,
     y = NULL,
@@ -304,7 +391,7 @@ Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes
     subtitle = plot_subtitle,
     title = plot_title,
     caption = plot_caption,
-    fill = "Race of\nthe study\nparticipants"
+    fill = "Type of animal"
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -332,20 +419,20 @@ Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes
     plot.subtitle = element_text(
       colour = text_hil,
       size = bts,
-      hjust = 1, 
-      vjust = 1,
+      hjust = 0.5, 
+      vjust = 0.5,
       lineheight = 0.3,
-      margin = margin(0,0,-200,0, "mm"),
+      margin = margin(0,0,0,0, "mm"),
       family = "caption_font"
     ),
     plot.caption = element_textbox(
       halign = 0,
-      hjust = 0,
+      hjust = 0.5,
       family = "caption_font",
       margin = margin(0,0,0,0, "mm"),
       size = 0.75 * bts
     ),
-    plot.margin = margin(15,5,10,5, "mm"),
+    plot.margin = margin(5,0,5,0, "mm"),
     panel.background = element_rect(
       fill = "transparent",
       colour = "transparent"
@@ -356,42 +443,26 @@ Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes
     ),
     
     # Axis and Strips
-    axis.text = element_blank(),
+    axis.text = element_text( 
+      size = 0.5 * bts,
+      margin = margin(0,0,0,0, "mm")
+      ),
     axis.ticks = element_blank(),
     axis.ticks.length = unit(0, "mm"),
-    panel.spacing.y = unit(-3.5, "mm"),
-    panel.spacing.x = unit(20, "mm"),
-    strip.text.x = element_text(
-      margin = margin(0,0,5,0, "mm"),
-      angle = 0,
-      face = "bold",
-      family = "caption_font",
-      size = bts,
-      lineheight = 0.3,
-      colour = text_col
-    ),
-    strip.text.y.left = element_text(
-      angle = 0,
-      margin = margin(0,20,0,0, "mm"),
-      face = "bold",
-      size = bts,
-      colour = text_col
-    ),
     
     # Legend
-    legend.position = "right",
-    legend.justification = c(1, 0.1),
+    legend.position = "bottom",
     legend.text = element_text(
-      margin = margin(4,0,4,2, "mm"),
+      margin = margin(0,0,0,0, "mm"),
       size = bts
     ),
     legend.key.height = unit(5, "mm"),
-    legend.key.width = unit(15, "mm"),
+    legend.key.width = unit(25, "mm"),
     legend.margin = margin(0,0,0,0, "mm"),
     legend.box.margin = margin(0,0,0,0, "mm"),
     legend.title = element_text(
       lineheight = 0.3,
-      margin = margin(0,0,5,0, "mm")
+      margin = margin(0,0,0,0, "mm")
     )
     
   )
