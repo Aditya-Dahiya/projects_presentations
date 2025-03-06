@@ -33,6 +33,8 @@ comments:
 
 The [Long Beach Animal Shelter Data](https://data.longbeach.gov/explore/dataset/animal-shelter-intakes-and-outcomes/information/) provides a comprehensive dataset detailing the intake and outcome records of animals at the [City of Long Beach Animal Care Services](https://www.longbeach.gov/acs/), made accessible through the [{animalshelter}](https://emilhvitfeldt.github.io/animalshelter/) R package. Curated by [Lydia Gibson](https://github.com/lgibson7) for the TidyTuesday challenge on March 4, 2025, this dataset allows enthusiasts to explore trends such as how pet adoptions have evolved over time and which types of pets—ranging from cats and dogs to other species—are most frequently adopted.
 
+Using the Long Beach Animal Shelter dataset, this graphic maps the locations of rescued animals across the city’s districts, leveraging latitude and longitude data. A base map of Long Beach was sourced from {ggmap} and Stadia Maps, converted to a SpatRaster with {terra}, and cropped to district boundaries for precision. Pie charts, created with {scatterpie} and positioned at district centroids using {sf}, illustrate the distribution of rescued animal types—"Cat," "Dog," "Bird," "Wild," and "Others"—within each district. The analysis reveals that cats are the most frequently rescued animals across all districts, followed by dogs. Notably, Districts 3 and 4 stand out with significant rescues of birds and wild animals alongside cats and dogs, highlighting distinct regional patterns in animal shelter intakes.
+
 ![.............](tidy_animal_shelter.png){#fig-1}
 
 ## **How I made this graphic?**
@@ -66,7 +68,7 @@ longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/
 #| label: viz-params
 
 # Font for titles
-font_add_google("Dosis",
+font_add_google("Encode Sans Condensed",
   family = "title_font"
 ) 
 
@@ -79,6 +81,12 @@ font_add_google("Saira Extra Condensed",
 font_add_google("Dosis",
   family = "body_font"
 ) 
+
+# Font for background text
+font_add_google(
+  "Sigmar One",
+  family = "back_font"
+)
 
 showtext_auto()
 
@@ -123,9 +131,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "................."
+plot_title <- "Paws, Wings, and Tails!\nMapping Animal Rescues in Long Beach"
 
-plot_subtitle <- str_wrap("...............", 30)
+plot_subtitle <- str_wrap("Cats dominate animal rescues across all Long Beach districts, followed by dogs, with Districts 3 and 4 uniquely showing notable numbers of birds and wild animals. This map visualizes shelter intakes using pie charts at district centroids, built with R packages {ggmap}, {terra}, {sf}, {scatterpie}, and {ggplot2}.", 110)
 
 str_view(plot_subtitle)
 ```
@@ -274,18 +282,10 @@ df3 <- df2 |>
       st_drop_geometry()
 
   )
-
-
-ggplot() +
-   +
-  coord_equal()
-
-
 ```
 
 ```{r}
 #| label: get-base-map-from-ggmap
-
 
 # Required packages
 library(ggmap)
@@ -294,52 +294,26 @@ library(ggplot2)
 library(tidyterra)
 
 # Get the map from ggmap
-register_stadiamaps("YOUR-API-KEY-HERE")
+# register_stadiamaps("YOUR-API-KEY-HERE")
 
 # Define the bounding box (assuming longbeach_bb is defined elsewhere)
 # Example: longbeach_bb <- c(left = -118.25, bottom = 33.75, right = -118.10, top = 33.85)
 longbeach_basemap <- get_stadiamap(
   bbox = longbeach_bb,
-  zoom = 10,
-  maptype = "stamen_toner_lines"
+  zoom = 14,
+  maptype = "stamen_toner_lite"
 )
 
-# Plot the basemap
-ggmap(longbeach_basemap)
-
-# Get the map from ggmap
-longbeach_basemap <- get_stadiamap(
-  bbox = longbeach_bb,
-  zoom = 10,
-  maptype = "stamen_toner_lines"
-)
-
-# Extract the raster data (RGB) and coordinates from the ggmap object
-raster_data <- as.raster(longbeach_basemap)  # Convert ggmap object to raster
-bbox <- attr(longbeach_basemap, "bb")        # Get bounding box attributes
-
-# Convert the raster to a matrix of RGB values
-rgb_matrix <- as.array(raster_data)
-
-# Create a SpatRaster from the RGB matrix
-spat_raster <- rast(rgb_matrix)
-
-# Set the extent of the SpatRaster using the bounding box
-ext(spat_raster) <- c(bbox$left, bbox$right, bbox$bottom, bbox$top)
-
-# Set the coordinate reference system (CRS) - Stadia Maps typically uses WGS84 (EPSG:4326)
-crs(spat_raster) <- "EPSG:4326"
-
-# Name the layers for RGB channels
-names(spat_raster) <- c("red", "green", "blue")
-
-# Plot with ggplot2 and tidyterra
-ggplot() +
-  geom_spatraster_rgb(data = spat_raster) +  # Use tidyterra to plot RGB
-  coord_sf(crs = "EPSG:4326") +                      # Ensure correct CRS for plotting
-  labs(title = "Long Beach Stamen Toner Lines Map") +
-  theme_minimal()
-
+# Create a SpatRaster from the {ggmap} base map
+spat_raster1 <- rast(longbeach_basemap) |> 
+  crop(
+    vect(
+      council_districts |> 
+      st_geometry() |> 
+      st_union()
+      ),
+    mask = TRUE
+  )
 ```
 
 ### The Base Plots
@@ -350,15 +324,30 @@ Using {[scatterpie](https://cran.r-project.org/web/packages/scatterpie/vignettes
 #| label: base-plot
 
 g <- ggplot(df1) +
+  geom_spatraster_rgb(
+    data = spat_raster1,
+    maxcell = Inf
+  ) +
   geom_sf(
     aes(colour = animal_type),
-    alpha = 0.1,
-    size = 0.2
+    alpha = 0.2,
+    size = 0.4
   ) +
   geom_sf(
     data = longbeach_districts,
     colour = "grey20",
-    fill = NA
+    fill = NA,
+    linewidth = 1.4
+  ) +
+  geom_sf_text(
+    data = longbeach_districts,
+    aes(label = paste0("District ", district)),
+    colour = "grey50",
+    size = bts / 2.5,
+    nudge_y = -0.005,
+    family = "title_font",
+    alpha = 0.5,
+    fontface = "bold"
   ) +
   scatterpie::geom_scatterpie(
     data = df3,
@@ -371,12 +360,15 @@ g <- ggplot(df1) +
       "Cat", "Dog", "Bird", "Wild", "Others"
     ),
     colour = bg_col,
-    alpha = 0.8
+    alpha = 0.6,
+    donut_radius = 0.4,
+    pie_scale = 5,
+    linewidth = 0.4
   ) +
   scale_fill_manual(values = mypal) +
   coord_sf(
-    xlim = c(-118.22, -118.06),
-    ylim = c(33.74, 33.88),
+    xlim = c(-118.25, -118.06),
+    ylim = c(33.73, 33.89),
     expand = TRUE,
     default_crs = "EPSG:4326"
   ) +
@@ -408,17 +400,17 @@ g <- ggplot(df1) +
       vjust = 0.5
     ),
     plot.title = element_text(
-        margin = margin(0,0,15,0, "mm"),
+        margin = margin(10,0,5,0, "mm"),
         colour = text_hil,
         hjust = 0.5,
-        size = bts * 1.75,
+        size = bts * 2,
         family = "title_font",
         face = "bold",
         lineheight = 0.3
       ),
     plot.subtitle = element_text(
       colour = text_hil,
-      size = bts,
+      size = bts * 1.2,
       hjust = 0.5, 
       vjust = 0.5,
       lineheight = 0.3,
@@ -429,7 +421,7 @@ g <- ggplot(df1) +
       halign = 0,
       hjust = 0.5,
       family = "caption_font",
-      margin = margin(0,0,0,0, "mm"),
+      margin = margin(5,0,5,0, "mm"),
       size = 0.75 * bts
     ),
     plot.margin = margin(5,0,5,0, "mm"),
@@ -453,18 +445,24 @@ g <- ggplot(df1) +
     # Legend
     legend.position = "bottom",
     legend.text = element_text(
-      margin = margin(0,0,0,0, "mm"),
+      margin = margin(0,0,0,2, "mm"),
       size = bts
     ),
     legend.key.height = unit(5, "mm"),
-    legend.key.width = unit(25, "mm"),
+    legend.key.width = unit(10, "mm"),
     legend.margin = margin(0,0,0,0, "mm"),
     legend.box.margin = margin(0,0,0,0, "mm"),
     legend.title = element_text(
       lineheight = 0.3,
-      margin = margin(0,0,0,0, "mm")
-    )
+      margin = margin(0,15,0,0, "mm")
+    ),
     
+    # Panel Grid
+    panel.grid = element_line(
+      linetype = 3,
+      colour = "grey50",
+      linewidth = 0.1
+    )
   )
 
 ggsave(
