@@ -1,10 +1,12 @@
 ---
-title: ".............."
+title: "Palm Trees' Species: Skyward or Sprawling"
 author: "Aditya Dahiya"
-date: "2025-03-17"
-subtitle: "................."
+date: "2025-03-22"
+subtitle: "The majority of the approximately 1800 palm tree species are either erect and non-climbing, characterized by tall, slender stems with much greater height than diameter, or non-erect and climbing, with wider stems relative to their height. Very few species fall outside these two dominant growth forms."
 categories:
   - "#TidyTuesday"
+  - "{ggblend}"
+  - "Scatter-plot"
 image: "thumbnails/tidy_palm_trees.png"
 format:
   html:
@@ -34,7 +36,7 @@ comments:
 
 The dataset for this week's exploration of [Palm Trees](https://www.nature.com/articles/s41597-019-0189-0) is sourced from the [PalmTraits 1.0 database](https://www.nature.com/articles/s41597-019-0189-0), a comprehensive global compilation of functional traits for palms (Arecaceae), a plant family pivotal in tropical and subtropical ecosystems. Accessible via the [`palmtrees` R package](https://github.com/EmilHvitfeldt/palmtrees) developed by [Emil Hvitfeldt](https://github.com/EmilHvitfeldt), this dataset was curated by [Lydia Gibson](https://github.com/lgibson7) for [TidyTuesday](https://github.com/rfordatascience/tidytuesday). It includes detailed taxonomic information such as species names (`spec_name`), genus (`acc_genus`), and subfamily (`palm_subfamily`), alongside functional traits like growth habits (e.g., `climbing`, `acaulescent`, `erect`), stem characteristics (e.g., `max_stem_height_m`, `stem_armed`), leaf dimensions (e.g., `max__blade__length_m`), and fruit properties (e.g., `average_fruit_length_cm`, `main_fruit_colors`).
 
-![......................](tidy_palm_trees.png){#fig-1}
+![A scatterplot showing maximum stem diameter (cm) on the X-axis and maximum stem diameter (m) on the Y-axis. The colours of dots refer to the stem-erectness and shape of dots refer to climbing habit. An important technique is the use of blending of colours using {ggblend} to ensure that near the origin of the graph, the overlapping points don’t lead to a loss of visual pattern. The two groups of palm trees’ species emerge which is distinctly visible.](tidy_palm_trees.png){#fig-1}
 
 ## **How I made this graphic?**
 
@@ -72,7 +74,7 @@ font_add_google("Saira Extra Condensed",
 ) 
 
 # Font for plot text
-font_add_google("Truculenta",
+font_add_google("Cuprum",
   family = "body_font"
 ) 
 
@@ -96,7 +98,7 @@ seecolor::print_color(text_col)
 line_col <- "grey30"
 
 # Define Base Text Size
-bts <- 90 
+bts <- 120
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -123,9 +125,9 @@ rm(github, github_username, xtwitter,
 # Add text to plot-------------------------------------------------
 plot_title <- "Palm Trees' Species: Skyward or Sprawling"
 
-plot_subtitle <- str_wrap("The majority of the approximately 1800 palm tree species are either erect and non-climbing, characterized by tall, slender stems with much greater height than diameter, or non-erect and climbing, with wider stems relative to their height. Very few species fall outside these two dominant growth forms.", 110)
+plot_subtitle <- "The majority of the approximately 1800 palm tree species are either erect and non-climbing, characterized by tall, slender stems with much greater height than diameter, or non-erect and climbing, with wider stems relative to their height. Very few species fall outside these two dominant growth forms."
 
-str_view(plot_subtitle)
+# str_view(plot_subtitle)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -259,37 +261,49 @@ g <- df |>
     )
   ) +
   geom_point(
-    size = 5,
+    size = 7,
     position = position_jitter(
       width = 3,
       height = 4
     ),
     alpha = 0.5
-  ) |> ggblend::blend("multiply") +
+  ) |> ggblend::blend("lighten") +
   annotate(
     geom = "text",
     colour = text_col,
     x = 50, y = 75,
     hjust = 1,
     vjust = 1,
-    size = bts / 4,
-    label = plot_subtitle,
+    size = bts / 3.3,
+    label = str_wrap(plot_subtitle, 60),
     lineheight = 0.3,
     family = "body_font"
   ) +
   paletteer::scale_colour_paletteer_d("ltc::trio3") +
   scale_x_continuous(
     limits = c(0, 50),
-    oob = scales::squish,
+    # oob = scales::squish,
     expand = expansion(0)
   ) +
   scale_y_continuous(
     limits = c(0, 75),
-    oob = scales::squish,
+    # oob = scales::squish,
     expand = expansion(0)
   ) +
   coord_cartesian(
     clip = "off"
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 10
+      )
+    ),
+    shape = guide_legend(
+      override.aes = list(
+        size = 10
+      )
+    )
   ) +
   labs(
     x = "Maximum Stem Diameter (cm)",
@@ -301,13 +315,13 @@ g <- df |>
   ) +
   
   theme_classic(
-    base_family = "body_font",
+    base_family = "caption_font",
     base_size = bts
   ) +
   theme(
     
     # Overall
-    plot.margin = margin(5,5,5,5, "mm"),
+    plot.margin = margin(15,10,15,10, "mm"),
     plot.title.position = "plot",
     panel.grid.major = element_line(
       linetype = "longdash",
@@ -335,9 +349,6 @@ g <- df |>
     axis.ticks.length = unit(6, "mm"),
     text = element_text(
       colour = text_col,
-      margin = margin(0,0,0,0, "mm"),
-      hjust = 0.5,
-      vjust = 0.5,
       lineheight = 0.3
     ),
     
@@ -354,8 +365,8 @@ g <- df |>
     # Labels and Strip Text
     plot.title = element_text(
       colour = text_hil,
-      margin = margin(5,0,5,0, "mm"),
-      size = bts * 2,
+      margin = margin(5,0,15,0, "mm"),
+      size = bts * 1.7,
       lineheight = 0.3,
       hjust = 0.5,
       family = "title_font"
@@ -368,15 +379,19 @@ g <- df |>
     ),
     
     # Legend
-    legend.position = "bottom",
+    legend.position = "inside",
+    legend.position.inside = c(1, 0.75),
+    legend.direction = "vertical",
+    legend.box = "horizontal",
+    legend.justification.inside = c(1, 1),
     legend.box.margin = margin(0,0,0,0, "mm"),
     legend.margin = margin(0,0,0,0, "mm"),
     legend.title = element_text(
-      margin = margin(0,0,0,0, "mm"),
+      margin = margin(0,0,5,0, "mm"),
       hjust = 0.5
     ),
     legend.text = element_text(
-      margin = margin(0,0,0,2, "mm")
+      margin = margin(2,0,2,3, "mm")
     ),
     legend.title.position = "top"
   )
@@ -423,6 +438,17 @@ image_read(here::here("data_vizs",
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
 
 
 sessioninfo::session_info()$packages |> 
