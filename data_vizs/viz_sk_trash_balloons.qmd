@@ -1,0 +1,556 @@
+---
+title: "Visualizing the North Korean Trash balloons"
+author: "Aditya Dahiya"
+date: "2025-03-31"
+subtitle: "Using R packages like sf, terra, and ggplot2, this article maps South Korea’s trash balloons, revealing geospatial insights into North Korea’s 2024 campaign through advanced analysis and visualization techniques."
+categories:
+  - "Geocomputation"
+  - "{osmdata}"
+  - "Open Street Maps"
+  - "{ggmap}"
+  - "{elevatr}"
+  - "Raster"
+  - "Population Density Raster"
+  - "{ggimage}"
+image: "thumbnails/viz_sk_trash_balloons.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The data for creating a graphical map of trash balloons is sourced from the Beyond Parallel project, an initiative of the Center for Strategic and International Studies (CSIS) Korea Chair. This dataset is based on their detailed research and analysis of North Korea's garbage-filled balloons sent into South Korea in 2024. The information was compiled from multiple sources, including satellite imagery, local media reports, and possibly government data, providing a comprehensive view of the balloon landings. The Beyond Parallel article, authored by Victor Cha and Andy Lim, offers a detailed map, while the Reuters article supplements this with additional context and CSIS data. For further details, refer to the original articles: [Beyond Parallel](https://beyondparallel.csis.org/map-of-north-koreas-garbage-filled-balloons/) and [Reuters](https://www.reuters.com/graphics/NORTHKOREA-SOUTHKOREA/TRASH/klvynygmjpg/). Credit goes to these teams for their rigorous data collection and analysis.
+
+![Using data from the Beyond Parallel project by the Center for Strategic and International Studies, this map of South Korea integrates elevation (hill-shade) and population density (darker purple indicating higher density) to contextualize the locations of trash balloons launched from North Korea in 2024. The balloons are depicted as dots, with colors transitioning from red (earlier dates) to black (later dates), revealing a notable concentration around Seoul, particularly during June-July. The visualization was crafted using key R packages: sf for spatial data handling, terra for raster processing, elevatr for elevation data, and ggplot2 for plotting. Additional enhancements were made with tidyterra and ggspatial for geospatial plotting, ggtext and showtext for text formatting, and fontawesome for design elements, creating a detailed and informative graphic.](viz_sk_trash_balloons.png){#fig-1}
+
+### How I made this graphic?
+
+To craft the map of South Korea’s trash balloons as shown in your code, a combination of geospatial analysis and sophisticated visualization techniques was employed, utilizing several powerful R packages. The [**sf**](https://r-spatial.github.io/sf/) package was pivotal for managing spatial data, allowing the transformation of administrative boundaries for South Korea, North Korea, and Japan—sourced via [**geodata**](https://github.com/r-spatial/geodata) and tidied with [**janitor**](https://github.com/sfirke/janitor)—into simple features. Elevation data, fetched using [**elevatr**](https://github.com/jhollist/elevatr), was processed with [**terra**](https://rspatial.github.io/terra/) to generate a hill-shade effect, enhancing the map’s topographic depth. This involved computing slope and aspect with `terra::terrain` and applying `terra::shade` to simulate sunlight from a 315-degree direction at a 30-degree angle. Population density data, derived from a global raster, was cropped and masked to South Korea’s boundaries using `terra::crop` and `terra::mask`, then refined with `terra::disagg` to boost resolution for a seamless fit with the vector map. The balloon locations, stored as point data in an [**sf**](https://r-spatial.github.io/sf/) object, were overlaid with a color gradient tied to detection dates using [**ggplot2**](https://ggplot2.tidyverse.org/)’s `scale_colour_date`.
+
+The visualization was built on [**ggplot2**](https://ggplot2.tidyverse.org/), with extensions like [**tidyterra**](https://dieghernan.github.io/tidyterra/) enabling the integration of raster layers (elevation and population density) into the plot. The [**ggspatial**](https://github.com/paleolimbot/ggspatial) package added a scale bar and north arrow, styled to complement the map’s design, while [**ggnewscale**](https://github.com/eliocamp/ggnewscale) managed multiple fill scales—greyscale for hill-shade and a purple gradient from [**paletteer**](https://github.com/EmilHvitfeldt/paletteer) for population density. Text elements were enhanced with [**ggtext**](https://github.com/wilkelab/ggtext) and [**showtext**](https://github.com/yixuan/showtext) for markdown formatting and custom fonts (e.g., Barlow from Google Fonts), and [**fontawesome**](https://github.com/rstudio/fontawesome) provided social media icons in the caption. The final composition layered these elements—balloons in a red-to-black gradient, administrative boundaries, and a detailed topographic and demographic backdrop—creating an informative and visually striking map of the trash balloon phenomenon in South Korea.
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(sf)                   # Simple Features in R
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+library(ggspatial)            # Scales and Arrows on maps
+
+# Data Wrangling & ggplot2
+library(tidyverse)            # All things tidy
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Barlow",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+# Get a Korean Style Colour Palette from
+# https://www.schemecolor.com/korean-style.php
+mypal <- c("#293380", "#953D60", "#F0EFF7",
+           "#DDBFE4", "#869FDE", "#8ABFE8")
+
+# A base Colour
+bg_col <- mypal[3]
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[1]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[1]
+seecolor::print_color(text_col)
+
+# Colour for location points
+point_col <- mypal[2]
+seecolor::print_color(point_col)
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Beyond Parallel project by Center for Strategic and International Studies ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Mapping the Menace:\nTrash Balloons Over South Korea"
+
+plot_subtitle <- "Locations of trash balloons launched from North Korea into South Korea in 2024, with detection dates colored from red to black, overlaid on elevation and population density (darker purple indicating higher density), showing a concentration around Seoul, especially peaking in June-July."
+```
+
+Get raw data, elevation data for South Korea and neighbouring countries
+
+```{r}
+#| label: eda-data-wrangling
+
+# Administrative Boundaries for South Korea, North Korea and Japan
+raw_admin <- geodata::gadm(
+  country = c("KOR", "PRK", "JPN"),
+  level = 1,
+  path = tempdir()
+) |> 
+  st_as_sf() |> 
+  janitor::clean_names() |> 
+  select(country, name_1, nl_name_1) |> 
+  st_transform("EPSG:4326")
+
+# st_crs(raw_admin)
+
+# Get exclusive map of South Korea
+south_korea_map <- raw_admin |> 
+  filter(country == "South Korea")
+
+south_korea_boundary <- south_korea_map |> 
+  rmapshaper::ms_dissolve()
+
+# Trial Code to check
+# south_korea_boundary |> 
+#   ggplot() +
+#   geom_sf()
+
+
+# Aggregate the maps of North Korea and Japan (neighbours of 
+# South Korea) and aggregate them to remove internal divisions
+# Then, crop map of North Korea and Japan (neighbours) to 
+# South Korean map's bounding box
+base_map <- raw_admin |> 
+  filter(country != "South Korea") |> 
+  rmapshaper::ms_dissolve() |> 
+  st_crop(st_bbox(south_korea_map))
+
+
+# Get elevation data for South Korea for a base map
+sk_elevation <- elevatr::get_elev_raster(
+  locations = south_korea_boundary,
+  z = 7
+) |> 
+  terra::rast() |> 
+  terra::crop(south_korea_boundary) |> 
+  terra::mask(south_korea_boundary, touches = FALSE)
+
+# Make a hill-shade relief map of South Korea elevation raster
+# Estimate the Slope of the terrain using terra::terrain
+slope1 <- terrain(sk_elevation, v = "slope", unit = "radians")
+# Estimate the Aspect or Orientation using terra::terrain
+aspect1 <- terrain(sk_elevation, v = "aspect", unit = "radians")
+
+# With a certain Sun-Angle and Sun-Direction
+# Calculate the hillshade effect with a certain degree of elevation
+sk_shade_single <- shade(
+  slope = slope1, 
+  aspect = aspect1,
+  angle = 30,
+  direction = 315,
+  normalize = TRUE
+)
+rm(slope1, aspect1)
+```
+
+Getting Population Density Data for South Korea
+
+```{r}
+
+# Population Density Raster for South Korea in latest year
+
+# Set Working Directory Temporarily to Desktop or elsewhere
+# Caution: Almost 167 MB of data for the entire raster file
+# 1990 to 2022 year Global Population Density 30 sec arc resolution
+# url <- paste0(
+#   "https://zenodo.org/records/11179644/files/GlobPOP_Count_30arc_2021_I32.tiff"
+#   )
+# 
+# output_file <- paste0("GlobPOP_Count_30arc_2021_I32.tiff")
+# 
+# download.file(
+#   url = url,
+#   destfile = output_file
+# )
+
+output_file <- paste0("GlobPOP_Count_30arc_2021_I32.tiff")
+
+# crop the World Population Desnity Raster to South Korea Map
+pop_rast_2021 <- terra::rast(output_file) |> 
+  
+  # Crop and mak population density raster to the Vector Map
+  # Boundaries of South Korea
+  terra::crop(south_korea_boundary) |> 
+  
+  # Increase resolution of raster to ensure better masking
+  # with a high resolution vector data of map boundaries
+  terra::disagg(fact = 4) |> 
+  
+  # Mask with the exact area of South Korea
+  terra::mask(south_korea_boundary, touches = FALSE)
+
+# Remove errors (i.e. negative population densities)
+pop_rast_2021[pop_rast_2021 <= 0] <- 0.01
+
+# Check population density values to make a nice colour / fill scale
+pop_rast_2021 |> 
+  values() |> 
+  as_tibble() |> 
+  drop_na() |> 
+  rename(value = GlobPOP_Count_30arc_2021_I32) |> 
+  ggplot(aes(x = 1, y = value)) +
+  geom_boxplot()
+
+pop_rast_2021 |> 
+  values() |> 
+  unique() |> 
+  summary()
+
+sk_shade_single |> 
+  values() |> 
+  as_tibble() |> 
+  drop_na() |> 
+  ggplot(aes(hillshade)) +
+  geom_boxplot()
+```
+
+Get Balloons Data
+
+```{r}
+raw_balloons <- read_csv(here::here("data", "data-bYmEd.csv")) |> 
+  janitor::clean_names()
+
+sk_balloons <- raw_balloons |> 
+  select(wave_number, lat, lon, time, date) |> 
+  mutate(date = mdy(date)) |> 
+  st_as_sf(coords = c("lon", "lat"), crs = "EPSG:4326")
+
+sk_balloons |> 
+  visdat::vis_miss()
+```
+
+Composing Final Plot
+
+```{r}
+#| label: base-plot
+
+# Check the South Korea Map
+
+g <- ggplot() +
+  
+  # Background Elevation Map: a hill-shade raster
+  geom_spatraster(
+    data = sk_shade_single,
+    maxcell = Inf
+  ) +
+  
+  # A greyscale palette for elevation hill-shade raster
+  scale_fill_gradient2(
+    high = "white",
+    low = "black",
+    mid = "grey90",
+    midpoint = 130,
+    na.value = "transparent"
+  ) +
+  guides(fill = "none") +
+  
+  # start a new fill scale
+  ggnewscale::new_scale_fill() +
+  geom_spatraster(
+    data = pop_rast_2021,
+    alpha = 0.5
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    name = "Population Density (persons per sq. km.)",
+    "grDevices::Purples 3",
+    direction = -1,
+    limits = c(0.01, 1.2e3),
+    oob = scales::squish,
+    trans = "sqrt",
+    labels = label_number(big.mark = ",", accuracy = 1),
+    breaks = c(1, 1e1, 1e2, 5e2, 1e3),
+    na.value = NA
+  ) +
+
+  # Plotting the garbage balloons
+  geom_sf(
+    data = sk_balloons,
+    mapping = aes(colour = date),
+    # colour = mypal[2],
+    size = 5,
+    pch = 8
+  ) +
+  scale_colour_date(
+    low = "#ff0000", 
+    high = "#170000",
+    name = "Date of Garbage Balloon Detection"
+  ) +
+  
+  # Coastline map of South Korea, North Korea and Japan within box
+  geom_sf(
+    data = base_map,
+    fill = colorspace::lighten(bg_col, 0.8),
+    colour = text_col,
+    linewidth = 0.4
+  ) +
+  
+  # Administrative Divisions of South Korea
+  geom_sf(
+    data = south_korea_map,
+    fill = NA,
+    colour = text_col,
+    linewidth = 0.4
+  ) +
+  
+  # Add north arrow and scale
+  ggspatial::annotation_scale(
+    bar_cols = c(mypal[4], mypal[2]),
+    line_width = 0.5,
+    text_family = "body_font",
+    text_cex = bts / 10,
+    location = "bl",
+    line_col = text_col,
+    text_col = text_col
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tr",
+    height = unit(5, "cm"),
+    width = unit(5, "cm"),
+    style = north_arrow_orienteering(
+      line_width = 0.5,
+      line_col = text_col,
+      fill = c(bg_col, text_col),
+      text_family = "body_font",
+      text_size = bts * 1.5
+    )
+  ) +
+  
+  # Coordinates
+  coord_sf(
+    expand = FALSE,
+    # crs = "EPSG:5186",
+    default_crs = "EPSG:4326",
+    clip = "off"
+  ) +
+  
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 95),
+    caption = plot_caption
+  ) +
+  # Theme and beautification of plot
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    legend.position = "bottom",
+    panel.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    text = element_text(
+      colour = text_col
+    ), 
+    
+    # Grid and Axes
+    panel.grid = element_line(
+      linewidth = 0.2,
+      colour = text_hil,
+      linetype = 3
+    ),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    
+    # Legend
+    legend.justification = c(0.5, 1),
+    legend.title.position = "top",
+    legend.direction = "horizontal",
+    legend.box = "horizontal",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text.position = "bottom",
+    legend.key.width = unit(30, "mm"),
+    legend.key.height = unit(6, "mm"),
+    legend.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    legend.margin = margin(-10,0,0,0, "mm"),
+    legend.box.margin = margin(-10,0,0,0, "mm"),
+    legend.spacing.y = unit(1, "cm"),
+    legend.spacing.x = unit(4, "cm"),
+    
+    # Labels
+    plot.title = element_text(
+      hjust = 0.5,
+      size = bts * 2.5,
+      margin = margin(5,0,5,0, "mm"),
+      family = "title_font",
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      family = "body_font",
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5, 
+      margin = margin(5,0,0,0, "mm"),
+      family = "caption_font",
+      size = 0.7 * bts
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here(
+    "data_vizs", "viz_sk_trash_balloons.png"
+  ),
+  height = 50,
+  width = 40,
+  units = "cm",
+  bg = bg_col
+)
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "viz_sk_trash_balloons.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_sk_trash_balloons.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(sf)                   # Simple Features in R
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+library(ggspatial)            # Scales and Arrows on maps
+
+# Data Wrangling & ggplot2
+library(tidyverse)            # All things tidy
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
