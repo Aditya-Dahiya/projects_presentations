@@ -1,0 +1,407 @@
+---
+title: "Railway Lines in Great Britain - UK and Ireland"
+author: "Aditya Dahiya"
+date: "2025-03-26"
+subtitle: "......................"
+categories:
+  - "Geocomputation"
+  - "{osmdata}"
+  - "Open Street Maps"
+  - "{ggmap}"
+image: "thumbnails/viz_britain_railways.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+..............................
+
+![.................](viz_britain_railways.png){#fig-1}
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Data Wrangling & Plotting Tools
+library(tidyverse)            # All things tidy
+library(sf)                   # Simple Features in R
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c("#dcdde1", "#487eb0", "#192a56", "#fbc531", "#DC143C")
+
+# A base Colour
+bg_col <- mypal[2]
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[3]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[3]
+seecolor::print_color(text_col)
+
+point_col <- mypal[5]
+seecolor::print_color(point_col)
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Open Street Maps & Stadia Maps", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "British Tourist Locations"
+
+plot_subtitle <- "This map shows the major tourist locations in the British Isles - UK and Ireland, i.e. England, Scotland, Wales, Northern Ireland and Ireland."
+```
+
+Get custom data
+
+```{r}
+#| label: eda-data-wrangling
+
+british_units <- geodata::gadm(
+  country = c("IRL", "GBR"),
+  level = 2,
+  path = tempdir()
+) |> 
+  janitor::clean_names() |> 
+  st_as_sf() |> 
+  select(country, name_1, name_2, geometry)
+
+# Get boundary of British Isles - UK + Ireland
+british_boundary <- rnaturalearth::ne_countries(
+  scale = "large",
+  country = c("United Kingdom", "Ireland")
+) |> 
+  select(name, iso_a3)
+
+
+british_units |> 
+  st_drop_geometry() |> 
+  visdat::vis_miss()
+
+british_units |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  dplyr::distinct(name_2)
+
+
+# g <- ggplot() +
+#   geom_sf(
+#     data = british_boundary
+#   ) +
+#   geom_sf(
+#     data = df_tourism,
+#     alpha = 0.5,
+#     size = 0.5
+#   ) +
+#   theme(
+#     legend.position = "none"
+#   )
+
+# ggplot(british_boundary) +
+#   geom_sf()
+
+british_tourism <- opq(
+  bbox = st_bbox(british_boundary),
+  timeout = 150
+) |> 
+  add_osm_feature(
+    key = "tourism",
+    value = "attraction"
+  ) |> 
+  osmdata_sf()
+
+# study British Tourism data to explore interesting trends
+# tour_missing <- british_tourism$osm_points |> 
+#   # filter(!is.na(name)) |> 
+#   st_drop_geometry() |> 
+#   summarise(
+#     across(
+#       everything(), 
+#       ~ mean(is.na(.)) * 100
+#       ), 
+#     .groups = "drop"
+#   ) |> 
+#   pivot_longer(
+#     everything(), 
+#     names_to = "column_name", 
+#     values_to = "perc_missing"
+#   )
+
+df_tourism <- british_tourism$osm_points |> 
+    select(name, accessibility, accessible) |> 
+  filter(!is.na(name)) |> 
+  
+
+british_bbox <- st_bbox(british_boundary)
+
+# A bounding box in the format c(lowerleftlon, lowerleftlat, upperrightlon, upperrightlat)
+british_bbox <- c(
+  left = british_bbox$xmin,
+  right = british_bbox$xmax,
+  bottom = british_bbox$ymin,
+  top = british_bbox$ymax
+)
+names(british_bbox) <- c("left", "right", "bottom", "top")
+
+
+# Register the Stadia Maps Key here
+# register_stadiamaps("KEY")
+raw_rast <- get_stadiamap(
+  bbox = british_bbox,
+  zoom = 7,
+  maptype = "alidade_smooth"
+)
+
+rast1 <- rast(raw_rast) |> 
+  crop(london_city_sf) |> 
+  mask(london_city_sf)
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+g <- ggplot() +
+  # geom_spatraster_rgb(
+  #   data = rast1,
+  #   alpha = 0.8,
+  #   maxcell = Inf
+  # ) +
+  geom_sf(
+    data = british_units,
+    fill = mypal[1],
+    colour = mypal[3],
+    linewidth = 0.25
+  ) + 
+  geom_sf(
+    data = british_boundary,
+    fill = NA,
+    colour = mypal[3],
+    linewidth = 0.5
+  ) + 
+  geom_sf(
+    data = df_tourism,
+    colour = mypal[5],
+    size = 2,
+    alpha = 0.5
+  ) +
+  # ggrepel::geom_text_repel(
+  #   data = df_tourism,
+  #   mapping = aes(
+  #     label = name,
+  #     geometry = geometry
+  #   ),
+  #   family = "caption_font",
+  #   colour = text_col,
+  #   lineheight = 0.25,
+  #   size = 24,
+  #   stat = "sf_coordinates",
+  #   force = 1,
+  #   force_pull = 0.001,
+  #   max.iter = 100
+  # ) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 110),
+    caption = plot_caption
+  ) +
+  coord_sf(
+    expand = FALSE,
+    clip = "off"
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Full plot features
+    plot.margin = margin(10,10,5,10, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    
+    # Labels and titles
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 3 * bts,
+      lineheight = 0.3,
+      margin = margin(0,0,5,0, "mm"),
+      colour = text_hil,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = bts,
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm"),
+      size = 0.7 * bts,
+      colour = text_hil
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here(
+    "data_vizs", "viz_britain_railways.png"
+  ),
+  height = 50,
+  width = 40,
+  units = "cm",
+  bg = colorspace::lighten(bg_col, 0.5)
+)
+```
+
+![](viz_britain_railways.png)
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "viz_britain_railways.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_britain_railways.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+# Data Wrangling & Plotting Tools
+library(tidyverse)            # All things tidy
+library(sf)                   # Simple Features in R
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
