@@ -1,10 +1,13 @@
 ---
-title: "................."
+title: "Pokemons: Heights and Weights (a scatterplot)"
 author: "Aditya Dahiya"
 date: "2025-04-01"
-subtitle: "........................"
+subtitle: "A simple scatterplot for weight and heights of different pokemons, coloured by their precribed colour, and a trend-line using geom_smooth(). The outlier pokemons are shown as images using ggimage::geom_image() and labelled with geom_text(). The title is shown as an annotation of a raster using {magick} and {grid}"
 categories:
   - "#TidyTuesday"
+  - "{magick}"
+  - "ggimage"
+  - "Images"
 image: "thumbnails/tidy_pokemon.png"
 format:
   html:
@@ -32,9 +35,9 @@ comments:
 
 ### About the Data
 
-...........
+This week's dataset dives into the world of Pokémon, sourced from the {pokemon} R package, available on [CRAN](https://cran.r-project.org/package=pokemon) and [GitHub](https://github.com/williamorim/pokemon). Curated by [Frank Hull](https://github.com/frankiethull), this dataset offers a comprehensive look at 949 Pokémon, with 22 columns detailing attributes like name, ID, height, weight, stats, types, and more, presented in both English and Brazilian Portuguese.
 
-![.................](tidy_pokemon.png){#fig-1}
+![A simple scatterplot for weight and heights of different pokemons, coloured by their precribed colour, and a trend-line using geom_smooth(). The outlier pokemons are shown as images using ggimage::geom_image() and labelled with geom_text(). The title is shown as an annotation of a raster using {magick} and {grid}](tidy_pokemon.png){#fig-1}
 
 ## **How I made this graphic?**
 
@@ -53,8 +56,13 @@ library(ggtext)               # Markdown text support for ggplot2
 library(showtext)             # Display fonts in ggplot2
 library(colorspace)           # Lighten and Darken colours
 
+library(magick)               # Download images and edit them
+library(ggimage)              # Display images in ggplot2
+library(patchwork)            # composing Plots
+
 pokemon_df <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-01/pokemon_df.csv')
 
+pokemon_logo_url <- "https://1000logos.net/wp-content/uploads/2017/05/Pokemon-logo.jpg"
 ```
 
 ### Visualization Parameters
@@ -68,13 +76,13 @@ font_add_google("Alegreya",
 ) 
 
 # Font for the caption
-font_add_google("Stint Ultra Condensed",
+font_add_google("Saira Extra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Alegreya",
-  family = "Josefin Slab"
+font_add_google("Unkempt",
+  family = "body_font"
 ) 
 
 showtext_auto()
@@ -122,9 +130,7 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "..................."
-
-plot_subtitle <- ".............................."
+plot_subtitle <- "A simple scatterplot comparing heights and weights of different Pokemons. Outiers are shown with images (using {ggimage}) and labelled with geom_text(). A trendline shows general pattern."
 
 ```
 
@@ -168,13 +174,6 @@ pokemon_df |>
 #     transform = "sqrt"
 #   )
 
-library(magick)
-pokemon_df |> 
-  slice(10) |> 
-  select(pokemon, url_icon, url_image) |> 
-  pull(url_image) |> 
-  image_read()
-
 df1 <- pokemon_df |> 
   arrange(desc(weight)) |> 
   mutate(
@@ -188,15 +187,45 @@ df1 <- pokemon_df |>
     pokemon = snakecase::to_title_case(pokemon)
   )
 
-df1 |> 
-  slice(10) |> 
-  select(pokemon, weight, height, id, url_icon, url_image) |> 
-  pull(url_image) |> 
-  image_read()
+# Check by reading one image
+# df1 |> 
+#   slice(10) |> 
+#   select(pokemon, weight, height, id, url_icon, url_image) |> 
+#   pull(url_image) |> 
+#   image_read()
 
 # Temporarily save images of selected "Pokemons"
-df1 |> 
-  select(pokemon, weight, height, id, url_image)
+df2 <- df1 |> 
+  select(pokemon, weight, height, id, url_image, 
+         selected_ids, color_1) |> 
+  filter(selected_ids) |> 
+  mutate(
+    check_image = str_remove(url_image, "https://raw.githubusercontent.com/HybridShivam/Pokemon/master/assets/images/"),
+    check_image = str_remove(check_image, ".png"),
+    check_image = as.numeric(check_image),
+    image_path = paste0("data_vizs/temp_pokemon_", id, ".png")
+  ) |> 
+  filter(
+    check_image < 1000
+  )
+
+# Dont run again: Code for downloading image files
+# for (i in df2$id){
+#   df2 |> 
+#     filter(id == i) |> 
+#     pull(url_image) |> 
+#     image_read() |> 
+#     image_resize("x200") |> 
+#     image_write(path = here::here("data_vizs", paste0("temp_pokemon_", i, ".png")))
+# }
+
+pokemon_logo <- image_read(pokemon_logo_url) |> 
+  image_transparent(color = "white", fuzz = 10)
+
+
+image_read(pokemon_logo_url) |> 
+  image_transparent(color = "white", fuzz = 10) |> 
+  image_resize("x400")
 ```
 
 ### The Base Plots
@@ -204,7 +233,7 @@ df1 |>
 ```{r}
 #| label: base-plot
 
-g <- df1 |> 
+g_base <- df1 |> 
   ggplot(
     mapping = aes(
       x = weight,
@@ -221,6 +250,9 @@ g <- df1 |>
     alpha = 0.7
   ) +
   
+  geom_smooth(
+    colour = alpha("grey20", 0.5)
+  ) +
   # Display IDs to manually find out the Pokeomons whose image 
   # we want to display
   # geom_text(
@@ -235,19 +267,40 @@ g <- df1 |>
   
   # Display Images for selected Pokemons
   ggimage::geom_image(
-    data = df1 |> filter(selected_ids),
-    mapping = aes(image = url_icon),
-    size = 2
+    data = df2,
+    mapping = aes(image = image_path),
+    size = 0.05
   ) +
   
   # Label the important Pokemons
   geom_text(
-    data = df1 |> filter(selected_ids),
-    mapping = aes(label = pokemon),
+    data = df2,
+    mapping = aes(
+      label = pokemon,
+      y = height * 0.9,
+      colour = color_1
+    ),
     family = "caption_font",
-    size = bts / 10,
-    nudge_y = -0.5,
-    check_overlap = TRUE
+    size = bts / 8,
+    check_overlap = TRUE,
+    colour = "grey30"
+  ) +
+  
+  # Annotate subtitle
+  annotate(
+    geom = "label",
+    label = str_wrap(plot_subtitle, 50),
+    x = 10,
+    y = 11.5,
+    lineheight = 0.3,
+    hjust = 0, 
+    vjust = 1,
+    size = bts / 6,
+    colour = darken("steelblue", 0.2),
+    family = "body_font",
+    label.size = NA,
+    fill = alpha("white", 0.7),
+    label.r = unit(0.05, "lines")
   ) +
   
   scale_colour_identity() +
@@ -259,15 +312,15 @@ g <- df1 |>
   scale_y_continuous(
     transform = "sqrt",
     expand = expansion(c(0, 0.05)),
-    breaks = c(1, 2, 5, 10, 15)
+    breaks = c(0.5, 2, 5, 10, 15)
   ) +
   coord_cartesian(
     clip = "off"
   ) +
   labs(
-    x = "Weight (in grams)",
-    y = "Height (in cm)",
-    title = plot_title,
+    x = "Weight",
+    y = "Height",
+    title = NULL,
     subtitle = NULL,
     caption = plot_caption
   ) +
@@ -321,10 +374,37 @@ g <- df1 |>
     plot.caption = element_textbox(
       margin = margin(5,0,5,0, "mm"),
       family = "caption_font",
-      hjust = 0.5,
-      halign = 0.5,
-      colour = text_hil
+      hjust = 1,
+      halign = 1,
+      colour = text_hil,
+      size = 0.6 * bts
     )
+  )
+
+
+g1 <- ggplot() +
+  annotation_custom(
+    grid::rasterGrob(pokemon_logo),
+    xmin = -Inf, xmax = Inf, 
+    ymin = -Inf, ymax = Inf
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    panel.background = element_rect(
+      fill = NA,
+      colour = NA
+    )
+  )
+
+g <- g_base +
+  inset_element(
+    p = g1,
+    left = 0.005, right = 0.55,
+    top = 1, bottom = 0.8
   )
 
 ggsave(
@@ -360,6 +440,16 @@ image_read(here::here("data_vizs",
       "tidy_pokemon.png"
     )
   )
+
+# Remove temporary images
+# List all files in data_vizs that start with "temp_pokemon_"
+temp_files <- list.files(
+  path = here::here("data_vizs"),
+  pattern = "^temp_pokemon_.*",
+  full.names = TRUE
+)
+# Remove the files (if any exist)
+file.remove(temp_files)
 ```
 
 ### Session Info
@@ -368,6 +458,21 @@ image_read(here::here("data_vizs",
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+library(magick)               # Download images and edit them
+library(ggimage)              # Display images in ggplot2
+library(patchwork)            # composing Plots
 
 
 sessioninfo::session_info()$packages |> 
