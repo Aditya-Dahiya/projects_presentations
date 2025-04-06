@@ -1,0 +1,377 @@
+---
+title: "NYT's Presidential precinct data for the 2024 U.S. general election"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "..................."
+categories:
+  - "Data Visualization"
+  - "Maps"
+  - "USA"
+  - "{sf}"
+  - "Gecomputation"
+  - "Geopolitics"
+date: "2025-04-06"
+image: "images/nyt_election_data_1.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects/nyt_election_data.html"
+  description: "Visualizations"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+<https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html>
+
+<https://www.nytimes.com/interactive/2025/us/elections/2024-election-map-precinct-results.html>
+
+<https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data>
+
+### Loading required packages
+
+```{r}
+#| label: setup
+
+# Data wrangling & visualization
+library(tidyverse)  # Data manipulation & visualization
+
+# Spatial data handling
+library(sf)         # Import, export, and manipulate vector data
+library(terra)      # Import, export, and manipulate raster data
+
+# ggplot2 extensions
+library(tidyterra)  # Helper functions for using terra with ggplot2
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text in ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(patchwork)            # Composing Plots
+library(ggspatial)            # Scales and Arrows in Maps
+
+bts = 11 # Base Text Size
+sysfonts::font_add_google("Saira Condensed", "body_font")
+sysfonts::font_add_google("Saira", "title_font")
+sysfonts::font_add_google("Saira Extra Condensed", "caption_font")
+showtext::showtext_auto()
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+theme_set(
+  theme_minimal(
+    base_size = bts,
+    base_family = "body_font"
+  ) +
+    theme(
+      text = element_text(
+        colour = "grey30",
+        lineheight = 0.3,
+        margin = margin(0,0,0,0, "pt")
+      ),
+      plot.title = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "pt")
+      ),
+      plot.subtitle = element_text(
+        hjust = 0.5,
+        margin = margin(0,0,0,0, "pt")
+      )
+    )
+)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data**:  New York Times (2024 Precinct-Level Election Results)",
+  "  |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+Getting the data
+
+```{r}
+
+url1 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.topojson.gz"
+
+url2 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.csv.gz"
+
+# Warning: Almost 1 GB of download
+nyt_raw_1 <- st_read(paste0("/vsigzip//vsicurl/", url1))
+
+# Save data to disk temporarily to use again during code trial
+# saveRDS(nyt_raw_1, file = "temp_nyt_election_data.rds")
+
+
+
+```
+
+A basic chloropleth of
+
+```{r}
+
+# Explore the State of New York
+nyt_raw_1 |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  filter(state == "NY")
+
+# Check CRS
+nyt_raw_1 |> 
+  st_crs()
+
+# Assign CRS and make data for the Selected State
+df1 <- nyt_raw_1 |> 
+  st_set_crs("EPSG:4326") |> 
+  dplyr::filter(state == "NY") |> 
+  mutate(perc_rep = (votes_rep/votes_total) - 0.5)
+
+df_bbox <- st_bbox(df1)
+
+# A custom Lambert Equal Area Projection for the State
+new_crs = paste0("+proj=laea +x_0=0 +y_0=0 +lon_0=", 
+                ((df_bbox$xmin + df_bbox$xmax) / 2), 
+                " +lat_0=", 
+                ((df_bbox$ymin + df_bbox$ymax) / 2))
+
+
+
+g <- df1 |> 
+  ggplot() +
+  geom_sf(
+    mapping = aes(fill = perc_rep),
+    colour = "transparent",
+    linewidth = 0.01
+  ) +
+  scale_fill_gradient2(
+    low = "blue",
+    high = "red",
+    mid = "white",
+    midpoint = 0,
+    na.value = "grey50",
+    labels = scales::label_percent(
+      style_negative = "parens"
+    )
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tr",
+    style = north_arrow_orienteering(
+      line_width = 0.5,
+      line_col = text_hil,
+      fill = c(bg_col, text_hil),
+      text_family = "body_font",
+      text_col = text_hil,
+      text_size = 40
+    )
+  ) +
+  ggspatial::annotation_scale(
+    location = "tl",
+    text_family = "body_font",
+    text_col = text_hil,
+    bar_cols = c(bg_col, text_hil),
+    text_cex = 5
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = 60
+  ) +
+  coord_sf(
+    crs = new_crs
+  ) +
+  labs(
+    title = "New York: Precint level Poll Data (2024)",
+    fill = "% Votes Margin",
+    caption = plot_caption
+  ) +
+  theme(
+    text = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    plot.margin = margin(0,0,0,0, "pt"),
+    legend.position = "inside",
+    legend.position.inside = c(0.02, 0.1),
+    legend.justification = c(0,0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.margin = margin(0,0,0,0, "pt"),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    legend.key.height = unit(5, "pt"),
+    legend.key.width = unit(50, "pt"),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,10,0, "pt"),
+      size = 30
+    ),
+    plot.title = element_text(
+      margin = margin(20,0,0,0, "pt"),
+      family = "title_font"
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", "nyt_election_data_1.png"),
+  height = 2000,
+  width = 2000,
+  units = "px",
+  bg = "white"
+)
+```
+
+![](images/nyt_election_data_1.png)
+
+Get a Contiguous Cartogram
+
+```{r}
+# Convert df1 into a cartogram
+
+library(cartogram)
+
+df2 <- df1 |> 
+  st_transform(ny_crs) |> 
+  st_simplify(dTolerance = 1000) |> 
+  cartogram_cont(weight = "votes_total")
+
+
+g <- df1 |> 
+  ggplot() +
+  geom_sf(
+    mapping = aes(fill = perc_rep),
+    colour = "transparent",
+    linewidth = 0.01
+  ) +
+  scale_fill_gradient2(
+    low = "blue",
+    high = "red",
+    mid = "white",
+    midpoint = 0,
+    na.value = "grey50",
+    labels = scales::label_percent(
+      style_negative = "parens"
+    )
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tr",
+    style = north_arrow_orienteering(
+      line_width = 0.5,
+      line_col = text_hil,
+      fill = c(bg_col, text_hil),
+      text_family = "body_font",
+      text_col = text_hil,
+      text_size = 40
+    )
+  ) +
+  ggspatial::annotation_scale(
+    location = "tl",
+    text_family = "body_font",
+    text_col = text_hil,
+    bar_cols = c(bg_col, text_hil),
+    text_cex = 5
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = 60
+  ) +
+  coord_sf(
+    crs = new_crs
+  ) +
+  labs(
+    title = "New York: Precint level Poll Data (2024)",
+    fill = "% Votes Margin",
+    caption = plot_caption
+  ) +
+  theme(
+    text = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    plot.margin = margin(0,0,0,0, "pt"),
+    legend.position = "inside",
+    legend.position.inside = c(0.02, 0.1),
+    legend.justification = c(0,0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.margin = margin(0,0,0,0, "pt"),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    legend.key.height = unit(5, "pt"),
+    legend.key.width = unit(50, "pt"),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,10,0, "pt"),
+      size = 30
+    ),
+    plot.title = element_text(
+      margin = margin(20,0,0,0, "pt"),
+      family = "title_font"
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", "nyt_election_data_2.png"),
+  height = 2000,
+  width = 2000,
+  units = "px",
+  bg = "white"
+)
+```
+
+![](images/nyt_election_data_2.png)
