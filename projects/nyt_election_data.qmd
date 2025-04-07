@@ -38,12 +38,6 @@ share:
 
 This comprehensive dataset compiles detailed, precinct-level results and geographic boundaries from the 2024 presidential election. It integrates official voting records and spatial data as described in the [New York Times Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) article and is further enriched by the interactive presentation found in the [NYT Election Map Precinct Results](https://www.nytimes.com/interactive/2025/us/elections/2024-election-map-precinct-results.html). In addition, the [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data) maintained by The New York Times provides national-level downloads and detailed documentation, reflecting the robust, transparent approach of their election team.
 
-### Graphic 1
-
-##### Beyond the color: A 56%-to-44% vote split becomes 81% red on the map—highlighting how choropleth displays can distort election outcomes by omitting population density considerations.
-
-![When map visuals mask reality: New York’s election map shows 81% red despite a 56% vote share for Democrats, underscoring the disconnect between spatial representation and voter turnout. This precinct-level election map of New York State uses a color gradient based on the margin calculated as (Republican votes – Democratic votes) divided by total votes, shading areas red for Republican advantage and blue for Democratic. Despite Democrats receiving 56% of the total vote—as shown in the accompanying pie chart—81% of the map is colored red, highlighting how traditional choropleth maps can mislead by neglecting population density variations. For more detailed data, refer to the [NYT Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) and the associated [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data).](images/nyt_election_data_1.png)
-
 Loading required packages
 
 ```{r}
@@ -149,7 +143,13 @@ nyt_raw_1 <- readRDS("temp_nyt_election_data.rds")
 
 ```
 
-A basic chloropleth of
+### Graphic 1
+
+**Beyond the color: A 56%-to-44% vote split becomes 81% red on the map—highlighting how choropleth displays can distort election outcomes by omitting population density considerations.**
+
+![When map visuals mask reality: New York’s election map shows 81% red despite a 56% vote share for Democrats, underscoring the disconnect between spatial representation and voter turnout. This precinct-level election map of New York State uses a color gradient based on the margin calculated as (Republican votes – Democratic votes) divided by total votes, shading areas red for Republican advantage and blue for Democratic. Despite Democrats receiving 56% of the total vote—as shown in the accompanying pie chart—81% of the map is colored red, highlighting how traditional choropleth maps can mislead by neglecting population density variations. For more detailed data, refer to the [NYT Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) and the associated [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data).](images/nyt_election_data_1.png){#fig-1}
+
+A basic chloropleth of the State of New York
 
 ```{r}
 
@@ -454,3 +454,175 @@ image_read(
     )
   )
 ```
+
+### Graphic 2
+
+Summarizing the data over entire USA by State, but now comparing a chloropleth map with a non-contiguous cartogram
+
+```{r}
+# Get state wise data compiled
+
+df4 <- nyt_raw_1 |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  group_by(state) |> 
+  summarise(
+    across(
+      .cols = c(votes_dem, votes_rep, votes_total),
+      .fns = sum
+    )
+  ) |> 
+  mutate(
+    perc_margin = ((votes_rep - votes_dem)/votes_total)
+  ) |> 
+  rename(abbr = state)
+
+df5 <- usmapdata::us_map() |> 
+  left_join(df4) |> 
+  mutate(area_var = as.numeric(st_area(geom))/1e6) |> 
+  left_join(
+    usdata::pop_age_2019 |> 
+      dplyr::distinct(state, state_total_population) |> 
+      rename(abbr = state)
+  )
+
+library(cartogram)
+
+df_cart <- df5 |> 
+  cartogram::cartogram_ncont(weight = "state_total_population")
+
+df6 <- bind_rows(
+  df5 |> mutate(facet_var = "A"), 
+  df_cart |> mutate(facet_var = "B")
+) |> 
+  mutate(
+    facet_var
+  )
+
+facet_labels <- c("Geographical Map", "A non-contiguous Cartogram")
+names(facet_labels) <- c("A", "B")
+
+g <- df6 |> 
+  ggplot(
+    mapping = aes(
+      fill = perc_margin
+    )
+  ) +
+  geom_sf() +
+  scale_fill_gradient2(
+    limits = c(-0.3, 0.3),
+    oob = scales::squish,
+    low = "blue",
+    high = "red",
+    mid = "white",
+    midpoint = 0,
+    na.value = "grey70",
+    labels = scales::label_percent(
+      style_negative = "parens"
+    )
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = abbr,
+      geometry = geom
+    ),
+    size = 8, 
+    colour = "black",
+    family = "body_font"
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "bl",
+    style = north_arrow_orienteering(
+      line_width = 0.5,
+      line_col = text_hil,
+      fill = c(bg_col, text_hil),
+      text_family = "body_font",
+      text_col = text_hil,
+      text_size = 40
+    )
+  ) +
+  ggspatial::annotation_scale(
+    location = "br",
+    text_family = "body_font",
+    text_col = text_hil,
+    bar_cols = c(bg_col, text_hil),
+    text_cex = 5,
+    line_col = text_hil
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = 60
+  ) +
+  coord_sf(clip = "off") +
+  facet_wrap(
+    ~facet_var, ncol = 1,
+    labeller = labeller(facet_var = facet_labels)
+  ) +
+  labs(
+    title = "Land vs. People: Mapping the 2024 U.S. Vote",
+    fill = "% Vote Margin",
+    caption = plot_caption
+  ) +
+  theme(
+    text = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    plot.margin = margin(0,0,0,0, "pt"),
+    legend.position = "inside",
+    legend.position.inside = c(0.5, -0.05),
+    legend.justification = c(0.5, 0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.margin = margin(0,0,0,0, "pt"),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    legend.key.height = unit(5, "pt"),
+    legend.key.width = unit(50, "pt"),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5,
+      family = "caption_font",
+      margin = margin(30,0,10,0, "pt"),
+      size = 30
+    ),
+    plot.title = element_text(
+      margin = margin(20,0,0,0, "pt"),
+      family = "title_font",
+      hjust = 0.5
+    ),
+    panel.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    strip.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    strip.text = element_text(
+      colour = text_hil,
+      family = "title_font",
+      size = 60, 
+      margin = margin(10,0,0,0, "pt")
+    ),
+    legend.background = element_rect(
+      fill = NA, colour = NA
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", "nyt_election_data_2.png"),
+  height = 3200,
+  width = 2000,
+  units = "px",
+  bg = "white"
+)
+```
+
+![This graphic presents two views of the 2024 U.S. Presidential Election results using precinct-level data. The left map is a choropleth showing each state's winning party—blue for Democrats, red for Republicans—with darker shades indicating larger victory margins. The right map is a non-contiguous cartogram where each state is resized based on its population, highlighting how densely populated (and often Democratic-leaning) states carry more electoral weight. While Republicans dominate in geographic area, the cartogram reveals the demographic strength behind the Democratic vote, illustrating the contrast between land size and population influence in national elections.](images/nyt_election_data_2.png){#fig-2}
