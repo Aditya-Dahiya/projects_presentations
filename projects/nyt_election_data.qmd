@@ -2,7 +2,7 @@
 title: "NYT's Presidential precinct data for the 2024 U.S. general election"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: "..................."
+subtitle: "R project leveraging election-level data from The New York Times to produce insightful and visually engaging graphics using {ggplot2} and {sf}."
 categories:
   - "Data Visualization"
   - "Maps"
@@ -10,8 +10,8 @@ categories:
   - "{sf}"
   - "Gecomputation"
   - "Geopolitics"
-date: "2025-04-06"
-image: "images/nyt_election_data_1.png"
+date: "2025-04-07"
+image: "images/nyt_election_data.png"
 format:
   html:
     code-fold: true
@@ -34,13 +34,17 @@ share:
   mastodon: true
 ---
 
-<https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html>
+### About the Data
 
-<https://www.nytimes.com/interactive/2025/us/elections/2024-election-map-precinct-results.html>
+This comprehensive dataset compiles detailed, precinct-level results and geographic boundaries from the 2024 presidential election. It integrates official voting records and spatial data as described in the [New York Times Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) article and is further enriched by the interactive presentation found in the [NYT Election Map Precinct Results](https://www.nytimes.com/interactive/2025/us/elections/2024-election-map-precinct-results.html). In addition, the [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data) maintained by The New York Times provides national-level downloads and detailed documentation, reflecting the robust, transparent approach of their election team.
 
-<https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data>
+### Graphic 1
 
-### Loading required packages
+##### Beyond the color: A 56%-to-44% vote split becomes 81% red on the map—highlighting how choropleth displays can distort election outcomes by omitting population density considerations.
+
+![When map visuals mask reality: New York’s election map shows 81% red despite a 56% vote share for Democrats, underscoring the disconnect between spatial representation and voter turnout. This precinct-level election map of New York State uses a color gradient based on the margin calculated as (Republican votes – Democratic votes) divided by total votes, shading areas red for Republican advantage and blue for Democratic. Despite Democrats receiving 56% of the total vote—as shown in the accompanying pie chart—81% of the map is colored red, highlighting how traditional choropleth maps can mislead by neglecting population density variations. For more detailed data, refer to the [NYT Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) and the associated [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data).](images/nyt_election_data_1.png)
+
+Loading required packages
 
 ```{r}
 #| label: setup
@@ -129,16 +133,18 @@ Getting the data
 
 ```{r}
 
-url1 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.topojson.gz"
+# url1 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.topojson.gz"
 
-url2 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.csv.gz"
+# url2 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.csv.gz"
 
 # Warning: Almost 1 GB of download
-nyt_raw_1 <- st_read(paste0("/vsigzip//vsicurl/", url1))
+# nyt_raw_1 <- st_read(paste0("/vsigzip//vsicurl/", url1))
 
 # Save data to disk temporarily to use again during code trial
 # saveRDS(nyt_raw_1, file = "temp_nyt_election_data.rds")
 
+# Read in the pre-saved data
+nyt_raw_1 <- readRDS("temp_nyt_election_data.rds")
 
 
 ```
@@ -161,7 +167,7 @@ nyt_raw_1 |>
 df1 <- nyt_raw_1 |> 
   st_set_crs("EPSG:4326") |> 
   dplyr::filter(state == "NY") |> 
-  mutate(perc_rep = (votes_rep/votes_total) - 0.5)
+  mutate(perc_rep = ((votes_rep - votes_dem)/votes_total))
 
 df_bbox <- st_bbox(df1)
 
@@ -171,6 +177,27 @@ new_crs = paste0("+proj=laea +x_0=0 +y_0=0 +lon_0=",
                 " +lat_0=", 
                 ((df_bbox$ymin + df_bbox$ymax) / 2))
 
+# Compute Geographical Area of red and blue areas
+sf_use_s2(FALSE)
+
+df2 <- df1 |> 
+  mutate(
+    area = as.numeric(st_area(geometry)),
+    vote_var = if_else(
+      perc_rep > 0,
+      "Republican",
+      "Democrat"
+    )
+  ) |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  group_by(vote_var) |> 
+  summarize(
+    area = sum(area) / 1e9
+  ) |> 
+  mutate(
+    perc = area / sum(area)
+  )
 
 
 g <- df1 |> 
@@ -202,7 +229,7 @@ g <- df1 |>
     )
   ) +
   ggspatial::annotation_scale(
-    location = "tl",
+    location = "bl",
     text_family = "body_font",
     text_col = text_hil,
     bar_cols = c(bg_col, text_hil),
@@ -216,8 +243,8 @@ g <- df1 |>
     crs = new_crs
   ) +
   labs(
-    title = "New York: Precint level Poll Data (2024)",
-    fill = "% Votes Margin",
+    title = "New York: Precinct level Poll Data (2024)",
+    fill = "% Vote Margin",
     caption = plot_caption
   ) +
   theme(
@@ -227,7 +254,7 @@ g <- df1 |>
     ),
     plot.margin = margin(0,0,0,0, "pt"),
     legend.position = "inside",
-    legend.position.inside = c(0.02, 0.1),
+    legend.position.inside = c(0.02, 0.15),
     legend.justification = c(0,0),
     legend.direction = "horizontal",
     legend.margin = margin(0,0,0,0, "pt"),
@@ -266,107 +293,144 @@ ggsave(
 )
 ```
 
-![](images/nyt_election_data_1.png)
-
-Get a Contiguous Cartogram
+Get some pie charts on areas and votes polled
 
 ```{r}
-# Convert df1 into a cartogram
 
-library(cartogram)
-
-df2 <- df1 |> 
-  st_transform(ny_crs) |> 
-  st_simplify(dTolerance = 1000) |> 
-  cartogram_cont(weight = "votes_total")
-
-
-g <- df1 |> 
-  ggplot() +
-  geom_sf(
-    mapping = aes(fill = perc_rep),
-    colour = "transparent",
-    linewidth = 0.01
-  ) +
-  scale_fill_gradient2(
-    low = "blue",
-    high = "red",
-    mid = "white",
-    midpoint = 0,
-    na.value = "grey50",
-    labels = scales::label_percent(
-      style_negative = "parens"
+g1 <- df1 |> 
+  st_drop_geometry() |> 
+  as_tibble() |> 
+  summarise(
+    across(
+      .cols = c(votes_dem, votes_rep, votes_total),
+      .fns = function(x)(sum(x, na.rm = T))
     )
+  ) |> 
+  mutate(others = votes_total - (votes_dem + votes_rep)) |> 
+  select(-votes_total) |> 
+  pivot_longer(
+    cols = everything(),
+    names_to = "vote_var",
+    values_to = "value_var"
+  ) |> 
+  mutate(perc = value_var / sum(value_var)) |> 
+  ggplot(
+    aes(x = 1, y = perc, fill = vote_var, 
+        label = paste0(round(100*perc, 1), "%"))
   ) +
-  ggspatial::annotation_north_arrow(
-    location = "tr",
-    style = north_arrow_orienteering(
-      line_width = 0.5,
-      line_col = text_hil,
-      fill = c(bg_col, text_hil),
-      text_family = "body_font",
-      text_col = text_hil,
-      text_size = 40
-    )
+  geom_col(
+    colour = bg_col,
+    linewidth = 0.4
   ) +
-  ggspatial::annotation_scale(
-    location = "tl",
-    text_family = "body_font",
-    text_col = text_hil,
-    bar_cols = c(bg_col, text_hil),
-    text_cex = 5
+  geom_text(
+    aes(x = 2, colour = vote_var),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    family = "body_font",
+    size = 10
   ) +
-  ggthemes::theme_map(
-    base_family = "body_font",
-    base_size = 60
+  scale_fill_manual(
+    values = c("grey70", "blue", "red")
   ) +
-  coord_sf(
-    crs = new_crs
+  scale_colour_manual(
+    values = c("grey70", "blue", "red")
   ) +
+  scale_x_continuous(
+    limits = c(0, 2.1),
+    expand = expansion(0)
+  ) +
+  coord_polar(theta = "y", clip = "off") +
   labs(
-    title = "New York: Precint level Poll Data (2024)",
-    fill = "% Votes Margin",
-    caption = plot_caption
+    title = "% polled votes"
+  ) +
+  theme_void(
+    base_size = 40,
+    base_family = "body_font"
   ) +
   theme(
-    text = element_text(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5, 
       margin = margin(0,0,0,0, "pt"),
       colour = text_hil
-    ),
-    plot.margin = margin(0,0,0,0, "pt"),
-    legend.position = "inside",
-    legend.position.inside = c(0.02, 0.1),
-    legend.justification = c(0,0),
-    legend.direction = "horizontal",
-    legend.margin = margin(0,0,0,0, "pt"),
-    legend.box.margin = margin(0,0,0,0, "pt"),
-    legend.text = element_text(
-      margin = margin(3,0,0,0, "pt"),
-      hjust = 0.5
-    ),
-    legend.title = element_text(
-      margin = margin(0,0,5,0, "pt"),
-      hjust = 0.5
-    ),
-    legend.title.position = "top",
-    legend.key.height = unit(5, "pt"),
-    legend.key.width = unit(50, "pt"),
-    plot.caption = element_textbox(
-      hjust = 0.5,
-      halign = 0.5,
-      family = "caption_font",
-      margin = margin(0,0,10,0, "pt"),
-      size = 30
-    ),
-    plot.title = element_text(
-      margin = margin(20,0,0,0, "pt"),
-      family = "title_font"
     )
   )
 
+
+g2 <- df2 |> 
+  ggplot(
+    aes(x = 1, y = perc, fill = vote_var, 
+        label = paste0(round(100*perc, 1), "%"))
+  ) +
+  geom_col(
+    colour = bg_col,
+    linewidth = 0.4
+  ) +
+  geom_text(
+    aes(x = 2, colour = vote_var),
+    position = position_stack(
+      vjust = 0.5
+    ),
+    family = "body_font",
+    size = 10
+  ) +
+  scale_fill_manual(
+    values = c("blue", "red")
+  ) +
+  scale_colour_manual(
+    values = c("blue", "red")
+  ) +
+  scale_x_continuous(
+    limits = c(0, 2.1),
+    expand = expansion(0)
+  ) +
+  coord_polar(theta = "y", clip = "off") +
+  labs(
+    title = "% geographical area",
+    fill = NULL
+  ) +
+  theme_void(
+    base_size = 40,
+    base_family = "body_font"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5, 
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    text = element_text(
+      colour = text_hil
+    )
+  )
+
+```
+
+Compile Plot
+
+```{r}
+library(patchwork)
+
+gfull <- g + 
+  inset_element(
+    p = g1,
+    left = 0, right = 0.25,
+    top = 0.95, bottom = 0.6,
+    align_to = "panel"
+  ) +
+  inset_element(
+    p = g2,
+    left = 0.25, right = 0.5,
+    top = 0.95, bottom = 0.6,
+    align_to = "panel"
+  )
+
 ggsave(
-  plot = g,
-  filename = here::here("projects", "images", "nyt_election_data_2.png"),
+  plot = gfull,
+  filename = here::here("projects", "images", 
+                        "nyt_election_data_1.png"),
   height = 2000,
   width = 2000,
   units = "px",
@@ -374,4 +438,19 @@ ggsave(
 )
 ```
 
-![](images/nyt_election_data_2.png)
+Thumbnail for page
+
+```{r}
+library(magick)
+image_read(
+  here::here("projects", "images",
+             "nyt_election_data_1.png")
+) |> 
+  image_resize("x400") |> 
+  image_write(
+    here::here(
+      "projects", "images",
+      "nyt_election_data.png"
+    )
+  )
+```
