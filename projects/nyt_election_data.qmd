@@ -78,27 +78,6 @@ seecolor::print_color(text_hil)
 text_col <- "grey20"
 seecolor::print_color(text_col)
 
-theme_set(
-  theme_minimal(
-    base_size = bts,
-    base_family = "body_font"
-  ) +
-    theme(
-      text = element_text(
-        colour = "grey30",
-        lineheight = 0.3,
-        margin = margin(0,0,0,0, "pt")
-      ),
-      plot.title = element_text(
-        hjust = 0.5,
-        margin = margin(0,0,0,0, "pt")
-      ),
-      plot.subtitle = element_text(
-        hjust = 0.5,
-        margin = margin(0,0,0,0, "pt")
-      )
-    )
-)
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -626,3 +605,152 @@ ggsave(
 ```
 
 ![This graphic presents two views of the 2024 U.S. Presidential Election results using precinct-level data. The left map is a choropleth showing each state's winning party—blue for Democrats, red for Republicans—with darker shades indicating larger victory margins. The right map is a non-contiguous cartogram where each state is resized based on its population, highlighting how densely populated (and often Democratic-leaning) states carry more electoral weight. While Republicans dominate in geographic area, the cartogram reveals the demographic strength behind the Democratic vote, illustrating the contrast between land size and population influence in national elections.](images/nyt_election_data_2.png){#fig-2}
+
+### **Analysis on population density and voter preferences**
+
+```{r}
+
+bts = 60
+
+sf_use_s2(FALSE)
+
+df7 <- nyt_raw_1 |> 
+  st_set_crs("EPSG:4326") |> 
+  mutate(
+    area = as.numeric(st_area(geometry))/1e6,
+    voter_density = votes_total / area,
+    perc_rep = ((votes_rep - votes_dem)/votes_total)
+  ) |> 
+  st_drop_geometry() |> 
+  as_tibble()
+
+df7 |> 
+  ggplot(aes(votes_total)) +
+  geom_boxplot() +
+  scale_x_continuous(trans = "log10")
+
+g <- df7 |> 
+  ggplot(
+    mapping = aes(
+      x = votes_total,
+      y = voter_density,
+      colour = perc_rep
+    )
+  ) +
+  geom_point(
+    size = 0.5,
+    position = position_jitter(
+      width = 0.2
+    )
+  ) +
+  scale_x_continuous(
+    transform = "log10",
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(space = T)
+    ),
+    expand = expansion(c(0, 0.05))
+  ) +
+  scale_y_continuous(
+    transform = "log10",
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(space = T)
+    ),
+    expand = expansion(0),
+    limits = c(0.01, 1.1e6),
+    oob = scales::squish
+  ) +
+  scale_colour_gradient2(
+    low = "blue",
+    high = "red",
+    mid = "white",
+    midpoint = 0,
+    na.value = "transparent",
+    labels = scales::label_percent(
+      style_negative = "parens"
+    )
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  theme_classic(
+    base_family = "body_font",
+    base_size = bts,
+    base_line_size = bts/150,
+    base_rect_size = bts/150
+  ) +
+  labs(
+    title = "..............",
+    fill = "......................",
+    caption = plot_caption,
+    colour = "% Vote Margin",
+    x = "Total number of votes in the precinct",
+    y = "Precinct Voter density (voters per sq. km.)"
+  ) +
+  theme(
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    plot.margin = margin(0,10,0,10, "pt"),
+    plot.background = element_rect(fill = NA, colour = NA),
+    panel.background = element_rect(fill = NA, colour = NA),
+    legend.background = element_rect(fill = NA, color = NA),
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(1, 0.01),
+    legend.justification = c(1, 0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.margin = margin(0,0,0,0, "pt"),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    legend.key.height = unit(2, "pt"),
+    legend.key.width = unit(30, "pt"),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5,
+      family = "caption_font",
+      margin = margin(0,0,10,0, "pt"),
+      size = 30
+    ),
+    plot.title = element_text(
+      margin = margin(20,0,0,0, "pt"),
+      family = "title_font"
+    ),
+    
+    # Axes
+    axis.text = element_text(
+      margin = margin(-20,0,-20,0, "pt")
+    ),
+    axis.title = element_text(
+      margin = margin(-10,0,-10,0, "pt")
+    ),
+    axis.line = element_line(
+      arrow = arrow(length = unit(5, "pt"))
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "pt")
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", 
+                        "nyt_election_data_3.png"),
+  height = 2000 * 5 / 4,
+  width = 2000,
+  units = "px",
+  bg = "grey95"
+)
+```
+
+![](images/nyt_election_data_3.png)
