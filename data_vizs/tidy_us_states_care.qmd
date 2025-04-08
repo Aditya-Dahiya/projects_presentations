@@ -1,0 +1,469 @@
+---
+title: "The Geography of Care: USA’s Health Maps"
+author: "Aditya Dahiya"
+date: "2025-04-08"
+subtitle: "Nine health indicators, one view—this faceted map visualizes standardized z-scores for each metric, highlighting geographic trends and disparities across U.S. states. Built using {ggplot2}, {sf}, and data wrangling with {dplyr}, it helps reveal patterns not visible in raw numbers alone."
+categories:
+  - "#TidyTuesday"
+  - "Maps"
+  - "USA"
+  - "Chloropleth"
+image: "thumbnails/tidy_us_states_care.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+The dataset for this week’s #TidyTuesday explores **state-level measurements of timely and effective care** in hospitals across the United States, sourced from [Medicare.gov](https://data.cms.gov/provider-data/dataset/apyc-v239). Collected and published by the *Centers for Medicare and Medicaid Services (CMS)*, the data captures how hospitals perform across various metrics such as emergency room wait times and treatment timelines for different conditions. With 22 unique measure IDs covering six condition categories, each record includes the state, the measured outcome, and the relevant time window. This dataset provides an opportunity to analyze geographic disparities in care quality and timeliness, potentially uncovering how factors like state population, staffing levels, or hospital capacity affect patient experiences. It was curated by Jon Harmon from the Data Science Learning Community, with inspiration from a [Visual Capitalist map](https://www.visualcapitalist.com/mapped-emergency-room-visit-times-by-state/) by Kayla Zhu and Christina Kostandi, highlighting how emergency room wait times vary dramatically across states.
+
+![This graphic displays nine choropleth maps comparing U.S. states across major healthcare indicators such as ER visits, immunization rates, preventable hospitalizations, and mental health service use. Each map shows standardized z-scores, enabling meaningful comparisons despite differing units and scales. States with higher-than-average values are shaded in darker hues, revealing regional patterns and disparities in healthcare access and utilization.](tidy_us_states_care.png){#fig-1}
+
+## **How I made this graphic?**
+
+To create this faceted map visualization of U.S. state-level healthcare indicators, I primarily used the [`ggplot2`](https://ggplot2.tidyverse.org/) framework from the [`tidyverse`](https://www.tidyverse.org/) suite for plotting, along with several powerful supporting packages. The spatial geometries were handled using [`sf`](https://r-spatial.github.io/sf/), while data wrangling was done with `dplyr`, `tidyr`, and `forcats`. Each of the nine maps represents a different performance indicator (selected using their `measure_id`) and is scaled using standardized z-scores for comparability. The base maps came from [`usmapdata`](https://github.com/hrbrmstr/usmapdata), and I used `geom_sf()` to draw state boundaries and `geom_sf_text()` to overlay actual indicator values. Color gradients were applied with [`paletteer`](https://emilhvitfeldt.github.io/paletteer/) and refined using [`colorspace`](https://colorspace.r-forge.r-project.org/), while plot text was enhanced via [`showtext`](https://cran.r-project.org/package=showtext) and [`ggtext`](https://wilkelab.org/ggtext/). The maps were arranged using [`facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html), revealing regional patterns—such as better emergency care metrics in the Midwest but lower vaccination scores. Final composition tweaks used [`patchwork`](https://patchwork.data-imaginist.com/), and social media icons were integrated with [`fontawesome`](https://github.com/rstudio/fontawesome) for a polished and branded appearance. Overall, this approach combined geospatial visualization, normalization, and typography to craft an insightful and visually cohesive narrative.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+library(magick)               # Download images and edit them
+library(ggimage)              # Display images in ggplot2
+library(patchwork)            # Composing Plots
+
+library(sf)                   # For maps and area computation
+
+care_state <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-08/care_state.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c("yellow", "blue", "grey30")
+# cols4all::c4a_gui()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[3]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[3]
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** medicare.gov, CMS & Jon Harmon", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "The Geography of Care: USA’s Health Maps"
+plot_subtitle <- "Nine health indicators, one view—this faceted map visualizes standardized z-scores for each metric, highlighting geographic trends and disparities across U.S. states. Built using {ggplot2}, {sf}, and data wrangling with {dplyr}, it helps reveal patterns not visible in raw numbers alone."
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# Overall exploration of the data
+# library(summarytools)
+# care_state |> 
+#   dfSummary() |> 
+#   view()
+
+# Lets look at the variables - names - meaning
+# care_state |> 
+#   distinct(measure_id, measure_name) |> 
+#   print(n = Inf)
+
+# Lets look at correlation between the various variables
+# care_state |>
+#   select(state, measure_id, score) |>
+#   pivot_wider(
+#     id_cols = state,
+#     names_from = measure_id,
+#     values_from = score
+#   ) |>
+#   select(-state) |>
+#   GGally::ggpairs()
+# Pair wise scatterplot is too heav to make sense.
+
+# Using ggcorrplot instead
+care_state |>
+  select(state, measure_id, score) |>
+  pivot_wider(
+    id_cols = state,
+    names_from = measure_id,
+    values_from = score
+  ) |>
+  select(-state) |>
+  cor(use = "pairwise.complete.obs") |> 
+  ggcorrplot::ggcorrplot() +
+  scale_fill_gradient2(
+    low = "red", high = "blue", mid = "white"
+  )
+
+# Select out the relevant variables that make more sense
+care_state |> 
+  filter(
+    measure_id %in% selected_vars
+  ) |>
+  distinct(measure_id, measure_name)
+
+selected_vars <- c(
+  "OP_18b", "OP_18c", "OP_22", 
+  "OP_29", "SAFE_USE_OF_OPIOIDS", "SEP_1",
+  "OP_23", "HCP_COVID_19", "IMM_3"
+  )
+
+# A correlation plot between the variables
+care_state |>
+  filter(
+    measure_id %in% selected_vars
+  ) |>
+  select(state, measure_id, score) |>
+  pivot_wider(
+    id_cols = state,
+    names_from = measure_id,
+    values_from = score
+  ) |>
+  select(-state) |>
+  cor(use = "pairwise.complete.obs") |>
+  ggcorrplot::ggcorrplot() +
+  scale_fill_gradient2(
+    low = "red", high = "blue", mid = "white"
+  )
+
+# A facet labeller vector
+df_temp <- care_state |> 
+  filter(measure_id %in% selected_vars) |> 
+  distinct(measure_id, measure_name)
+facet_names <- df_temp$measure_name
+# Improve names (remove unwanted words)
+facet_names <- str_wrap(str_replace(df_temp$measure_name, "\\b(Higher|A lower|Lower)\\b.*", ""), 50)
+names(facet_names) <- df_temp$measure_id
+# Reverse the variable for which lower value is better
+rev_vars = c("OP_18b", "OP_18c", "OP_22")
+rm(df_temp)
+
+# Create a final usable tibble for faceted map of USA
+df1 <- care_state |> 
+  filter(
+    measure_id %in% selected_vars
+  ) |> 
+  select(
+    state, 
+    measure_id, 
+    # measure_name,
+    score
+  ) |> 
+  group_by(measure_id) |> 
+  mutate(
+    score = if_else(
+      measure_id %in% rev_vars,
+      -score,
+      score
+    ),
+    # Using standardized z-score for Fill Scale
+    score_scaled = (score - mean(score, na.rm = TRUE)) / 
+                      sd(score, na.rm = TRUE),
+    
+    
+    score_display = if_else(
+      score == min(score, na.rm = T) | score == max(score, na.rm = T),
+      score,
+      NA
+    )
+  ) |> 
+  ungroup() |> 
+  mutate(measure_id  = fct(measure_id, levels = selected_vars)) |> 
+  rename(abbr = state)
+
+# Check if values are propery distributed.
+# df1 |> 
+#   ggplot(aes(x = score_scaled)) +
+#   geom_boxplot() +
+#   facet_wrap(~measure_id, ncol = 1)
+
+
+df_plot <- usmapdata::us_map() |> 
+  select(abbr, full, geom) |> 
+  left_join(df1) |> 
+  mutate(area_var = as.numeric(st_area(geom)))
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- ggplot(
+  data = df_plot,
+  mapping = aes(
+    fill = score_scaled
+  )
+) +
+  geom_sf(
+    colour = bg_col,
+    linewidth = 0.2
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = round(abs(score), 1),
+      size = area_var
+    ),
+    family = "caption_font",
+    colour = text_col
+  ) +
+  scale_size(range = c(bts/40, bts/8)) +
+  facet_wrap(
+    ~ measure_id,
+    ncol = 3,
+    labeller = labeller(
+      measure_id = facet_names
+    )
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Tropic",
+    direction = -1,
+    limits = c(-1, 1),
+    oob = scales::squish,
+    breaks = c(-0.6, 0.6),
+    labels = c("Worse than National Average",
+               "Better than National Average")
+  ) +
+  guides(size = "none") +
+  coord_sf(clip = "off", expand = FALSE) +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 100),
+    caption = plot_caption,
+    fill = NULL
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(5,-5,5,-15, "mm"),
+    plot.title.position = "plot",
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(15,0,5,0, "mm"),
+      size = bts * 1.8,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(5,0,15,0, "mm"),
+      size = 0.8 * bts,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.5 * bts
+    ),
+    plot.caption.position = "plot",
+    
+    # Legend
+    legend.position = "bottom",
+    legend.margin = margin(-20,0,0,0, "mm"),
+    legend.box.margin = margin(-20,0,0,0, "mm"),
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.text = element_text(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.key.height = unit(10, "mm"),
+    legend.key.width = unit(60, "mm"),
+    legend.justification = c(0.5, 1),
+    
+    # Strip Text
+    strip.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3,
+      hjust = 0.5,
+      vjust = 0.5,
+      family = "caption_font",
+      size = bts / 2
+    ),
+    strip.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    panel.spacing.y = unit(5, "mm"),
+    panel.spacing.x = unit(-15, "mm"),
+    
+    # Axes
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_blank(),
+    axis.text = element_blank()
+  )
+
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_us_states_care.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_us_states_care.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_us_states_care.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+# Data Import and Wrangling Tools
+library(tidyverse)            # All things tidy
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+library(magick)               # Download images and edit them
+library(ggimage)              # Display images in ggplot2
+library(patchwork)            # composing Plots
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
