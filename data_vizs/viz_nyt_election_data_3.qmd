@@ -1,0 +1,380 @@
+---
+title: "Density Divide: Urban vs. Rural Voting (2024)"
+author: "Aditya Dahiya"
+date: "2025-04-09"
+subtitle: "This scatter plot maps total votes against voter density for 127,260 precincts in the 2024 presidential election, with a color gradient from blue to red showing the voting margin. Precincts with higher population density predominantly supported the Democratic candidate, while those with lower density favored the Republican. The visualization underscores a clear urban-rural political split based on comprehensive data from The New York Times."
+categories:
+  - "Geopolitics"
+  - "USA"
+image: "thumbnails/viz_nyt_election_data_3.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+This comprehensive dataset compiles detailed, precinct-level results and geographic boundaries from the 2024 presidential election. It integrates official voting records and spatial data as described in the [New York Times Election Map Data](https://www.nytimes.com/2025/01/15/us/elections/2024-election-map-data.html) article and is further enriched by the interactive presentation found in the [NYT Election Map Precinct Results](https://www.nytimes.com/interactive/2025/us/elections/2024-election-map-precinct-results.html). In addition, the [GitHub repository](https://github.com/nytimes/presidential-precinct-map-2024?tab=readme-ov-file#download-national-data) maintained by The New York Times provides national-level downloads and detailed documentation, reflecting the robust, transparent approach of their election team.
+
+![This scatter plot visualizes the 2024 presidential election results across 127,260 U.S. precincts, sourced from The New York Times. The x-axis shows the total number of votes per precinct (log scale), while the y-axis represents voter density (voters per square kilometer, log scale). Each dot represents a precinct, colored by voting margin: blue for Democratic wins, red for Republican wins, with a gradient in between. The plot reveals a clear pattern—densely populated precincts (higher on the y-axis) tend to favor Democrats, while sparsely populated ones lean Republican, illustrating the urban-rural electoral divide.](/projects/images/nyt_election_data_3.png)
+
+### Code
+
+```{r}
+
+
+# Data wrangling & visualization
+library(tidyverse)  # Data manipulation & visualization
+
+# Spatial data handling
+library(sf)         # Import, export, and manipulate vector data
+library(terra)      # Import, export, and manipulate raster data
+
+# ggplot2 extensions
+library(tidyterra)  # Helper functions for using terra with ggplot2
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text in ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(patchwork)            # Composing Plots
+library(ggspatial)            # Scales and Arrows in Maps
+
+bts = 11 # Base Text Size
+sysfonts::font_add_google("Saira Condensed", "body_font")
+sysfonts::font_add_google("Saira", "title_font")
+sysfonts::font_add_google("Saira Extra Condensed", "caption_font")
+showtext::showtext_auto()
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data**:  New York Times (2024 Precinct-Level Election Results)",
+  "  |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+
+# url1 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.topojson.gz"
+
+# url2 <- "https://int.nyt.com/newsgraphics/elections/map-data/2024/national/precincts-with-results.csv.gz"
+
+# Warning: Almost 1 GB of download
+# nyt_raw_1 <- st_read(paste0("/vsigzip//vsicurl/", url1))
+
+# Save data to disk temporarily to use again during code trial
+# saveRDS(nyt_raw_1, file = "temp_nyt_election_data.rds")
+
+# Read in the pre-saved data
+nyt_raw_1 <- readRDS("temp_nyt_election_data.rds")
+
+
+bts = 60
+
+sf_use_s2(FALSE)
+
+df7 <- nyt_raw_1 |> 
+  st_set_crs("EPSG:4326") |> 
+  mutate(
+    area = as.numeric(st_area(geometry))/1e6,
+    voter_density = votes_total / area,
+    perc_rep = ((votes_rep - votes_dem)/votes_total)
+  ) |> 
+  st_drop_geometry() |> 
+  as_tibble()
+
+# Check the distribution of total votes
+df7 |> 
+  ggplot(aes(votes_total)) +
+  geom_boxplot() +
+  scale_x_continuous(trans = "log10")
+
+# Check the distribution of voter density
+df7 |> 
+  ggplot(aes(voter_density)) +
+  geom_boxplot() +
+  scale_x_continuous(trans = "log10")
+
+# Thus, we need a log scale on X-axis and Y-axis.
+
+# Keep Selected variables needed for plotting
+df7 |> names()
+plotdf <- df7 |> 
+  select(id, state, votes_total, voter_density, perc_rep)
+plotdf |> 
+  summary()
+
+plotdf |> 
+  select(-id, -state) |> 
+  drop_na()
+# Start Plot
+g <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = votes_total,
+      y = voter_density,
+      colour = perc_rep
+    )
+  ) +
+  geom_point(
+    size = 0.2,
+    alpha = 0.75,
+    position = position_jitter(
+      width = 0.2
+    )
+  ) +
+  
+  # Add Text Annotation
+  annotate(
+    geom = "label",
+    x = 1e4, y = 5e4,
+    label = "Each dot represents\na precinct in the\nUS Elections.",
+    family = "body_font",
+    hjust = 0.5, 
+    vjust = 0.7,
+    lineheight = 0.3,
+    colour = text_hil,
+    size = bts / 4,
+    fill = alpha("white", 0.4),
+    label.size = NA,
+    label.padding = unit(0.1, "lines") 
+  ) +
+  scale_x_continuous(
+    limits = c(10, 2e4),
+    transform = "log10",
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(space = T)
+    ),
+    expand = expansion(c(0, 0.05)),
+    breaks = 10^(1:5)
+  ) +
+  scale_y_continuous(
+    transform = "log10",
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(space = T),
+      accuracy = 1
+    ),
+    expand = expansion(0),
+    limits = c(0.01, 1.1e5),
+    breaks = c(10^(0:5))
+  ) +
+  scale_colour_gradient2(
+    low = "blue",
+    high = "red",
+    mid = "white",
+    midpoint = 0,
+    na.value = "transparent",
+    breaks = c(-0.75, 0.75),
+    labels = c("Voted\nDemocrat", "Voted\nRepublican")
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts,
+    base_line_size = bts/150,
+    base_rect_size = bts/150
+  ) +
+  labs(
+    title = "Density Divide: Urban vs. Rural Voting (2024)",
+    subtitle = str_wrap("This scatter plot maps total votes against voter density for 127,260 precincts in the 2024 presidential election, with a color gradient from blue to red showing the voting margin. Precincts with higher population density predominantly supported the Democratic candidate, while those with lower density favored the Republican. The visualization underscores a clear urban-rural political split based on comprehensive data from The New York Times.", 100),
+    caption = plot_caption,
+    colour = "% Vote Margin",
+    x = "Total number of votes in the precinct",
+    y = "Precinct Voter density (voters per sq. km.)"
+  ) +
+  theme(
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "pt"),
+      colour = text_hil
+    ),
+    plot.margin = margin(0,10,0,10, "pt"),
+    panel.border = element_blank(),
+    plot.background = element_rect(fill = NA, colour = NA),
+    panel.background = element_rect(fill = NA, colour = NA),
+    legend.background = element_rect(fill = NA, color = NA),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0.99, 0.01),
+    legend.justification = c(1, 0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "pt"),
+    legend.box.margin = margin(0,0,0,0, "pt"),
+    legend.text = element_text(
+      margin = margin(3,0,0,0, "pt"),
+      hjust = 0.5,
+      lineheight = 0.3,
+      size = bts / 2
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    legend.key.height = unit(2, "pt"),
+    legend.key.width = unit(30, "pt"),
+    plot.caption = element_textbox(
+      hjust = 1,
+      halign = 1,
+      family = "caption_font",
+      margin = margin(10,0,5,0, "pt"),
+      size = 30
+    ),
+    plot.title = element_text(
+      margin = margin(20,0,10,0, "pt"),
+      hjust = 0.5,
+      face = "bold",
+      size = 1.4 * bts
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,5,0, "pt"),
+      lineheight = 0.3,
+      hjust = 0.5,
+      size = bts / 1.5
+    ),
+    
+    # Axes
+    panel.spacing = unit(0, "pt"),
+    axis.title.x = element_text(margin = margin(0,0,0,0, "pt")),
+    axis.title.y = element_text(margin = margin(0,0,0,0, "pt")),
+    axis.text.x = element_text(
+      margin = margin(2,2,2,2, "pt")
+    ),
+    axis.text.y = element_text(
+      margin = margin(2,2,2,2, "pt")
+    ),
+    axis.line = element_line(
+      arrow = arrow(length = unit(5, "pt"))
+    ),
+    axis.ticks = element_line(
+      linewidth = 0.1
+    ),
+    axis.ticks.length = unit(5, "pt")
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", 
+                        "nyt_election_data_3.png"),
+  height = 2000 * 5 / 4,
+  width = 2000,
+  units = "px",
+  bg = "grey95"
+)
+```
+
+This graphic, designed to explore the relationship between voter density and voting patterns in the 2024 presidential election, was created using R and several key packages. The data, sourced from The New York Times' comprehensive precinct-level results, was first loaded and processed using the [**`sf`**](https://r-spatial.github.io/sf/) package for spatial data handling and the [**`tibble`**](https://tibble.tidyverse.org/) package for data manipulation. The `st_set_crs` function was used to set the coordinate reference system to EPSG:4326, ensuring accurate geographic area calculation, while `st_area` from the **`sf`** package calculated precinct areas for determining voter density (total votes divided by area). The voting margin was computed as the difference between Republican and Democratic votes divided by total votes. For visualization, the [**`ggplot2`**](https://ggplot2.tidyverse.org/) package was employed to create a scatter plot, using `geom_point` to plot total votes against voter density, coloured by voting margin. To manage the wide range of values, log10 transformations were applied to both axes with `scale_x_continuous` and `scale_y_continuous`, with labels formatted using `scales::label_number` and `cut_short_scale` from the [**`scales`**](https://scales.r-lib.org/) package. The color gradient was defined with `scale_colour_gradient2`, mapping blue to Democratic wins and red to Republican wins.
+
+Save a thumbnail
+
+```{r}
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("projects", "images", 
+                      "nyt_election_data_3.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_nyt_election_data_3.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data wrangling & visualization
+library(tidyverse)  # Data manipulation & visualization
+
+# Spatial data handling
+library(sf)         # Import, export, and manipulate vector data
+library(terra)      # Import, export, and manipulate raster data
+
+# ggplot2 extensions
+library(tidyterra)  # Helper functions for using terra with ggplot2
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text in ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(patchwork)            # Composing Plots
+library(ggspatial)            # Scales and Arrows in Maps
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
