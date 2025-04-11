@@ -1,0 +1,387 @@
+---
+title: "................"
+author: "Aditya Dahiya"
+date: "2025-04-11"
+subtitle: "........................"
+categories:
+  - "Geocomputation"
+  - "{ggmap}"
+  - "Maps"
+image: "thumbnails/..................png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+![....................](viz_usa_hurricanes.png){#fig-1}
+
+### How I made this graphic?
+
+Loading required libraries, data import & creating custom functions.
+
+```{r}
+#| label: setup
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(sf)                   # Simple Features in R
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+library(ggspatial)            # Scales and Arrows on maps
+
+# Data Wrangling & ggplot2
+library(tidyverse)            # All things tidy
+
+library(dplyr)
+library(janitor)  # For clean column name handling
+
+library(rvest)
+library(tibble)
+
+# URL of the webpage
+url <- "https://www.aoml.noaa.gov/hrd/hurdat/UShurrs_detailed.html"
+
+# Read the HTML content of the page
+page <- read_html(url)
+
+# Extract the first table from the page and convert it to a tibble
+raw_data <- page |> 
+  html_element("table")  |>    # Target the table element
+  html_table()  |>             # Convert to data frame
+  as_tibble()                  # Convert to tibble
+
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Barlow",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+# Get a Korean Style Colour Palette from
+# https://www.schemecolor.com/korean-style.php
+mypal <- c("#293380", "#953D60", "#F0EFF7",
+           "#DDBFE4", "#869FDE", "#8ABFE8")
+
+# A base Colour
+bg_col <- mypal[3]
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[1]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[1]
+seecolor::print_color(text_col)
+
+# Colour for location points
+point_col <- mypal[2]
+seecolor::print_color(point_col)
+
+# Define Base Text Size
+bts <- 90 
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Beyond Parallel project by Center for Strategic and International Studies ", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "............"
+
+plot_subtitle <- "................................"
+```
+
+Get raw data, elevation data for South Korea and neighbouring countries
+
+```{r}
+#| label: eda-data-wrangling
+
+drop_rows <- paste0(185:202, "0s")
+
+df1 <- raw_data |> 
+  # Remove first 3 rows
+  slice(-1:-3) |> 
+  # Select first 10 columns
+  select(1:10) |>  
+  # Use row 4 (now first row after slicing) as column names
+  janitor::row_to_names(1) |>  
+  # Convert all columns to appropriate types
+  readr::type_convert() |> 
+  # Clean the names of the columns
+  janitor::clean_names() |> 
+  # Drop the rows that are row-headers (i.e. 1850s, 1860s, ...)
+  filter(!(number %in% drop_rows)) |> 
+  mutate(
+    # Extract numeric value and direction from latitude
+    lat = as.numeric(str_extract(latitude, "\\d+\\.?\\d*")),
+    lat_dir = str_extract(latitude, "[NS]"),
+    # Extract numeric value and direction from longitude
+    lon = as.numeric(str_extract(longitude, "\\d+\\.?\\d*")),
+    lon_dir = str_extract(longitude, "[WE]"),
+    # Convert to signed decimal degrees
+    lat = if_else(lat_dir == "S", -lat, lat),
+    lon = if_else(lon_dir == "W", -lon, lon)
+  ) |> 
+  filter(!is.na(lat) & !is.na(lon)) |> 
+  # Convert to sf object (WGS84 coordinate system)
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
+  # Remove intermediate columns
+  select(-ends_with("_dir"), -latitude, -longitude)
+
+
+df1
+```
+
+Composing Final Plot
+
+```{r}
+#| label: base-plot
+
+# Check the South Korea Map
+
+
+
+
+  # Administrative Divisions of South Korea
+  geom_sf(
+    data = south_korea_map,
+    fill = NA,
+    colour = text_col,
+    linewidth = 0.4
+  ) +
+  
+  # Add north arrow and scale
+  ggspatial::annotation_scale(
+    bar_cols = c(mypal[4], mypal[2]),
+    line_width = 0.5,
+    text_family = "body_font",
+    text_cex = bts / 10,
+    location = "bl",
+    line_col = text_col,
+    text_col = text_col
+  ) +
+  ggspatial::annotation_north_arrow(
+    location = "tr",
+    height = unit(5, "cm"),
+    width = unit(5, "cm"),
+    style = north_arrow_orienteering(
+      line_width = 0.5,
+      line_col = text_col,
+      fill = c(bg_col, text_col),
+      text_family = "body_font",
+      text_size = bts * 1.5
+    )
+  ) +
+  
+  # Coordinates
+  coord_sf(
+    expand = FALSE,
+    # crs = "EPSG:5186",
+    default_crs = "EPSG:4326",
+    clip = "off"
+  ) +
+  
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 95),
+    caption = plot_caption
+  ) +
+  # Theme and beautification of plot
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    legend.position = "bottom",
+    panel.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    plot.background = element_rect(
+      fill = bg_col,
+      colour = bg_col
+    ),
+    text = element_text(
+      colour = text_col
+    ), 
+    
+    # Grid and Axes
+    panel.grid = element_line(
+      linewidth = 0.2,
+      colour = text_hil,
+      linetype = 3
+    ),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    
+    # Legend
+    legend.justification = c(0.5, 1),
+    legend.title.position = "top",
+    legend.direction = "horizontal",
+    legend.box = "horizontal",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text.position = "bottom",
+    legend.key.width = unit(30, "mm"),
+    legend.key.height = unit(6, "mm"),
+    legend.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    legend.margin = margin(-10,0,0,0, "mm"),
+    legend.box.margin = margin(-10,0,0,0, "mm"),
+    legend.spacing.y = unit(1, "cm"),
+    legend.spacing.x = unit(4, "cm"),
+    
+    # Labels
+    plot.title = element_text(
+      hjust = 0.5,
+      size = bts * 2.5,
+      margin = margin(5,0,5,0, "mm"),
+      family = "title_font",
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      family = "body_font",
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5, 
+      margin = margin(5,0,0,0, "mm"),
+      family = "caption_font",
+      size = 0.7 * bts
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here(
+    "data_vizs", "viz_sk_trash_balloons.png"
+  ),
+  height = 50,
+  width = 40,
+  units = "cm",
+  bg = bg_col
+)
+```
+
+Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "viz_usa_hurricanes.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_usa_hurricanes.png"
+    )
+  )
+```
+
+Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
