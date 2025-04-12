@@ -1,13 +1,17 @@
 ---
-title: "................"
+title: "Visualizing Hurricane History: Landfalls, Wind Speed & Scale"
 author: "Aditya Dahiya"
 date: "2025-04-11"
-subtitle: "........................"
+subtitle: "This graphic maps all U.S. hurricane landfalls from 1850 to 2024, showing location and intensity at landfall. Inset charts reveal seasonal patterns, decadal trends in storm strength, and rising maximum wind speeds over time."
 categories:
   - "Geocomputation"
   - "{ggmap}"
   - "Maps"
-image: "thumbnails/..................png"
+  - "Webscraping"
+  - "{rvest}"
+  - "{sf}"
+  - "Data Is Plural"
+image: "thumbnails/viz_usa_hurricanes.png"
 format:
   html:
     code-fold: true
@@ -34,11 +38,13 @@ comments:
 
 ### About the Data
 
-![....................](viz_usa_hurricanes.png){#fig-1}
+The data on U.S. hurricane landfalls is sourced from NOAA’s [Hurricane Research Division](https://www.aoml.noaa.gov/hrd/hurricane-research-division/), which maintains two key tables. The [first table](https://www.aoml.noaa.gov/hrd/hurdat/All_U.S._Hurricanes.html) provides an overview of hurricanes since the 1850s, including year, month, name, affected states, Saffir-Simpson category, central pressure, and wind speed. A [second, more detailed table](https://www.aoml.noaa.gov/hrd/hurdat/UShurrs_detailed.html) adds landfall dates, coordinates, and other metrics but has gaps in the late 1970s–early 1980s. These datasets are valuable for climatological research, though users should note inconsistencies in record-keeping over time. For methodology, see NOAA’s [Saffir-Simpson scale](https://www.nhc.noaa.gov/aboutsshws.php).
+
+![This visualization maps every recorded hurricane landfall along the U.S. coast from 1850 to 2024, with dot colors representing storm intensity on the Saffir-Simpson scale. The inset charts provide additional context: hurricanes are most frequent in September, higher-intensity storms have become more common in recent decades, and maximum wind speeds show a gradual upward trend over time. The graphic draws on NOAA’s detailed hurricane records and offers a long-term view of how these powerful storms have impacted the U.S. coastline over nearly two centuries.](viz_usa_hurricanes.png){#fig-1}
 
 ### How I made this graphic?
 
-Loading required libraries, data import & creating custom functions.
+**Loading required libraries, data import**
 
 ```{r}
 #| label: setup
@@ -61,12 +67,11 @@ library(ggspatial)            # Scales and Arrows on maps
 
 # Data Wrangling & ggplot2
 library(tidyverse)            # All things tidy
+library(patchwork)            # Composing plots
 
-library(dplyr)
 library(janitor)  # For clean column name handling
 
-library(rvest)
-library(tibble)
+library(rvest)                # Web Scraping
 
 # URL of the webpage
 url <- "https://www.aoml.noaa.gov/hrd/hurdat/UShurrs_detailed.html"
@@ -82,47 +87,48 @@ raw_data <- page |>
 
 ```
 
-Visualization Parameters
+-   **Date/Time:** Date and time when the circulation center crosses the U.S. coastline (including barrier islands). Time is estimated to the nearest hour.
+
+-   **Max Winds:** Estimated maximum sustained (1 min) surface (10 m) winds to occur along the U. S. coast.
+
+-   **SSHWS:** The estimated Saffir-Simpson Hurricane Scale at landfall based upon maximum 1-min surface winds.
+
+-   **Cent Press:** The central pressure of the hurricane at landfall. Central pressure values in parentheses indicate that the value is a simple estimation (based upon a wind-pressure relationship), not directly measured or calculated.
+
+**Visualization Parameters**
 
 ```{r}
 #| label: viz-params
 
 # Font for titles
-font_add_google("Barlow",
+font_add_google("Saira",
   family = "title_font"
 ) 
 
 # Font for the caption
-font_add_google("Barlow Condensed",
+font_add_google("Saira Extra Condensed",
   family = "caption_font"
 ) 
 
 # Font for plot text
-font_add_google("Barlow Semi Condensed",
+font_add_google("Saira Condensed",
   family = "body_font"
 ) 
 
 showtext_auto()
-# Get a Korean Style Colour Palette from
-# https://www.schemecolor.com/korean-style.php
-mypal <- c("#293380", "#953D60", "#F0EFF7",
-           "#DDBFE4", "#869FDE", "#8ABFE8")
+mypal <- c("#009392FF", "#9CCB86FF", "#EEB479FF", "#E88471FF", "#CF597EFF")
 
 # A base Colour
-bg_col <- mypal[3]
+bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
-text_hil <- mypal[1]
+text_hil <- "grey30"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- mypal[1]
+text_col <- "grey20"
 seecolor::print_color(text_col)
-
-# Colour for location points
-point_col <- mypal[2]
-seecolor::print_color(point_col)
 
 # Define Base Text Size
 bts <- 90 
@@ -139,7 +145,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** Beyond Parallel project by Center for Strategic and International Studies ", 
+  "**Data:** Hurricane Research Division (NOAA)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -149,24 +155,29 @@ rm(github, github_username, xtwitter,
    xtwitter_username, social_caption_1, 
    social_caption_2)
 
-# Add text to plot-------------------------------------------------
-plot_title <- "............"
+# Alpha Values for dots and colours
+alpha_value = 0.4
 
-plot_subtitle <- "................................"
+# Add text to plot-------------------------------------------------
+plot_title <- "U.S. Hurricane Landfalls (1850–2024): Trends"
+
+plot_subtitle <- "All recorded U.S. hurricane landfalls from 1850 to 2024, with colored dots indicating the location and intensity (Saffir-Simpson Hurricane Scale) at landfall. Charts above highlight seasonal patterns, changes in hurricane strength by decade, and trends in maximum wind speed over time."
 ```
 
-Get raw data, elevation data for South Korea and neighbouring countries
+**Data Wrangling**
 
 ```{r}
 #| label: eda-data-wrangling
 
 drop_rows <- paste0(185:202, "0s")
 
+base_map <- usmapdata::us_map()
+
 df1 <- raw_data |> 
   # Remove first 3 rows
   slice(-1:-3) |> 
   # Select first 10 columns
-  select(1:10) |>  
+  select(1:13) |>  
   # Use row 4 (now first row after slicing) as column names
   janitor::row_to_names(1) |>  
   # Convert all columns to appropriate types
@@ -190,68 +201,132 @@ df1 <- raw_data |>
   # Convert to sf object (WGS84 coordinate system)
   st_as_sf(coords = c("lon", "lat"), crs = 4326) |> 
   # Remove intermediate columns
-  select(-ends_with("_dir"), -latitude, -longitude)
+  select(-ends_with("_dir"), -latitude, -longitude) |> 
+  mutate(
+    # Convert date column into proper dates
+    date = date |> 
+      str_replace("\\D+$", "") |> # Remove non-digits at end
+      mdy(),  # Convert to date
+    
+    # Extract maximum wind speed, and Saffir-Simpson Hurricane Scale
+    max_winds_kt = parse_number(max_winds_kt),
+    ss_hws = parse_number(ss_hws),
+    pressure = parse_number(central_pressure_mb),
+    
+    # Parse time column (handles UTC/Zulu times)
+    time = parse_time(time, format = "%H%MZ"),
+    
+    # Remove all quotation marks
+    storm_names = str_remove_all(storm_names, pattern = '\"') |> 
+                    str_to_title(),
+    storm_names = if_else(
+                    str_detect(storm_names, "---"),
+                    NA,
+                    storm_names
+                  ),
+    decade = paste0(floor(year(date) / 10) * 10, "s")
+  ) |> 
+  select(-rm_wnm, -oci_mb, -central_pressure_mb) |> 
+  relocate(geometry, .after = everything()) |> 
+  filter(!is.na(date) & !is.na(ss_hws)) |> 
+  
+  # Convert to CRS of US Map
+  st_transform(crs = st_crs(base_map))
 
+# Set the values for controlling the extent of the map
+st_bbox(df1)
+xlim_values <- st_bbox(df1)[c(1, 3)]
+ylim_values <- st_bbox(df1)[c(2, 4)]
 
-df1
+bbox_raster <- st_bbox(df1 |> st_transform("EPSG:4326"))
+names(bbox_raster) <- c("left", "bottom", "right", "top")
+ 
+# library(ggmap)
+# base_raster_raw <- get_stadiamap(
+#   bbox = bbox_raster,
+#   zoom = 5,
+#   maptype = "stamen_terrain_background"
+# )
+# 
+# base_raster <- rast(base_raster_raw) |> 
+#   terra::crop(base_map |> st_transform("EPSG:4326")) |> 
+#   terra::mask(base_map |> st_transform("EPSG:4326")) |> 
+#   terra::project(df1)
+# 
+# ggplot() +
+#   geom_spatraster_rgb(
+#     data = base_raster
+#   )
 ```
 
-Composing Final Plot
+**Composing Final Plot**
 
 ```{r}
 #| label: base-plot
 
-# Check the South Korea Map
-
-
-
-
-  # Administrative Divisions of South Korea
+# Base Plot ------------------------------------------------------------
+g_base <- ggplot() +
   geom_sf(
-    data = south_korea_map,
-    fill = NA,
+    data = base_map,
     colour = text_col,
-    linewidth = 0.4
+    alpha = 0.6
   ) +
   
-  # Add north arrow and scale
-  ggspatial::annotation_scale(
-    bar_cols = c(mypal[4], mypal[2]),
-    line_width = 0.5,
-    text_family = "body_font",
-    text_cex = bts / 10,
-    location = "bl",
-    line_col = text_col,
-    text_col = text_col
+  geom_sf_text(
+    data = base_map,
+    mapping = aes(label = abbr),
+    size = bts / 3,
+    colour = alpha(text_col, 0.5),
+    check_overlap = T
   ) +
-  ggspatial::annotation_north_arrow(
-    location = "tr",
-    height = unit(5, "cm"),
-    width = unit(5, "cm"),
-    style = north_arrow_orienteering(
-      line_width = 0.5,
-      line_col = text_col,
-      fill = c(bg_col, text_col),
-      text_family = "body_font",
-      text_size = bts * 1.5
-    )
+  geom_sf(
+    data = df1 |> st_jitter(factor = 0.02),
+    mapping = aes(
+      size = ss_hws,
+      colour = as.character(ss_hws)
+    ),
+    alpha = 0.4
   ) +
-  
-  # Coordinates
+  annotate(
+    geom = "label",
+    x = 537727.1,
+    y = -303554.2,
+    label = str_wrap(plot_subtitle, 25),
+    size = bts / 2.5,
+    lineheight = 0.3,
+    hjust = 0.5,
+    vjust = 0.7,
+    family = "body_font",
+    fill = alpha(bg_col, 0.7),
+    label.size = NA,
+    label.padding = unit(0., "lines"),
+    colour = text_hil
+  ) +
   coord_sf(
-    expand = FALSE,
-    # crs = "EPSG:5186",
-    default_crs = "EPSG:4326",
-    clip = "off"
+    xlim = xlim_values,
+    ylim = ylim_values
   ) +
-  
+  labs(
+    colour = "Saffir-Simpson Hurricane Scale",
+    size = "Saffir-Simpson Hurricane Scale",
+    x = NULL, y = NULL
+  ) +
+  scale_colour_manual(
+    values = mypal
+  ) +
+  scale_size(
+    range = c(1, 15),
+    transform = "exp"
+  ) +
+
   labs(
     title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 95),
+    # subtitle = str_wrap(plot_subtitle, 95),
     caption = plot_caption
   ) +
+  
   # Theme and beautification of plot
-  ggthemes::theme_map(
+  theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
@@ -260,17 +335,8 @@ Composing Final Plot
     plot.margin = margin(5,5,5,5, "mm"),
     plot.title.position = "plot",
     plot.caption.position = "plot",
-    legend.position = "bottom",
-    panel.background = element_rect(
-      fill = bg_col,
-      colour = bg_col
-    ),
-    plot.background = element_rect(
-      fill = bg_col,
-      colour = bg_col
-    ),
     text = element_text(
-      colour = text_col
+        colour = text_hil
     ), 
     
     # Grid and Axes
@@ -279,12 +345,15 @@ Composing Final Plot
       colour = text_hil,
       linetype = 3
     ),
-    axis.text = element_blank(),
+    axis.text.x = element_text(margin = margin(0,0,0,0, "mm")),
+    axis.text.y = element_text(margin = margin(0,0,0,0, "mm")),
     axis.ticks = element_blank(),
     axis.ticks.length = unit(0, "mm"),
     
     # Legend
-    legend.justification = c(0.5, 1),
+    legend.position = "inside",
+    legend.position.inside = c(0, 1),
+    legend.justification = c(0, 1),
     legend.title.position = "top",
     legend.direction = "horizontal",
     legend.box = "horizontal",
@@ -294,26 +363,26 @@ Composing Final Plot
     ),
     legend.text = element_text(
       margin = margin(2,0,0,0, "mm"),
-      hjust = 0.5
+      hjust = 0.5,
+      face = "bold"
     ),
-    legend.text.position = "bottom",
-    legend.key.width = unit(30, "mm"),
-    legend.key.height = unit(6, "mm"),
+    legend.text.position = "left",
     legend.background = element_rect(
-      fill = NA, colour = NA
+      fill = alpha("white", 0.6), colour = NA
     ),
-    legend.margin = margin(-10,0,0,0, "mm"),
-    legend.box.margin = margin(-10,0,0,0, "mm"),
+    legend.margin = margin(5,5,5,5, "mm"),
+    legend.box.margin = margin(5,5,5,5, "mm"),
     legend.spacing.y = unit(1, "cm"),
-    legend.spacing.x = unit(4, "cm"),
+    legend.spacing.x = unit(3, "cm"),
     
     # Labels
     plot.title = element_text(
       hjust = 0.5,
-      size = bts * 2.5,
-      margin = margin(5,0,5,0, "mm"),
-      family = "title_font",
-      lineheight = 0.3
+      size = bts * 2.2,
+      margin = margin(5,0,100,0, "mm"),
+      family = "body_font",
+      lineheight = 0.3,
+      face = "bold"
     ),
     plot.subtitle = element_text(
       hjust = 0.5, 
@@ -324,25 +393,205 @@ Composing Final Plot
     plot.caption = element_textbox(
       hjust = 0.5,
       halign = 0.5, 
-      margin = margin(5,0,0,0, "mm"),
+      margin = margin(10,0,0,0, "mm"),
       family = "caption_font",
       size = 0.7 * bts
     )
   )
 
+# Inset : Bar Chart of number of Hurricanes by SS_HWS each decade
+inset_barchart <- df1 |> 
+  st_drop_geometry() |> 
+  filter(decade != "1970s") |> 
+  count(decade, ss_hws) |> 
+  ggplot(
+    aes(
+      x = decade, 
+      y = n,
+      fill = as.character(ss_hws)
+    )
+  ) +
+  ggchicklet::geom_chicklet(
+    alpha = alpha_value,
+    colour = bg_col,
+    position = position_stack(reverse = T)
+  ) +
+  geom_text(
+    aes(label = n),
+    family = "body_font",
+    position = position_stack(reverse = T, vjust = 0.5),
+    colour = alpha(text_col, 0.5),
+    size = bts / 10
+  ) +
+  scale_fill_manual(values = mypal) +
+  labs(
+    x = NULL,
+    y = "Number of hurricanes (in each decade)"
+  ) +
+  theme_minimal(
+    base_size = bts / 2,
+    base_family = "body_font"
+  ) +
+  theme(
+    text = element_text(colour = text_hil),
+    legend.position = "none",
+    axis.text.x = element_text(
+      margin = margin(0.5,0,0,0, "mm"),
+      angle = 90,
+      hjust = 0.5, vjust = 0.5
+    ),
+    panel.grid = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.y = element_blank(),
+    axis.ticks.length.y = unit(0, "mm"),
+    axis.text.y = element_text(margin = margin(0,0,0,0, "mm")),
+    axis.title.y = element_text(margin = margin(0,0,0,0, "mm"))
+  )
+
+# Inset bar chart on number of hurricanes per month (historically)  
+inset_barchart2 <- df1 |> 
+  st_drop_geometry() |> 
+  filter(decade != "1970s") |> 
+  mutate(month_var = month(date, label = TRUE)) |> 
+  count(month_var, ss_hws) |> 
+  ggplot(
+    aes(
+      x = month_var, 
+      y = n,
+      fill = as.character(ss_hws)
+    )
+  ) +
+  ggchicklet::geom_chicklet(
+    alpha = alpha_value,
+    colour = bg_col,
+    position = position_stack(reverse = T)
+  ) +
+  geom_text(
+    mapping = aes(label = n, size = n),
+    family = "body_font",
+    position = position_stack(reverse = T, vjust = 0.5),
+    colour = alpha(text_col, 0.5)
+  ) +
+  scale_fill_manual(values = mypal) +
+  labs(
+    x = NULL,
+    y = "Number of hurricanes (in each month)"
+  ) +
+  theme_minimal(
+    base_size = bts/2,
+    base_family = "body_font"
+  ) +
+  theme(
+    text = element_text(colour = text_hil),
+    legend.position = "none",
+    axis.text.x = element_text(
+      margin = margin(1,0,0,0, "mm")
+    ),
+    panel.grid = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.y = element_blank(),
+    axis.ticks.length.y = unit(0, "mm"),
+    axis.text.y = element_text(margin = margin(0,0,0,0, "mm")),
+    axis.title.y = element_text(margin = margin(0,0,0,0, "mm"))
+  )
+  
+inset_scatterplot <- df1 |> 
+  st_drop_geometry() |> 
+  ggplot(aes(x = date, y = max_winds_kt)) +
+  geom_jitter(
+    aes(colour = as.character(ss_hws)),
+    alpha = alpha_value
+  ) +
+  geom_smooth(
+    colour = alpha("black", 0.7)
+  ) +
+  scale_y_continuous(
+    limits = c(60, 135),
+    breaks = seq(70, 130, 10),
+    expand = expansion(0)
+  ) +
+  scale_x_date(
+    expand = expansion(0),
+    breaks = seq(as.Date("1840-01-01"), as.Date("2030-01-01"), by = "20 years"),
+    date_labels = "%Y"
+  ) +
+  scale_colour_manual(values = mypal) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  labs(
+    x = NULL,
+    y = "Maximum Wind Speed"
+  ) +
+  theme_classic(
+    base_size = bts/2,
+    base_family = "body_font"
+  ) +
+  theme(
+    text = element_text(colour = text_hil),
+    legend.position = "none",
+    axis.text.x = element_text(
+      margin = margin(2,0,0,0, "mm")
+    ),
+    panel.grid.major.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line = element_line(
+      linewidth = 0.2,
+      colour = text_hil,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    panel.grid = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.y = element_blank(),
+    axis.ticks.length.y = unit(0, "mm"),
+    axis.text.y = element_text(margin = margin(0,1,0,0, "mm")),
+    axis.title.y = element_text(margin = margin(0,0,0,0, "mm")),
+    panel.background = element_rect(fill = NA, colour = NA),
+    plot.background = element_rect(fill = NA, colour = NA)
+  ) 
+
+library(patchwork)
+
+g <- g_base +
+  inset_element(
+    p = inset_barchart,
+    align_to = "full",
+    left = 0, right = 0.5,
+    bottom = 0.78, top = 0.96,
+    clip = FALSE
+  ) +
+  inset_element(
+    p = inset_barchart2,
+    align_to = "full",
+    left = 0.48, right = 0.75,
+    bottom = 0.78, top = 0.96,
+    clip = FALSE
+  ) +
+  inset_element(
+    p = inset_scatterplot,
+    align_to = "full",
+    left = 0.72, right = 1,
+    bottom = 0.78, top = 0.96,
+    clip = FALSE
+  )
+
+
 ggsave(
   plot = g,
   filename = here::here(
-    "data_vizs", "viz_sk_trash_balloons.png"
+    "data_vizs", "viz_usa_hurricanes.png"
   ),
-  height = 50,
+  height = 60,
   width = 40,
   units = "cm",
   bg = bg_col
 )
+
 ```
 
-Savings the thumbnail for the webpage
+**Savings the thumbnail for the webpage**
 
 ```{r}
 #| label: save-image
@@ -363,12 +612,36 @@ image_read(here::here("data_vizs",
   )
 ```
 
-Session Info
+**Session Info**
 
 ```{r}
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
+
+# Plot touch-up tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text support for ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(colorspace)           # Lighten and Darken colours
+
+
+# Getting geographic data 
+library(sf)                   # Simple Features in R
+library(ggmap)                # Getting raster maps
+library(terra)                # Cropping / Masking rasters
+library(tidyterra)            # Rasters with ggplot2
+library(osmdata)              # Open Street Maps data
+library(ggspatial)            # Scales and Arrows on maps
+
+# Data Wrangling & ggplot2
+library(tidyverse)            # All things tidy
+library(patchwork)            # Composing plots
+
+library(janitor)  # For clean column name handling
+
+library(rvest)                # Web Scraping
 
 sessioninfo::session_info()$packages |> 
   as_tibble() |> 
