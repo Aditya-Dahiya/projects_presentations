@@ -156,7 +156,7 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Alpha Values for dots and colours
-alpha_value = 0.4
+alpha_value = 0.6
 
 # Add text to plot-------------------------------------------------
 plot_title <- "U.S. Hurricane Landfalls (1850–2024): Trends"
@@ -240,23 +240,6 @@ ylim_values <- st_bbox(df1)[c(2, 4)]
 
 bbox_raster <- st_bbox(df1 |> st_transform("EPSG:4326"))
 names(bbox_raster) <- c("left", "bottom", "right", "top")
- 
-# library(ggmap)
-# base_raster_raw <- get_stadiamap(
-#   bbox = bbox_raster,
-#   zoom = 5,
-#   maptype = "stamen_terrain_background"
-# )
-# 
-# base_raster <- rast(base_raster_raw) |> 
-#   terra::crop(base_map |> st_transform("EPSG:4326")) |> 
-#   terra::mask(base_map |> st_transform("EPSG:4326")) |> 
-#   terra::project(df1)
-# 
-# ggplot() +
-#   geom_spatraster_rgb(
-#     data = base_raster
-#   )
 ```
 
 **Composing Final Plot**
@@ -285,7 +268,7 @@ g_base <- ggplot() +
       size = ss_hws,
       colour = as.character(ss_hws)
     ),
-    alpha = 0.4
+    alpha = alpha_value
   ) +
   annotate(
     geom = "label",
@@ -611,6 +594,255 @@ image_read(here::here("data_vizs",
     )
   )
 ```
+
+### Combining {ggrepel} with {sf}
+
+The following code generates a map showcasing named hurricanes that made landfall in the USA between 1850 and 2024. It utilizes a suite of packages to handle data processing, spatial operations, and plotting. The script begins by filtering the dataset `df1` using [`filter()`](https://dplyr.tidyverse.org/reference/filter.html) from the {dplyr} package to exclude entries with missing storm names, and selects the first occurrence for each using [`slice()`](https://dplyr.tidyverse.org/reference/slice.html), ensuring that only the earliest landfall per storm is visualized.
+
+The visualization is built using {ggplot2}. The map is constructed by adding the hurricane landfall points with [`geom_sf()`](https://ggplot2.tidyverse.org/reference/geom_sf.html), colored and sized based on the Saffir-Simpson scale. The {ggblend} package's [`blend()`](https://mjskay.github.io/ggblend/reference/blend.html) function is employed to apply a “darken” blending mode, enhancing contrast between layers. Labels for hurricane names and years are added with [`geom_text_repel()`](https://ggrepel.slowkow.com/reference/geom_text_repel.html) from {ggrepel}, which ensures non-overlapping text annotations. State abbreviations are added using [`geom_sf_text()`](https://ggplot2.tidyverse.org/reference/geom_sf_text.html), and a subtitle is included using [`annotate()`](https://ggplot2.tidyverse.org/reference/annotate.html).
+
+```{r}
+
+# Get data only on the named Hurricanes
+df1 |> 
+  st_drop_geometry() |> 
+  filter(!is.na(storm_names)) |> 
+  count(storm_names, sort = T)
+
+df2 <- df1 |> 
+  filter(!is.na(storm_names)) |> 
+  group_by(storm_names) |> 
+  slice(1) |> 
+  ungroup()
+
+# BBOX for names hurricanes landfall points
+xlim_values <- st_bbox(df2)[c(1, 3)]
+ylim_values <- st_bbox(df2)[c(2, 4)]
+
+library(ggrepel)
+library(ggmap)
+base_raster_raw <- get_stadiamap(
+  bbox = bbox_raster,
+  zoom = 7,
+  maptype = "stamen_terrain_background"
+)
+
+base_raster <- rast(base_raster_raw) |>
+  terra::crop(base_map |> st_transform("EPSG:4326"))
+  terra::mask(base_map |> st_transform("EPSG:4326"))
+
+ggplot() +
+  geom_spatraster_rgb(
+    data = base_raster,
+    alpha = alpha_value
+  )
+
+base_map <- geodata::gadm(
+  country = "USA",
+  level = 1,
+)
+
+plot_subtitle <- "Names of the hurricanes that made landfalls in USA from 1850 to 2024, with colored dots indicating the location and intensity (Saffir-Simpson Hurricane Scale) at landfall. Labels indicate the given name, and the year of landfall in parenthesis."
+
+sshws_annotation <- "The **Saffir-Simpson Hurricane Wind Scale** is a 1 to 5 rating system that categorizes hurricanes based on their sustained wind speeds. Developed in the 1970s, it estimates potential damage, with **Category 1** indicating minimal damage (winds of 74–95 mph) and **Category 5** representing catastrophic destruction (winds exceeding 157 mph). The scale helps communicate storm intensity and prepare communities for potential impacts." |> 
+  str_wrap(90) |> 
+  str_replace_all("\\n", "<br>")
+
+g <- ggplot() +
+  # geom_spatraster_rgb(
+  #   data = base_raster,
+  #   alpha = alpha_value
+  # ) +
+  geom_sf(
+    data = base_map,
+    colour = text_col,
+    alpha = alpha_value
+  ) +
+  geom_sf(
+    data = df2,
+    mapping = aes(
+      colour = as.character(ss_hws),
+      size = ss_hws
+    ),
+    alpha = alpha_value
+  ) |> ggblend::blend("darken") +
+  scale_size(
+    range = c(4, 24),
+    transform = "exp"
+  ) +
+  
+  ggrepel::geom_text_repel(
+    data = df2,
+    mapping = aes(
+      geometry = geometry,
+      label = paste0(storm_names, " (", year(date), ")"),
+      colour = as.character(ss_hws)
+    ),
+    family = "caption_font",
+    segment.size = 0.2,
+    min.segment.length = unit(0.1, "pt"),
+    force = 10,
+    force_pull = 0.1,
+    stat = "sf_coordinates",
+    position = ggrepel::position_nudge_repel(
+      x = 1, y = -2
+      ),
+    lineheight = 0.25,
+    size = bts / 5
+  ) +
+  geom_sf_text(
+    data = base_map,
+    mapping = aes(label = abbr),
+    size = bts / 3,
+    colour = alpha(text_col, 0.3),
+    check_overlap = T,
+    family = "title_font",
+    fontface = "bold"
+  ) +
+  
+  # Add subtitle
+  annotate(
+    geom = "label",
+    x = -100.5,
+    y = 46,
+    label = str_wrap(plot_subtitle, 25),
+    size = bts / 2.5,
+    lineheight = 0.3,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    fill = alpha(bg_col, 0.6),
+    label.size = NA,
+    label.padding = unit(0.1, "lines"),
+    colour = text_hil,
+    fontface = "bold"
+  ) +
+  
+  # Add Text Annotation on SS HWS Scale
+  annotate(
+    geom = "richtext",
+    x = -87.5,
+    y = 19.5,
+    label = sshws_annotation,
+    size = bts / 4.5,
+    lineheight = 0.33,
+    hjust = 0,
+    vjust = 1,
+    family = "caption_font",
+    fill = alpha(bg_col, 0.6),
+    label.size = NA,
+    label.padding = unit(0.1, "lines"),
+    colour = text_hil
+  ) +
+  
+  coord_sf(
+    crs = st_crs(df2),
+    default_crs = "EPSG:4326",
+    xlim = c(-100, -70),
+    ylim = c(17, 45)
+  ) +
+  labs(
+    colour = "Saffir-Simpson Hurricane Scale",
+    size = "Saffir-Simpson Hurricane Scale",
+    x = NULL, y = NULL
+  ) +
+  scale_colour_manual(
+    values = mypal
+  ) +
+  labs(
+    title = "U.S. Hurricane Landfalls: 1850-2024\nA History in Names and Winds",
+    # subtitle = str_wrap(plot_subtitle, 90),
+    caption = plot_caption
+  ) +
+  
+  # Theme and beautification of plot
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    text = element_text(
+        colour = text_hil
+    ), 
+    
+    # Grid and Axes
+    panel.grid = element_line(
+      linewidth = 0.2,
+      colour = text_hil,
+      linetype = 3
+    ),
+    axis.text.x = element_text(margin = margin(0,0,0,0, "mm")),
+    axis.text.y = element_text(margin = margin(0,0,0,0, "mm")),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0.05, 0.02),
+    legend.justification = c(0, 0),
+    legend.title.position = "top",
+    legend.direction = "horizontal",
+    legend.box = "horizontal",
+    legend.title = element_text(
+      margin = margin(0,0,2,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      hjust = 0.5,
+      face = "bold"
+    ),
+    legend.text.position = "left",
+    legend.background = element_rect(
+      fill = alpha("white", 0.7), colour = NA
+    ),
+    legend.margin = margin(5,5,5,5, "mm"),
+    legend.box.margin = margin(5,5,5,5, "mm"),
+    legend.spacing.y = unit(1, "cm"),
+    legend.spacing.x = unit(3, "cm"),
+    
+    # Labels
+    plot.title = element_text(
+      hjust = 0.5,
+      size = bts * 2.7,
+      margin = margin(5,0,5,0, "mm"),
+      family = "body_font",
+      lineheight = 0.3,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5, 
+      family = "body_font",
+      lineheight = 0.3,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      halign = 0.5, 
+      margin = margin(10,0,0,0, "mm"),
+      family = "caption_font",
+      size = 0.7 * bts
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here(
+    "data_vizs", "viz_usa_hurricanes_2.png"
+  ),
+  height = 50,
+  width = 40,
+  units = "cm",
+  bg = bg_col
+)
+
+```
+
+![This map visualizes all named hurricanes that made landfall in the USA between 1850 and 2024. Each colored dot marks a landfall location, with size and color representing the storm’s intensity based on the Saffir-Simpson Hurricane Wind Scale. Labels display the hurricane’s name and year of landfall. The background terrain map and state boundaries provide geographical context, offering a clear view of historical hurricane patterns across the U.S. coastline.](viz_usa_hurricanes_2.png)
 
 **Session Info**
 

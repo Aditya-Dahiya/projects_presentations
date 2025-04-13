@@ -198,6 +198,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#about-the-data" id="toc-about-the-data" class="nav-link active" data-scroll-target="#about-the-data">About the Data</a></li>
   <li><a href="#how-i-made-this-graphic" id="toc-how-i-made-this-graphic" class="nav-link" data-scroll-target="#how-i-made-this-graphic">How I made this graphic?</a></li>
+  <li><a href="#combining-ggrepel-with-sf" id="toc-combining-ggrepel-with-sf" class="nav-link" data-scroll-target="#combining-ggrepel-with-sf">Combining {ggrepel} with {sf}</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/Aditya-Dahiya/projects_presentations/edit/main/data_vizs/viz_usa_hurricanes.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Aditya-Dahiya/projects_presentations/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -368,7 +369,7 @@ Figure&nbsp;1: This visualization maps every recorded hurricane landfall along t
 <span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a>   social_caption_2)</span>
 <span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a><span class="co"># Alpha Values for dots and colours</span></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>alpha_value <span class="ot">=</span> <span class="fl">0.4</span></span>
+<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>alpha_value <span class="ot">=</span> <span class="fl">0.6</span></span>
 <span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a><span class="co"># Add text to plot-------------------------------------------------</span></span>
 <span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>plot_title <span class="ot">&lt;-</span> <span class="st">"U.S. Hurricane Landfalls (1850–2024): Trends"</span></span>
@@ -450,24 +451,7 @@ Figure&nbsp;1: This visualization maps every recorded hurricane landfall along t
 <span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a>ylim_values <span class="ot">&lt;-</span> <span class="fu">st_bbox</span>(df1)[<span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>)]</span>
 <span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a>bbox_raster <span class="ot">&lt;-</span> <span class="fu">st_bbox</span>(df1 <span class="sc">|&gt;</span> <span class="fu">st_transform</span>(<span class="st">"EPSG:4326"</span>))</span>
-<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(bbox_raster) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"left"</span>, <span class="st">"bottom"</span>, <span class="st">"right"</span>, <span class="st">"top"</span>)</span>
-<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a> </span>
-<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a><span class="co"># library(ggmap)</span></span>
-<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a><span class="co"># base_raster_raw &lt;- get_stadiamap(</span></span>
-<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a><span class="co">#   bbox = bbox_raster,</span></span>
-<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a><span class="co">#   zoom = 5,</span></span>
-<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a><span class="co">#   maptype = "stamen_terrain_background"</span></span>
-<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span>
-<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
-<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a><span class="co"># base_raster &lt;- rast(base_raster_raw) |&gt; </span></span>
-<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a><span class="co">#   terra::crop(base_map |&gt; st_transform("EPSG:4326")) |&gt; </span></span>
-<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a><span class="co">#   terra::mask(base_map |&gt; st_transform("EPSG:4326")) |&gt; </span></span>
-<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a><span class="co">#   terra::project(df1)</span></span>
-<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
-<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a><span class="co"># ggplot() +</span></span>
-<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a><span class="co">#   geom_spatraster_rgb(</span></span>
-<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a><span class="co">#     data = base_raster</span></span>
-<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a><span class="co">#   )</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(bbox_raster) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"left"</span>, <span class="st">"bottom"</span>, <span class="st">"right"</span>, <span class="st">"top"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <p><strong>Composing Final Plot</strong></p>
@@ -495,7 +479,7 @@ Figure&nbsp;1: This visualization maps every recorded hurricane landfall along t
 <span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> ss_hws,</span>
 <span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="fu">as.character</span>(ss_hws)</span>
 <span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fl">0.4</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> alpha_value</span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(</span>
 <span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">geom =</span> <span class="st">"label"</span>,</span>
@@ -820,48 +804,300 @@ Figure&nbsp;1: This visualization maps every recorded hurricane landfall along t
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
+</section>
+<section id="combining-ggrepel-with-sf" class="level3">
+<h3 class="anchored" data-anchor-id="combining-ggrepel-with-sf">Combining {ggrepel} with {sf}</h3>
+<p>The following code generates a map showcasing named hurricanes that made landfall in the USA between 1850 and 2024. It utilizes a suite of packages to handle data processing, spatial operations, and plotting. The script begins by filtering the dataset <code>df1</code> using <a href="https://dplyr.tidyverse.org/reference/filter.html"><code>filter()</code></a> from the {dplyr} package to exclude entries with missing storm names, and selects the first occurrence for each using <a href="https://dplyr.tidyverse.org/reference/slice.html"><code>slice()</code></a>, ensuring that only the earliest landfall per storm is visualized.</p>
+<p>The visualization is built using {ggplot2}. The map is constructed by adding the hurricane landfall points with <a href="https://ggplot2.tidyverse.org/reference/geom_sf.html"><code>geom_sf()</code></a>, colored and sized based on the Saffir-Simpson scale. The {ggblend} package’s <a href="https://mjskay.github.io/ggblend/reference/blend.html"><code>blend()</code></a> function is employed to apply a “darken” blending mode, enhancing contrast between layers. Labels for hurricane names and years are added with <a href="https://ggrepel.slowkow.com/reference/geom_text_repel.html"><code>geom_text_repel()</code></a> from {ggrepel}, which ensures non-overlapping text annotations. State abbreviations are added using <a href="https://ggplot2.tidyverse.org/reference/geom_sf_text.html"><code>geom_sf_text()</code></a>, and a subtitle is included using <a href="https://ggplot2.tidyverse.org/reference/annotate.html"><code>annotate()</code></a>.</p>
+<div class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get data only on the named Hurricanes</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>df1 <span class="sc">|&gt;</span> </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(storm_names)) <span class="sc">|&gt;</span> </span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(storm_names, <span class="at">sort =</span> T)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>df2 <span class="ot">&lt;-</span> df1 <span class="sc">|&gt;</span> </span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(storm_names)) <span class="sc">|&gt;</span> </span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(storm_names) <span class="sc">|&gt;</span> </span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice</span>(<span class="dv">1</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="co"># BBOX for names hurricanes landfall points</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>xlim_values <span class="ot">&lt;-</span> <span class="fu">st_bbox</span>(df2)[<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">3</span>)]</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>ylim_values <span class="ot">&lt;-</span> <span class="fu">st_bbox</span>(df2)[<span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>)]</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggmap)</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>base_raster_raw <span class="ot">&lt;-</span> <span class="fu">get_stadiamap</span>(</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">bbox =</span> bbox_raster,</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">zoom =</span> <span class="dv">7</span>,</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">maptype =</span> <span class="st">"stamen_terrain_background"</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>base_raster <span class="ot">&lt;-</span> <span class="fu">rast</span>(base_raster_raw) <span class="sc">|&gt;</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">crop</span>(base_map <span class="sc">|&gt;</span> <span class="fu">st_transform</span>(<span class="st">"EPSG:4326"</span>))</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">mask</span>(base_map <span class="sc">|&gt;</span> <span class="fu">st_transform</span>(<span class="st">"EPSG:4326"</span>))</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_spatraster_rgb</span>(</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> base_raster,</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> alpha_value</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>base_map <span class="ot">&lt;-</span> geodata<span class="sc">::</span><span class="fu">gadm</span>(</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>  <span class="at">country =</span> <span class="st">"USA"</span>,</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>  <span class="at">level =</span> <span class="dv">1</span>,</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>plot_subtitle <span class="ot">&lt;-</span> <span class="st">"Names of the hurricanes that made landfalls in USA from 1850 to 2024, with colored dots indicating the location and intensity (Saffir-Simpson Hurricane Scale) at landfall. Labels indicate the given name, and the year of landfall in parenthesis."</span></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>sshws_annotation <span class="ot">&lt;-</span> <span class="st">"The **Saffir-Simpson Hurricane Wind Scale** is a 1 to 5 rating system that categorizes hurricanes based on their sustained wind speeds. Developed in the 1970s, it estimates potential damage, with **Category 1** indicating minimal damage (winds of 74–95 mph) and **Category 5** representing catastrophic destruction (winds exceeding 157 mph). The scale helps communicate storm intensity and prepare communities for potential impacts."</span> <span class="sc">|&gt;</span> </span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">str_wrap</span>(<span class="dv">90</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">str_replace_all</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">n"</span>, <span class="st">"&lt;br&gt;"</span>)</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>  <span class="co"># geom_spatraster_rgb(</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   data = base_raster,</span></span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>  <span class="co">#   alpha = alpha_value</span></span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ) +</span></span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> base_map,</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> text_col,</span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> alpha_value</span>
+<span id="cb6-55"><a href="#cb6-55" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-56"><a href="#cb6-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(</span>
+<span id="cb6-57"><a href="#cb6-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> df2,</span>
+<span id="cb6-58"><a href="#cb6-58" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb6-59"><a href="#cb6-59" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="fu">as.character</span>(ss_hws),</span>
+<span id="cb6-60"><a href="#cb6-60" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> ss_hws</span>
+<span id="cb6-61"><a href="#cb6-61" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-62"><a href="#cb6-62" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> alpha_value</span>
+<span id="cb6-63"><a href="#cb6-63" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> ggblend<span class="sc">::</span><span class="fu">blend</span>(<span class="st">"darken"</span>) <span class="sc">+</span></span>
+<span id="cb6-64"><a href="#cb6-64" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size</span>(</span>
+<span id="cb6-65"><a href="#cb6-65" aria-hidden="true" tabindex="-1"></a>    <span class="at">range =</span> <span class="fu">c</span>(<span class="dv">4</span>, <span class="dv">24</span>),</span>
+<span id="cb6-66"><a href="#cb6-66" aria-hidden="true" tabindex="-1"></a>    <span class="at">transform =</span> <span class="st">"exp"</span></span>
+<span id="cb6-67"><a href="#cb6-67" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-68"><a href="#cb6-68" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-69"><a href="#cb6-69" aria-hidden="true" tabindex="-1"></a>  ggrepel<span class="sc">::</span><span class="fu">geom_text_repel</span>(</span>
+<span id="cb6-70"><a href="#cb6-70" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> df2,</span>
+<span id="cb6-71"><a href="#cb6-71" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb6-72"><a href="#cb6-72" aria-hidden="true" tabindex="-1"></a>      <span class="at">geometry =</span> geometry,</span>
+<span id="cb6-73"><a href="#cb6-73" aria-hidden="true" tabindex="-1"></a>      <span class="at">label =</span> <span class="fu">paste0</span>(storm_names, <span class="st">" ("</span>, <span class="fu">year</span>(date), <span class="st">")"</span>),</span>
+<span id="cb6-74"><a href="#cb6-74" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> <span class="fu">as.character</span>(ss_hws)</span>
+<span id="cb6-75"><a href="#cb6-75" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-76"><a href="#cb6-76" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span>,</span>
+<span id="cb6-77"><a href="#cb6-77" aria-hidden="true" tabindex="-1"></a>    <span class="at">segment.size =</span> <span class="fl">0.2</span>,</span>
+<span id="cb6-78"><a href="#cb6-78" aria-hidden="true" tabindex="-1"></a>    <span class="at">min.segment.length =</span> <span class="fu">unit</span>(<span class="fl">0.1</span>, <span class="st">"pt"</span>),</span>
+<span id="cb6-79"><a href="#cb6-79" aria-hidden="true" tabindex="-1"></a>    <span class="at">force =</span> <span class="dv">10</span>,</span>
+<span id="cb6-80"><a href="#cb6-80" aria-hidden="true" tabindex="-1"></a>    <span class="at">force_pull =</span> <span class="fl">0.1</span>,</span>
+<span id="cb6-81"><a href="#cb6-81" aria-hidden="true" tabindex="-1"></a>    <span class="at">stat =</span> <span class="st">"sf_coordinates"</span>,</span>
+<span id="cb6-82"><a href="#cb6-82" aria-hidden="true" tabindex="-1"></a>    <span class="at">position =</span> ggrepel<span class="sc">::</span><span class="fu">position_nudge_repel</span>(</span>
+<span id="cb6-83"><a href="#cb6-83" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> <span class="dv">1</span>, <span class="at">y =</span> <span class="sc">-</span><span class="dv">2</span></span>
+<span id="cb6-84"><a href="#cb6-84" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb6-85"><a href="#cb6-85" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.25</span>,</span>
+<span id="cb6-86"><a href="#cb6-86" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> bts <span class="sc">/</span> <span class="dv">5</span></span>
+<span id="cb6-87"><a href="#cb6-87" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-88"><a href="#cb6-88" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf_text</span>(</span>
+<span id="cb6-89"><a href="#cb6-89" aria-hidden="true" tabindex="-1"></a>    <span class="at">data =</span> base_map,</span>
+<span id="cb6-90"><a href="#cb6-90" aria-hidden="true" tabindex="-1"></a>    <span class="at">mapping =</span> <span class="fu">aes</span>(<span class="at">label =</span> abbr),</span>
+<span id="cb6-91"><a href="#cb6-91" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> bts <span class="sc">/</span> <span class="dv">3</span>,</span>
+<span id="cb6-92"><a href="#cb6-92" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="fu">alpha</span>(text_col, <span class="fl">0.3</span>),</span>
+<span id="cb6-93"><a href="#cb6-93" aria-hidden="true" tabindex="-1"></a>    <span class="at">check_overlap =</span> T,</span>
+<span id="cb6-94"><a href="#cb6-94" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"title_font"</span>,</span>
+<span id="cb6-95"><a href="#cb6-95" aria-hidden="true" tabindex="-1"></a>    <span class="at">fontface =</span> <span class="st">"bold"</span></span>
+<span id="cb6-96"><a href="#cb6-96" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-97"><a href="#cb6-97" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-98"><a href="#cb6-98" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add subtitle</span></span>
+<span id="cb6-99"><a href="#cb6-99" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(</span>
+<span id="cb6-100"><a href="#cb6-100" aria-hidden="true" tabindex="-1"></a>    <span class="at">geom =</span> <span class="st">"label"</span>,</span>
+<span id="cb6-101"><a href="#cb6-101" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="sc">-</span><span class="fl">100.5</span>,</span>
+<span id="cb6-102"><a href="#cb6-102" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="dv">46</span>,</span>
+<span id="cb6-103"><a href="#cb6-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">label =</span> <span class="fu">str_wrap</span>(plot_subtitle, <span class="dv">25</span>),</span>
+<span id="cb6-104"><a href="#cb6-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> bts <span class="sc">/</span> <span class="fl">2.5</span>,</span>
+<span id="cb6-105"><a href="#cb6-105" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb6-106"><a href="#cb6-106" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="dv">0</span>,</span>
+<span id="cb6-107"><a href="#cb6-107" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="dv">1</span>,</span>
+<span id="cb6-108"><a href="#cb6-108" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"body_font"</span>,</span>
+<span id="cb6-109"><a href="#cb6-109" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(bg_col, <span class="fl">0.6</span>),</span>
+<span id="cb6-110"><a href="#cb6-110" aria-hidden="true" tabindex="-1"></a>    <span class="at">label.size =</span> <span class="cn">NA</span>,</span>
+<span id="cb6-111"><a href="#cb6-111" aria-hidden="true" tabindex="-1"></a>    <span class="at">label.padding =</span> <span class="fu">unit</span>(<span class="fl">0.1</span>, <span class="st">"lines"</span>),</span>
+<span id="cb6-112"><a href="#cb6-112" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> text_hil,</span>
+<span id="cb6-113"><a href="#cb6-113" aria-hidden="true" tabindex="-1"></a>    <span class="at">fontface =</span> <span class="st">"bold"</span></span>
+<span id="cb6-114"><a href="#cb6-114" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-115"><a href="#cb6-115" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-116"><a href="#cb6-116" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add Text Annotation on SS HWS Scale</span></span>
+<span id="cb6-117"><a href="#cb6-117" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(</span>
+<span id="cb6-118"><a href="#cb6-118" aria-hidden="true" tabindex="-1"></a>    <span class="at">geom =</span> <span class="st">"richtext"</span>,</span>
+<span id="cb6-119"><a href="#cb6-119" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="sc">-</span><span class="fl">87.5</span>,</span>
+<span id="cb6-120"><a href="#cb6-120" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="fl">19.5</span>,</span>
+<span id="cb6-121"><a href="#cb6-121" aria-hidden="true" tabindex="-1"></a>    <span class="at">label =</span> sshws_annotation,</span>
+<span id="cb6-122"><a href="#cb6-122" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> bts <span class="sc">/</span> <span class="fl">4.5</span>,</span>
+<span id="cb6-123"><a href="#cb6-123" aria-hidden="true" tabindex="-1"></a>    <span class="at">lineheight =</span> <span class="fl">0.33</span>,</span>
+<span id="cb6-124"><a href="#cb6-124" aria-hidden="true" tabindex="-1"></a>    <span class="at">hjust =</span> <span class="dv">0</span>,</span>
+<span id="cb6-125"><a href="#cb6-125" aria-hidden="true" tabindex="-1"></a>    <span class="at">vjust =</span> <span class="dv">1</span>,</span>
+<span id="cb6-126"><a href="#cb6-126" aria-hidden="true" tabindex="-1"></a>    <span class="at">family =</span> <span class="st">"caption_font"</span>,</span>
+<span id="cb6-127"><a href="#cb6-127" aria-hidden="true" tabindex="-1"></a>    <span class="at">fill =</span> <span class="fu">alpha</span>(bg_col, <span class="fl">0.6</span>),</span>
+<span id="cb6-128"><a href="#cb6-128" aria-hidden="true" tabindex="-1"></a>    <span class="at">label.size =</span> <span class="cn">NA</span>,</span>
+<span id="cb6-129"><a href="#cb6-129" aria-hidden="true" tabindex="-1"></a>    <span class="at">label.padding =</span> <span class="fu">unit</span>(<span class="fl">0.1</span>, <span class="st">"lines"</span>),</span>
+<span id="cb6-130"><a href="#cb6-130" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> text_hil</span>
+<span id="cb6-131"><a href="#cb6-131" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-132"><a href="#cb6-132" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-133"><a href="#cb6-133" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_sf</span>(</span>
+<span id="cb6-134"><a href="#cb6-134" aria-hidden="true" tabindex="-1"></a>    <span class="at">crs =</span> <span class="fu">st_crs</span>(df2),</span>
+<span id="cb6-135"><a href="#cb6-135" aria-hidden="true" tabindex="-1"></a>    <span class="at">default_crs =</span> <span class="st">"EPSG:4326"</span>,</span>
+<span id="cb6-136"><a href="#cb6-136" aria-hidden="true" tabindex="-1"></a>    <span class="at">xlim =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">100</span>, <span class="sc">-</span><span class="dv">70</span>),</span>
+<span id="cb6-137"><a href="#cb6-137" aria-hidden="true" tabindex="-1"></a>    <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">17</span>, <span class="dv">45</span>)</span>
+<span id="cb6-138"><a href="#cb6-138" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-139"><a href="#cb6-139" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb6-140"><a href="#cb6-140" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"Saffir-Simpson Hurricane Scale"</span>,</span>
+<span id="cb6-141"><a href="#cb6-141" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="st">"Saffir-Simpson Hurricane Scale"</span>,</span>
+<span id="cb6-142"><a href="#cb6-142" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span></span>
+<span id="cb6-143"><a href="#cb6-143" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-144"><a href="#cb6-144" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_colour_manual</span>(</span>
+<span id="cb6-145"><a href="#cb6-145" aria-hidden="true" tabindex="-1"></a>    <span class="at">values =</span> mypal</span>
+<span id="cb6-146"><a href="#cb6-146" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-147"><a href="#cb6-147" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb6-148"><a href="#cb6-148" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"U.S. Hurricane Landfalls: 1850-2024</span><span class="sc">\n</span><span class="st">A History in Names and Winds"</span>,</span>
+<span id="cb6-149"><a href="#cb6-149" aria-hidden="true" tabindex="-1"></a>    <span class="co"># subtitle = str_wrap(plot_subtitle, 90),</span></span>
+<span id="cb6-150"><a href="#cb6-150" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> plot_caption</span>
+<span id="cb6-151"><a href="#cb6-151" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-152"><a href="#cb6-152" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb6-153"><a href="#cb6-153" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Theme and beautification of plot</span></span>
+<span id="cb6-154"><a href="#cb6-154" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(</span>
+<span id="cb6-155"><a href="#cb6-155" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_family =</span> <span class="st">"body_font"</span>,</span>
+<span id="cb6-156"><a href="#cb6-156" aria-hidden="true" tabindex="-1"></a>    <span class="at">base_size =</span> bts</span>
+<span id="cb6-157"><a href="#cb6-157" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb6-158"><a href="#cb6-158" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb6-159"><a href="#cb6-159" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Overall</span></span>
+<span id="cb6-160"><a href="#cb6-160" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-161"><a href="#cb6-161" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title.position =</span> <span class="st">"plot"</span>,</span>
+<span id="cb6-162"><a href="#cb6-162" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption.position =</span> <span class="st">"plot"</span>,</span>
+<span id="cb6-163"><a href="#cb6-163" aria-hidden="true" tabindex="-1"></a>    <span class="at">text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb6-164"><a href="#cb6-164" aria-hidden="true" tabindex="-1"></a>        <span class="at">colour =</span> text_hil</span>
+<span id="cb6-165"><a href="#cb6-165" aria-hidden="true" tabindex="-1"></a>    ), </span>
+<span id="cb6-166"><a href="#cb6-166" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb6-167"><a href="#cb6-167" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Grid and Axes</span></span>
+<span id="cb6-168"><a href="#cb6-168" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_line</span>(</span>
+<span id="cb6-169"><a href="#cb6-169" aria-hidden="true" tabindex="-1"></a>      <span class="at">linewidth =</span> <span class="fl">0.2</span>,</span>
+<span id="cb6-170"><a href="#cb6-170" aria-hidden="true" tabindex="-1"></a>      <span class="at">colour =</span> text_hil,</span>
+<span id="cb6-171"><a href="#cb6-171" aria-hidden="true" tabindex="-1"></a>      <span class="at">linetype =</span> <span class="dv">3</span></span>
+<span id="cb6-172"><a href="#cb6-172" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-173"><a href="#cb6-173" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"mm"</span>)),</span>
+<span id="cb6-174"><a href="#cb6-174" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"mm"</span>)),</span>
+<span id="cb6-175"><a href="#cb6-175" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks =</span> <span class="fu">element_blank</span>(),</span>
+<span id="cb6-176"><a href="#cb6-176" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks.length =</span> <span class="fu">unit</span>(<span class="dv">0</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-177"><a href="#cb6-177" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb6-178"><a href="#cb6-178" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Legend</span></span>
+<span id="cb6-179"><a href="#cb6-179" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">"inside"</span>,</span>
+<span id="cb6-180"><a href="#cb6-180" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position.inside =</span> <span class="fu">c</span>(<span class="fl">0.05</span>, <span class="fl">0.02</span>),</span>
+<span id="cb6-181"><a href="#cb6-181" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.justification =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">0</span>),</span>
+<span id="cb6-182"><a href="#cb6-182" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title.position =</span> <span class="st">"top"</span>,</span>
+<span id="cb6-183"><a href="#cb6-183" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.direction =</span> <span class="st">"horizontal"</span>,</span>
+<span id="cb6-184"><a href="#cb6-184" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box =</span> <span class="st">"horizontal"</span>,</span>
+<span id="cb6-185"><a href="#cb6-185" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title =</span> <span class="fu">element_text</span>(</span>
+<span id="cb6-186"><a href="#cb6-186" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">2</span>,<span class="dv">0</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-187"><a href="#cb6-187" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span></span>
+<span id="cb6-188"><a href="#cb6-188" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-189"><a href="#cb6-189" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text =</span> <span class="fu">element_text</span>(</span>
+<span id="cb6-190"><a href="#cb6-190" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">2</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-191"><a href="#cb6-191" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb6-192"><a href="#cb6-192" aria-hidden="true" tabindex="-1"></a>      <span class="at">face =</span> <span class="st">"bold"</span></span>
+<span id="cb6-193"><a href="#cb6-193" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-194"><a href="#cb6-194" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.text.position =</span> <span class="st">"left"</span>,</span>
+<span id="cb6-195"><a href="#cb6-195" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.background =</span> <span class="fu">element_rect</span>(</span>
+<span id="cb6-196"><a href="#cb6-196" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> <span class="fu">alpha</span>(<span class="st">"white"</span>, <span class="fl">0.7</span>), <span class="at">colour =</span> <span class="cn">NA</span></span>
+<span id="cb6-197"><a href="#cb6-197" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-198"><a href="#cb6-198" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-199"><a href="#cb6-199" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.box.margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>,<span class="dv">5</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-200"><a href="#cb6-200" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.spacing.y =</span> <span class="fu">unit</span>(<span class="dv">1</span>, <span class="st">"cm"</span>),</span>
+<span id="cb6-201"><a href="#cb6-201" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.spacing.x =</span> <span class="fu">unit</span>(<span class="dv">3</span>, <span class="st">"cm"</span>),</span>
+<span id="cb6-202"><a href="#cb6-202" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb6-203"><a href="#cb6-203" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Labels</span></span>
+<span id="cb6-204"><a href="#cb6-204" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(</span>
+<span id="cb6-205"><a href="#cb6-205" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb6-206"><a href="#cb6-206" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> bts <span class="sc">*</span> <span class="fl">2.7</span>,</span>
+<span id="cb6-207"><a href="#cb6-207" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">5</span>,<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">0</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-208"><a href="#cb6-208" aria-hidden="true" tabindex="-1"></a>      <span class="at">family =</span> <span class="st">"body_font"</span>,</span>
+<span id="cb6-209"><a href="#cb6-209" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb6-210"><a href="#cb6-210" aria-hidden="true" tabindex="-1"></a>      <span class="at">face =</span> <span class="st">"bold"</span></span>
+<span id="cb6-211"><a href="#cb6-211" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-212"><a href="#cb6-212" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(</span>
+<span id="cb6-213"><a href="#cb6-213" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>, </span>
+<span id="cb6-214"><a href="#cb6-214" aria-hidden="true" tabindex="-1"></a>      <span class="at">family =</span> <span class="st">"body_font"</span>,</span>
+<span id="cb6-215"><a href="#cb6-215" aria-hidden="true" tabindex="-1"></a>      <span class="at">lineheight =</span> <span class="fl">0.3</span>,</span>
+<span id="cb6-216"><a href="#cb6-216" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"mm"</span>)</span>
+<span id="cb6-217"><a href="#cb6-217" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-218"><a href="#cb6-218" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.caption =</span> <span class="fu">element_textbox</span>(</span>
+<span id="cb6-219"><a href="#cb6-219" aria-hidden="true" tabindex="-1"></a>      <span class="at">hjust =</span> <span class="fl">0.5</span>,</span>
+<span id="cb6-220"><a href="#cb6-220" aria-hidden="true" tabindex="-1"></a>      <span class="at">halign =</span> <span class="fl">0.5</span>, </span>
+<span id="cb6-221"><a href="#cb6-221" aria-hidden="true" tabindex="-1"></a>      <span class="at">margin =</span> <span class="fu">margin</span>(<span class="dv">10</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>, <span class="st">"mm"</span>),</span>
+<span id="cb6-222"><a href="#cb6-222" aria-hidden="true" tabindex="-1"></a>      <span class="at">family =</span> <span class="st">"caption_font"</span>,</span>
+<span id="cb6-223"><a href="#cb6-223" aria-hidden="true" tabindex="-1"></a>      <span class="at">size =</span> <span class="fl">0.7</span> <span class="sc">*</span> bts</span>
+<span id="cb6-224"><a href="#cb6-224" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-225"><a href="#cb6-225" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-226"><a href="#cb6-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-227"><a href="#cb6-227" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
+<span id="cb6-228"><a href="#cb6-228" aria-hidden="true" tabindex="-1"></a>  <span class="at">plot =</span> g,</span>
+<span id="cb6-229"><a href="#cb6-229" aria-hidden="true" tabindex="-1"></a>  <span class="at">filename =</span> here<span class="sc">::</span><span class="fu">here</span>(</span>
+<span id="cb6-230"><a href="#cb6-230" aria-hidden="true" tabindex="-1"></a>    <span class="st">"data_vizs"</span>, <span class="st">"viz_usa_hurricanes_2.png"</span></span>
+<span id="cb6-231"><a href="#cb6-231" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb6-232"><a href="#cb6-232" aria-hidden="true" tabindex="-1"></a>  <span class="at">height =</span> <span class="dv">50</span>,</span>
+<span id="cb6-233"><a href="#cb6-233" aria-hidden="true" tabindex="-1"></a>  <span class="at">width =</span> <span class="dv">40</span>,</span>
+<span id="cb6-234"><a href="#cb6-234" aria-hidden="true" tabindex="-1"></a>  <span class="at">units =</span> <span class="st">"cm"</span>,</span>
+<span id="cb6-235"><a href="#cb6-235" aria-hidden="true" tabindex="-1"></a>  <span class="at">bg =</span> bg_col</span>
+<span id="cb6-236"><a href="#cb6-236" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="viz_usa_hurricanes_2.png" class="img-fluid figure-img"></p>
+<figcaption>This map visualizes all named hurricanes that made landfall in the USA between 1850 and 2024. Each colored dot marks a landfall location, with size and color representing the storm’s intensity based on the Saffir-Simpson Hurricane Wind Scale. Labels display the hurricane’s name and year of landfall. The background terrain map and state boundaries provide geographical context, offering a clear view of historical hurricane patterns across the U.S. coastline.</figcaption>
+</figure>
+</div>
 <p><strong>Session Info</strong></p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot touch-up tools</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)               <span class="co"># Nice Scales for ggplot2</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(fontawesome)          <span class="co"># Icons display in ggplot2</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggtext)               <span class="co"># Markdown text support for ggplot2</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(showtext)             <span class="co"># Display fonts in ggplot2</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(colorspace)           <span class="co"># Lighten and Darken colours</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Getting geographic data </span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)                   <span class="co"># Simple Features in R</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggmap)                <span class="co"># Getting raster maps</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(terra)                <span class="co"># Cropping / Masking rasters</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyterra)            <span class="co"># Rasters with ggplot2</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(osmdata)              <span class="co"># Open Street Maps data</span></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggspatial)            <span class="co"># Scales and Arrows on maps</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Data Wrangling &amp; ggplot2</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)            <span class="co"># All things tidy</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)            <span class="co"># Composing plots</span></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)  <span class="co"># For clean column name handling</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rvest)                <span class="co"># Web Scraping</span></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>sessioninfo<span class="sc">::</span><span class="fu">session_info</span>()<span class="sc">$</span>packages <span class="sc">|&gt;</span> </span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_tibble</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(package, </span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>         <span class="at">version =</span> loadedversion, </span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>         date, source) <span class="sc">|&gt;</span> </span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(package) <span class="sc">|&gt;</span> </span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>  janitor<span class="sc">::</span><span class="fu">clean_names</span>(</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">case =</span> <span class="st">"title"</span></span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  gt<span class="sc">::</span><span class="fu">gt</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  gt<span class="sc">::</span><span class="fu">opt_interactive</span>(</span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">use_search =</span> <span class="cn">TRUE</span></span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>  gtExtras<span class="sc">::</span><span class="fu">gt_theme_espn</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot touch-up tools</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)               <span class="co"># Nice Scales for ggplot2</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(fontawesome)          <span class="co"># Icons display in ggplot2</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggtext)               <span class="co"># Markdown text support for ggplot2</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(showtext)             <span class="co"># Display fonts in ggplot2</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(colorspace)           <span class="co"># Lighten and Darken colours</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Getting geographic data </span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)                   <span class="co"># Simple Features in R</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggmap)                <span class="co"># Getting raster maps</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(terra)                <span class="co"># Cropping / Masking rasters</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyterra)            <span class="co"># Rasters with ggplot2</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(osmdata)              <span class="co"># Open Street Maps data</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggspatial)            <span class="co"># Scales and Arrows on maps</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Data Wrangling &amp; ggplot2</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)            <span class="co"># All things tidy</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)            <span class="co"># Composing plots</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)  <span class="co"># For clean column name handling</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rvest)                <span class="co"># Web Scraping</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>sessioninfo<span class="sc">::</span><span class="fu">session_info</span>()<span class="sc">$</span>packages <span class="sc">|&gt;</span> </span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as_tibble</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(package, </span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>         <span class="at">version =</span> loadedversion, </span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>         date, source) <span class="sc">|&gt;</span> </span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(package) <span class="sc">|&gt;</span> </span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>  janitor<span class="sc">::</span><span class="fu">clean_names</span>(</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">case =</span> <span class="st">"title"</span></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>  gt<span class="sc">::</span><span class="fu">gt</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>  gt<span class="sc">::</span><span class="fu">opt_interactive</span>(</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">use_search =</span> <span class="cn">TRUE</span></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>  gtExtras<span class="sc">::</span><span class="fu">gt_theme_espn</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div id="tbl-session-info" class="cell quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-tbl figure">
@@ -870,24 +1106,24 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
 </figcaption>
 <div aria-describedby="tbl-session-info-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div class="cell-output-display">
-<div id="zgtqcxwtmd" class=".gt_table" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="nftpjmkxki" class=".gt_table" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>@import url("https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
-#zgtqcxwtmd table {
+#nftpjmkxki table {
   font-family: Lato, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#zgtqcxwtmd thead, #zgtqcxwtmd tbody, #zgtqcxwtmd tfoot, #zgtqcxwtmd tr, #zgtqcxwtmd td, #zgtqcxwtmd th {
+#nftpjmkxki thead, #nftpjmkxki tbody, #nftpjmkxki tfoot, #nftpjmkxki tr, #nftpjmkxki td, #nftpjmkxki th {
   border-style: none;
 }
 
-#zgtqcxwtmd p {
+#nftpjmkxki p {
   margin: 0;
   padding: 0;
 }
 
-#zgtqcxwtmd .gt_table {
+#nftpjmkxki .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -913,12 +1149,12 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-left-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_caption {
+#nftpjmkxki .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#zgtqcxwtmd .gt_title {
+#nftpjmkxki .gt_title {
   color: #333333;
   font-size: 24px;
   font-weight: initial;
@@ -930,7 +1166,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-bottom-width: 0;
 }
 
-#zgtqcxwtmd .gt_subtitle {
+#nftpjmkxki .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -942,7 +1178,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-top-width: 0;
 }
 
-#zgtqcxwtmd .gt_heading {
+#nftpjmkxki .gt_heading {
   background-color: #FFFFFF;
   text-align: left;
   border-bottom-color: #FFFFFF;
@@ -954,13 +1190,13 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-right-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_bottom_border {
+#nftpjmkxki .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_col_headings {
+#nftpjmkxki .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -975,7 +1211,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-right-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_col_heading {
+#nftpjmkxki .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 80%;
@@ -995,7 +1231,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   overflow-x: hidden;
 }
 
-#zgtqcxwtmd .gt_column_spanner_outer {
+#nftpjmkxki .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 80%;
@@ -1007,15 +1243,15 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 4px;
 }
 
-#zgtqcxwtmd .gt_column_spanner_outer:first-child {
+#nftpjmkxki .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#zgtqcxwtmd .gt_column_spanner_outer:last-child {
+#nftpjmkxki .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#zgtqcxwtmd .gt_column_spanner {
+#nftpjmkxki .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -1027,11 +1263,11 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   width: 100%;
 }
 
-#zgtqcxwtmd .gt_spanner_row {
+#nftpjmkxki .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#zgtqcxwtmd .gt_group_heading {
+#nftpjmkxki .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1057,7 +1293,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   text-align: left;
 }
 
-#zgtqcxwtmd .gt_empty_group_heading {
+#nftpjmkxki .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -1072,15 +1308,15 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   vertical-align: middle;
 }
 
-#zgtqcxwtmd .gt_from_md > :first-child {
+#nftpjmkxki .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#zgtqcxwtmd .gt_from_md > :last-child {
+#nftpjmkxki .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#zgtqcxwtmd .gt_row {
+#nftpjmkxki .gt_row {
   padding-top: 7px;
   padding-bottom: 7px;
   padding-left: 5px;
@@ -1099,7 +1335,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   overflow-x: hidden;
 }
 
-#zgtqcxwtmd .gt_stub {
+#nftpjmkxki .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 80%;
@@ -1112,7 +1348,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 5px;
 }
 
-#zgtqcxwtmd .gt_stub_row_group {
+#nftpjmkxki .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1126,15 +1362,15 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   vertical-align: top;
 }
 
-#zgtqcxwtmd .gt_row_group_first td {
+#nftpjmkxki .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#zgtqcxwtmd .gt_row_group_first th {
+#nftpjmkxki .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#zgtqcxwtmd .gt_summary_row {
+#nftpjmkxki .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1144,16 +1380,16 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 5px;
 }
 
-#zgtqcxwtmd .gt_first_summary_row {
+#nftpjmkxki .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_first_summary_row.thick {
+#nftpjmkxki .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#zgtqcxwtmd .gt_last_summary_row {
+#nftpjmkxki .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1163,7 +1399,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-bottom-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_grand_summary_row {
+#nftpjmkxki .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1173,7 +1409,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 5px;
 }
 
-#zgtqcxwtmd .gt_first_grand_summary_row {
+#nftpjmkxki .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1183,7 +1419,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-top-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_last_grand_summary_row_top {
+#nftpjmkxki .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1193,11 +1429,11 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-bottom-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_striped {
+#nftpjmkxki .gt_striped {
   background-color: #FAFAFA;
 }
 
-#zgtqcxwtmd .gt_table_body {
+#nftpjmkxki .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -1206,7 +1442,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-bottom-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_footnotes {
+#nftpjmkxki .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1220,7 +1456,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-right-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_footnote {
+#nftpjmkxki .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -1229,7 +1465,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 5px;
 }
 
-#zgtqcxwtmd .gt_sourcenotes {
+#nftpjmkxki .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1243,7 +1479,7 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   border-right-color: #D3D3D3;
 }
 
-#zgtqcxwtmd .gt_sourcenote {
+#nftpjmkxki .gt_sourcenote {
   font-size: 12px;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -1251,77 +1487,77 @@ Table&nbsp;1: R Packages and their versions used in the creation of this page an
   padding-right: 5px;
 }
 
-#zgtqcxwtmd .gt_left {
+#nftpjmkxki .gt_left {
   text-align: left;
 }
 
-#zgtqcxwtmd .gt_center {
+#nftpjmkxki .gt_center {
   text-align: center;
 }
 
-#zgtqcxwtmd .gt_right {
+#nftpjmkxki .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#zgtqcxwtmd .gt_font_normal {
+#nftpjmkxki .gt_font_normal {
   font-weight: normal;
 }
 
-#zgtqcxwtmd .gt_font_bold {
+#nftpjmkxki .gt_font_bold {
   font-weight: bold;
 }
 
-#zgtqcxwtmd .gt_font_italic {
+#nftpjmkxki .gt_font_italic {
   font-style: italic;
 }
 
-#zgtqcxwtmd .gt_super {
+#nftpjmkxki .gt_super {
   font-size: 65%;
 }
 
-#zgtqcxwtmd .gt_footnote_marks {
+#nftpjmkxki .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#zgtqcxwtmd .gt_asterisk {
+#nftpjmkxki .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#zgtqcxwtmd .gt_indent_1 {
+#nftpjmkxki .gt_indent_1 {
   text-indent: 5px;
 }
 
-#zgtqcxwtmd .gt_indent_2 {
+#nftpjmkxki .gt_indent_2 {
   text-indent: 10px;
 }
 
-#zgtqcxwtmd .gt_indent_3 {
+#nftpjmkxki .gt_indent_3 {
   text-indent: 15px;
 }
 
-#zgtqcxwtmd .gt_indent_4 {
+#nftpjmkxki .gt_indent_4 {
   text-indent: 20px;
 }
 
-#zgtqcxwtmd .gt_indent_5 {
+#nftpjmkxki .gt_indent_5 {
   text-indent: 25px;
 }
 
-#zgtqcxwtmd .katex-display {
+#nftpjmkxki .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#zgtqcxwtmd div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#nftpjmkxki div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
-<div id="zgtqcxwtmd" class="reactable html-widget" style="width:auto;height:auto;"></div>
-<script type="application/json" data-for="zgtqcxwtmd">{"x":{"tag":{"name":"Reactable","attribs":{"data":{"Package":["DBI","KernSmooth","R6","Rcpp","bitops","chromote","class","classInt","cli","codetools","colorspace","digest","dplyr","e1071","evaluate","farver","fastmap","fontawesome","forcats","generics","ggmap","ggplot2","ggspatial","ggtext","glue","gridtext","gt","gtExtras","gtable","hms","htmltools","htmlwidgets","httr","janitor","jpeg","jsonlite","knitr","later","lifecycle","lubridate","magrittr","munsell","osmdata","paletteer","patchwork","pillar","pkgconfig","plyr","png","processx","promises","proxy","ps","purrr","readr","rematch2","rlang","rmarkdown","rstudioapi","rvest","scales","sessioninfo","sf","showtext","showtextdb","snakecase","stringi","stringr","sysfonts","terra","tibble","tidyr","tidyselect","tidyterra","tidyverse","timechange","tzdb","units","vctrs","websocket","withr","xfun","xml2","yaml"],"Version":["1.2.3","2.23-22","2.6.1","1.0.12","1.0-9","0.5.0","7.3-22","0.4-11","3.6.2","0.2-19","2.1-0","0.6.35","1.1.4","1.7-16","1.0.3","2.1.2","1.2.0","0.5.3","1.0.0","0.1.3","4.0.0","3.5.1","1.1.9","0.1.2","1.8.0","0.1.5","0.11.1","0.5.0","0.3.6","1.1.3","0.5.8.1","1.6.4","1.4.7","2.2.1","0.1-11","1.8.9","1.50","1.4.1","1.0.4","1.9.4","2.0.3","0.5.1","0.2.5","1.6.0","1.3.0","1.10.1","2.0.3","1.8.9","0.1-8","3.8.6","1.3.2","0.4-27","1.9.0","1.0.4","2.1.5","2.1.2","1.1.5","2.29","0.17.1","1.0.4","1.3.0","1.2.3","1.0-20","0.9-7","3.0","0.11.1","1.8.7","1.5.1","0.8.9","1.8-29","3.2.1","1.3.1","1.2.1","0.7.0","2.0.0","0.3.0","0.5.0","0.8-7","0.6.5","1.4.2","3.0.2","0.51","1.3.8","2.3.10"],"Date":["2024-06-02","2023-07-10","2025-02-15","2024-01-09","2024-10-03","2025-03-21","2023-05-03","2025-01-08","2023-12-11","2023-02-01","2023-01-23","2024-03-11","2023-11-17","2024-09-16","2025-01-10","2024-05-13","2024-05-15","2024-11-16","2023-01-29","2022-07-05","2023-11-19","2024-04-23","2023-08-17","2022-09-16","2024-09-30","2022-09-16","2024-10-04","2023-09-15","2024-10-25","2023-03-21","2024-04-04","2023-12-06","2023-08-15","2024-12-22","2025-03-21","2024-09-20","2025-03-16","2024-11-27","2023-11-07","2024-12-08","2022-03-30","2024-04-01","2023-08-14","2024-01-21","2024-09-16","2025-01-07","2019-09-22","2023-10-02","2022-11-29","2025-02-21","2024-11-28","2022-06-09","2025-02-18","2025-02-05","2024-01-10","2020-05-01","2025-01-17","2024-11-04","2024-10-22","2024-02-12","2023-11-28","2025-02-05","2025-03-24","2024-03-02","2020-06-04","2023-08-27","2025-03-27","2023-11-14","2024-03-02","2025-02-26","2023-03-20","2024-01-24","2024-03-11","2025-02-03","2023-02-22","2024-01-18","2025-03-15","2025-03-11","2023-12-01","2024-07-22","2024-10-28","2025-02-19","2025-03-14","2024-07-26"],"Source":["CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.1)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)","CRAN (R 4.3.3)"]},"columns":[{"id":"Package","name":"Package","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"left"},{"id":"Version","name":"Version","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"right"},{"id":"Date","name":"Date","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"right"},{"id":"Source","name":"Source","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"left"}],"searchable":true,"defaultPageSize":10,"showPageSizeOptions":false,"pageSizeOptions":[10,25,50,100],"paginationType":"numbers","showPagination":true,"showPageInfo":true,"minRows":1,"striped":true,"height":"auto","theme":{"color":"#333333","backgroundColor":"#FFFFFF","stripedColor":"#fafafa","style":{"font-family":"Lato, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif","fontSize":"16px"},"tableStyle":{"borderTopStyle":"solid","borderTopWidth":"2px","borderTopColor":"#D3D3D3"},"headerStyle":{"fontWeight":"bolder","backgroundColor":"transparent","borderBottomStyle":"solid","borderBottomWidth":"2px","borderBottomColor":"#D3D3D3"},"groupHeaderStyle":{"fontWeight":"bolder","backgroundColor":"transparent","borderBottomStyle":"solid","borderBottomWidth":"2px","borderBottomColor":"#D3D3D3"},"cellStyle":{"fontWeight":"normal"}},"elementId":"zgtqcxwtmd","dataKey":"6979d82cec6107cc10913f2d4c36dc19"},"children":[]},"class":"reactR_markup"},"evals":["tag.attribs.columns.0.style","tag.attribs.columns.1.style","tag.attribs.columns.2.style","tag.attribs.columns.3.style"],"jsHooks":[]}</script>
+<div id="nftpjmkxki" class="reactable html-widget" style="width:auto;height:auto;"></div>
+<script type="application/json" data-for="nftpjmkxki">{"x":{"tag":{"name":"Reactable","attribs":{"data":{"Package":["DBI","KernSmooth","R6","Rcpp","bitops","class","classInt","cli","codetools","colorspace","digest","dplyr","e1071","evaluate","farver","fastmap","fontawesome","forcats","generics","ggmap","ggplot2","ggspatial","ggtext","glue","gridtext","gt","gtExtras","gtable","hms","htmltools","htmlwidgets","httr","janitor","jpeg","jsonlite","knitr","lifecycle","lubridate","magrittr","munsell","osmdata","paletteer","patchwork","pillar","pkgconfig","plyr","png","proxy","purrr","readr","rematch2","rlang","rmarkdown","rstudioapi","rvest","scales","sessioninfo","sf","showtext","showtextdb","snakecase","stringi","stringr","sysfonts","terra","tibble","tidyr","tidyselect","tidyterra","tidyverse","timechange","tzdb","units","vctrs","withr","xfun","xml2","yaml"],"Version":["1.2.3","2.23-24","2.6.1","1.0.14","1.0-9","7.3-22","0.4-11","3.6.4","0.2-20","2.1-1","0.6.37","1.1.4","1.7-16","1.0.3","2.1.2","1.2.0","0.5.3","1.0.0","0.1.3","4.0.0","3.5.1","1.1.9","0.1.2","1.8.0","0.1.5","0.11.1","0.5.0","0.3.6","1.1.3","0.5.8.1","1.6.4","1.4.7","2.2.1","0.1-11","1.9.1","1.50","1.0.4","1.9.4","2.0.3","0.5.1","0.2.5","1.6.0","1.3.0","1.10.2","2.0.3","1.8.9","0.1-8","0.4-27","1.0.4","2.1.5","2.1.2","1.1.5","2.29","0.17.1","1.0.4","1.3.0","1.2.3","1.0-20","0.9-7","3.0","0.11.1","1.8.7","1.5.1","0.8.9","1.8-29","3.2.1","1.3.1","1.2.1","0.7.0","2.0.0","0.3.0","0.5.0","0.8-7","0.6.5","3.0.2","0.51","1.3.8","2.3.10"],"Date":["2024-06-02","2024-05-17","2025-02-15","2025-01-12","2024-10-03","2023-05-03","2025-01-08","2025-02-13","2024-03-31","2024-07-26","2024-08-19","2023-11-17","2024-09-16","2025-01-10","2024-05-13","2024-05-15","2024-11-16","2023-01-29","2022-07-05","2023-11-19","2024-04-23","2023-08-17","2022-09-16","2024-09-30","2022-09-16","2024-10-04","2023-09-15","2024-10-25","2023-03-21","2024-04-04","2023-12-06","2023-08-15","2024-12-22","2025-03-21","2025-03-03","2025-03-16","2023-11-07","2024-12-08","2022-03-30","2024-04-01","2023-08-14","2024-01-21","2024-09-16","2025-04-05","2019-09-22","2023-10-02","2022-11-29","2022-06-09","2025-02-05","2024-01-10","2020-05-01","2025-01-17","2024-11-04","2024-10-22","2024-02-12","2023-11-28","2025-02-05","2025-03-24","2024-03-02","2020-06-04","2023-08-27","2025-03-27","2023-11-14","2024-03-02","2025-02-26","2023-03-20","2024-01-24","2024-03-11","2025-02-03","2023-02-22","2024-01-18","2025-03-15","2025-03-11","2023-12-01","2024-10-28","2025-02-19","2025-03-14","2024-07-26"],"Source":["CRAN (R 4.4.3)","CRAN (R 4.4.2)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.1)","CRAN (R 4.4.2)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.2)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.0)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.3)","CRAN (R 4.4.2)"]},"columns":[{"id":"Package","name":"Package","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"left"},{"id":"Version","name":"Version","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"right"},{"id":"Date","name":"Date","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"right"},{"id":"Source","name":"Source","type":"character","na":"NA","minWidth":125,"style":"function(rowInfo, colInfo) {\nconst rowIndex = rowInfo.index + 1\n}","html":true,"align":"left"}],"searchable":true,"defaultPageSize":10,"showPageSizeOptions":false,"pageSizeOptions":[10,25,50,100],"paginationType":"numbers","showPagination":true,"showPageInfo":true,"minRows":1,"striped":true,"height":"auto","theme":{"color":"#333333","backgroundColor":"#FFFFFF","stripedColor":"#fafafa","style":{"font-family":"Lato, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif","fontSize":"16px"},"tableStyle":{"borderTopStyle":"solid","borderTopWidth":"2px","borderTopColor":"#D3D3D3"},"headerStyle":{"fontWeight":"bolder","backgroundColor":"transparent","borderBottomStyle":"solid","borderBottomWidth":"2px","borderBottomColor":"#D3D3D3"},"groupHeaderStyle":{"fontWeight":"bolder","backgroundColor":"transparent","borderBottomStyle":"solid","borderBottomWidth":"2px","borderBottomColor":"#D3D3D3"},"cellStyle":{"fontWeight":"normal"}},"elementId":"nftpjmkxki","dataKey":"3e9a1551ab3b5a14c8d9b7fb85c23abd"},"children":[]},"class":"reactR_markup"},"evals":["tag.attribs.columns.0.style","tag.attribs.columns.1.style","tag.attribs.columns.2.style","tag.attribs.columns.3.style"],"jsHooks":[]}</script>
 </div>
 </div>
 </div>
