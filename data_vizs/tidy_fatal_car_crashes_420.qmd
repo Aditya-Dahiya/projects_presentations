@@ -1,0 +1,390 @@
+---
+title: "Monthly Patterns Lie, Hourly Patterns Reveal (4/20)"
+author: "Aditya Dahiya"
+date: "2025-04-24"
+subtitle: "While daily fatal crashes on April 20th appear unremarkable, a closer look at hourly data reveals a spike during the evening “4:20” window. The second facet highlights this hidden pattern, showing elevated fatalities from 4:20 PM to midnight."
+categories:
+  - "#TidyTuesday"
+  - "{ggblend}"
+image: "thumbnails/tidy_fata_car_crashes_420.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+This week's dataset comes from the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday), originally submitted by [\@Rmadillo](https://github.com/Rmadillo) as part of an analysis on fatal car crashes in the United States during the ["4/20 holiday"](https://en.wikipedia.org/wiki/420_(cannabis_culture))—specifically between 4:20pm and 11:59pm on April 20th. The dataset builds on a [2019 study by Harper and Palayew](https://injuryprevention.bmj.com/content/early/2019/01/29/injuryprev-2018-043068) that revisited earlier findings from [Staples and Redelmeier (2018)](https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2672534) which had suggested a significant spike in traffic fatalities on 4/20. Harper and Palayew’s replication study used a broader time window and more robust methods, finding **no strong signal** linking fatal crashes specifically to 4/20, but did confirm elevated risks around other major holidays like July 4th. The dataset includes `daily_accidents.csv` (fatality counts by date), `daily_accidents_420.csv` (indicating whether an accident occurred during the 4/20 timeframe), and `daily_accidents_420_time.csv` (flagging accidents during the 4:20pm–11:59pm window on any day). The data can be accessed directly via [GitHub](https://github.com/rfordatascience/tidytuesday/tree/main/data/2025/2025-04-22) or loaded using the [`tidytuesdayR`](https://cran.r-project.org/package=tidytuesdayR) or [`pydytuesday`](https://github.com/posit-dev/python-tidytuesday-challenge) libraries in R and Python, respectively. Thank you to [Jon Harmon](https://github.com/jonthegeek) and the [Data Science Learning Community](https://github.com/rfordatascience/tidytuesday) for curating this resource.
+
+![This graphic explores fatal car crashes in the U.S. from 1992 to 2016, with each dot representing one day. The first facet shows daily fatalities by month, revealing no unusual spike on April 20th (highlighted in dark red). The second facet plots hourly fatalities, uncovering a distinct increase in deaths during the evening hours of April 20th (4:20 PM to 11:59 PM). While the date may seem statistically ordinary at a daily scale, zooming into the evening hours reveals a significant rise in fatal crashes—suggesting that the true signal is hidden in the finer resolution of time.](tidy_fatal_car_crashes_420.png){#fig-1}
+
+## **How I made this graphic?**
+
+To create this graphic, a rich set of R packages was employed to streamline data wrangling, visual storytelling, and layout design. The foundational [**tidyverse**](https://www.tidyverse.org/) suite handled data import and transformation, while [`scales`](https://scales.r-lib.org/) provided refined axis labeling. For polished visuals, [`ggtext`](https://wilkelab.org/ggtext/) enabled markdown-styled subtitles and captions, [`fontawesome`](https://github.com/rstudio/fontawesome) embedded social icons, and [`showtext`](https://yixuan.showtext/) displayed custom [Google Fonts](https://fonts.google.com/). The color aesthetics were fine-tuned using [`colorspace`](https://colorspace.r-forge.r-project.org/), and [`patchwork`](https://patchwork.data-imaginist.com/) was prepared for composing multiple plots if needed. Images were handled by [`magick`](https://docs.ropensci.org/magick/) and [`ggimage`](https://github.com/GuangchuangYu/ggimage). To identify patterns, two datasets were grouped and summarized using `dplyr` verbs, distinguishing April 20th from other days. Finally, [`ggplot2`](https://ggplot2.tidyverse.org/) and [`ggblend`](https://github.com/mikelove/ggblend) layered jittered points with color-coded emphasis and custom annotations, producing a clean yet revealing plot exported via `ggsave()`.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork             # Composing Plots
+)
+
+daily_accidents <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-22/daily_accidents.csv')
+
+daily_accidents_420 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-22/daily_accidents_420.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# cols4all::c4a_gui()
+
+mypal <- c("#FF7502", "#C55CC9", "#0F6F74")
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Harper and Palayew; @Rmadillo", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "April 20th: Just Another Day... Until 4:20 PM"
+
+plot_subtitle <- "While daily fatal crashes on <b style='color:darkred'>April 20th</b> appear unremarkable, a closer look at hourly data reveals a spike<br>during the evening <b style='color:darkred'>4:20 window</b>. The second facet highlights this hidden pattern, showing elevated<br>fatalities from <b style='color:darkred'>4:20 PM to midnight</b>."
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+library(summarytools)
+
+daily_accidents |> 
+  dfSummary() |> 
+  view()
+
+daily_accidents_420 |> 
+  dfSummary() |> 
+  view()
+
+daily_accidents_420 |> 
+  group_by(e420) |> 
+  summarise(
+    avg_fatalities = mean(fatalities_count, na.rm = TRUE)
+  )
+
+df_by_day <- daily_accidents_420 |> 
+  group_by(date) |> 
+  summarise(
+    fatalities_count = sum(fatalities_count, na.rm = T)
+  ) |> 
+  mutate(
+    e420 = if_else(
+      month(date) == 4 & day(date) == 20,
+      TRUE,
+      FALSE
+    )
+  )
+
+df_by_hour <- daily_accidents_420 |>
+  group_by(date, e420) |> 
+  summarise(fatalities_count = sum(fatalities_count, na.rm = T)) |> 
+  ungroup() |> 
+  mutate(
+    fatalities_count = if_else(
+      e420,
+      fatalities_count / 7.67,
+      fatalities_count / 24
+    )
+  )
+ 
+df_plot <- bind_rows(
+  df_by_day |> 
+  mutate(
+    facet_var = "April 20th does not have higher\nfatalities than any other calendar day"
+  ),
+df_by_hour |> 
+  mutate(
+    facet_var = "But, between 4:20 pm to 11:59 pm on 20th April, fatatlies per\nhour are higher, on average, than any other ordinary hour"
+  )
+)
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- df_plot |> 
+  ggplot(
+    aes(
+      x = month(date, label = T),
+      y = fatalities_count,
+      colour = e420,
+      size = e420
+    )
+  ) +
+  geom_jitter() |> ggblend::blend(
+    blend = "multiply", alpha = 0.7
+    ) +
+  facet_wrap(
+    ~facet_var,
+    ncol = 1,
+    scales = "free_y"
+  ) +
+  scale_colour_manual(
+    values = c("grey80", "darkred")
+  ) +
+  scale_size_manual(
+    values = c(2, 8)
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = plot_title,
+    subtitle = str_wrap(plot_subtitle, 70),
+    caption = plot_caption,
+    fill = NULL,
+    x = NULL,
+    y = "Number of deaths in crashes"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    legend.position = "none",
+    plot.title.position = "plot",
+    panel.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts * 2.2,
+      lineheight = 0.3,
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_textbox(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts,
+      lineheight = 0.3,
+      hjust = 0.5,
+      halign = 0.5
+    ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.8 * bts,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    
+    # Axes
+    axis.line.y = element_line(
+      colour = text_col,
+      arrow = arrow(length = unit(4, "mm")),
+      linewidth = 0.8
+    ),
+    axis.line.x = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.x = element_text(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5,
+      face = "bold",
+      size = bts * 1.5
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,2,0,0, "mm"),
+      hjust = 1
+    ),
+    
+    # Panel Grid
+    panel.grid = element_blank(),
+    
+    # Strip Text
+    strip.text = element_text(
+      size = bts * 1.5,
+      margin = margin(0,0,-20,0, "mm"), 
+      lineheight = 0.3
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_fatal_car_crashes_420.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_fatal_car_crashes_420.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_fatal_car_crashes_420.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork             # Composing Plots
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
