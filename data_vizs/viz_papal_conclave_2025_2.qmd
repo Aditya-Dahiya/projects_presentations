@@ -1,16 +1,16 @@
 ---
-title: "Guardians of the Keys: The Electors of the Next Pope"
+title: "Beeswarm plot on Age Profile of 2025 Papal Conclave"
 author: "Aditya Dahiya"
 date: "2025-04-25"
-subtitle: "This graphic was created in R using a combination of web scraping, image processing, and data visualization techniques. It combines the power of `rvest`, `magick`, and `ggplot2`—along with `geom_image` and custom grid layouts—to transform structured Vatican data into a clear, visual story of papal influence."
+subtitle: "Delving into the demographics of the 2025 Papal Conclave electors, this visualization, crafted with the elegant aesthetics of {ggplot2} and the non-overlapping precision of {ggbeeswarm}, paired with image integration via {ggimage} and web scraping powered by {rvest}, offers a unique perspective on the ages and global representation of the cardinals poised to shape the Catholic Church's future."
 categories:
   - "Geopolitics"
   - "Images"
   - "Web Scraping"
   - "{rvest}"
-  - "{magick}"
+  - "{ggbeeswarm}"
   - "{ggimage}"
-image: "thumbnails/viz_papal_conclave_2025.png"
+image: "thumbnails/viz_papal_conclave_2025_2.png"
 format:
   html:
     code-fold: true
@@ -37,13 +37,7 @@ comments:
 
 ### Who Will Choose the Next Pope?
 
-This grid visualization shows the 134 cardinal electors eligible to vote in the next papal conclave. Each circle represents a cardinal, arranged by their ecclesiastical rank (Cardinal-Bishop, -Priest, -Deacon), with portrait images cropped uniformly. The color of each circle’s border indicates which pope appointed them: St. John Paul II, Pope Benedict XVI, and Pope Francis.
-
-What stands out is the overwhelming number of electors—**over 70%**—appointed by Pope Francis. This dramatic shift means the next pope is likely to reflect his theological priorities and pastoral tone. The graphic offers a clear visual narrative of influence and succession, making it easier to grasp how Church leadership has evolved over the past three decades.
-
-This isn’t just a chart of faces—it’s a window into how the future of the Catholic Church is being shaped today.
-
-![Portraits of the 134 cardinal electors who will vote in the next papal conclave, arranged by ecclesiastical rank. Circle border colors indicate the pope who appointed each cardinal.](viz_papal_conclave_2025.png){#fig-1}
+![A visual snapshot of the College of Cardinals eligible to elect the next Pope in the 2025 conclave. This beeswarm plot beautifully arranges each cardinal by age, preventing overlap while clearly displaying the distribution. Each circle represents a cardinal, colored by their ecclesiastical order (bishop, priest, or deacon), and is accompanied by their portrait, name, and country. The clustering effect of the beeswarm layout, powered by the ggbeeswarm package and its position_beeswarm() function, reveals a predominantly older demographic within the electors, highlighting the age range from 45 to 79.](viz_papal_conclave_2025_2.png){#fig-1}
 
 ### About the Data
 
@@ -51,7 +45,7 @@ The data for this visualization originates from the Wikipedia article [*Cardinal
 
 ### How I made this graphic?
 
-To create this visualization, I first collected the list of cardinal electors from [Wikipedia](https://en.wikipedia.org/wiki/List_of_cardinal_electors) and scraped their portraits using the [`rvest`](https://rvest.tidyverse.org/) package in R. Each image was then processed and uniformly cropped using the [`magick`](https://docs.ropensci.org/magick/) package and `cropcircles` package to focus on faces. I categorized the cardinals by rank and identified the pope who appointed each using available Vatican sources. For plotting, I used [`ggplot2`](https://ggplot2.tidyverse.org/) with a custom grid layout inspired by the [`geom_image()`](https://github.com/dreamRs/geomtextpath) and `geom_point()` to overlay portraits inside colored borders.
+To craft this graphic illustrating the age profile of the 2025 Papal Conclave electors, I leveraged the power of several R packages within the **tidyverse** ecosystem. First, I used the `rvest` package, specifically the `read_html()` and `html_table()` functions, to scrape the crucial data on cardinal electors directly from the linked [Wikipedia article](https://en.wikipedia.org/wiki/Cardinal_electors_in_the_2025_papal_conclave). After cleaning and transforming this data using functions from `dplyr` and `lubridate`, the core visualization was built with `ggplot2`. To arrange the cardinal portraits and age points in a visually appealing and non-overlapping manner, I employed the `ggbeeswarm` package, utilizing its `geom_beeswarm()` function with a custom `position_beeswarm()` function set to the `"center"` method and a small `cex` value for fine-tuned spacing. Each cardinal's image, sourced using a custom function involving Google's Custom Search API and processed with the `magick` and `ggimage` packages, was then layered onto the plot using `geom_image()`. The ecclesiastical order of each cardinal was represented by color, managed through `scale_colour_manual()` with a custom palette from `paletteer`. Finally, textual elements, including names, countries, titles, and captions with linked social media handles, were added using standard `ggplot2` geoms and the `ggtext` package for enhanced formatting, while custom fonts were incorporated via the `showtext` package.
 
 ### Loading required libraries
 
@@ -70,8 +64,10 @@ pacman::p_load(
   magick,               # Download images and edit them
   ggimage,              # Display images in ggplot2
   patchwork,            # Composing Plots
-  rvest                 # Web-Scraping
+  rvest,                # Web-Scraping
+  ggbeeswarm            # Beeswarm Plots
 )
+
 
 # URL of the Wikipedia page
 # Read the HTML content of the page
@@ -82,37 +78,7 @@ table_df <- page |>
   html_table(fill = TRUE)
 table_df <- table_df[[1]]
 
-# Ensure the table is a tibble
-cardinals <- as_tibble(table_df) |> 
-  janitor::clean_names() |> 
-  mutate(
-    # Extract the date string from raw data
-    born = str_extract(born, "^\\d{1,2} \\w+ \\d{4}"),
-    # Convert to Date format
-    born = dmy(born),  
-    
-    # Calculate age for each cardinal in years
-    age = time_length(
-      interval(
-        start = born, 
-        end = today()), 
-        unit = "years") |> 
-      floor()
-
-  ) |> 
-  mutate(
-    date_consistory = str_extract(
-      consistory, "^\\d{1,2} \\w+ \\d{4}"
-      ) |>  dmy(),
-    pope_consistory = str_remove(
-      consistory, "^\\d{1,2} \\w+ \\d{4}"
-      ) |>  str_trim(),
-    pope_consistory = paste0("Pope ", pope_consistory),
-    .keep = "unused"
-  ) |> 
-  select(-ref)
-
-rm(page, table_df)
+rm(page)
 
 ```
 
@@ -141,7 +107,7 @@ showtext_auto()
 
 # cols4all::c4a_gui()
 
-mypal <- c("#FFCC20", "#C9252C", "#515356")
+mypal <- paletteer::paletteer_d("NineteenEightyR::sunset2")[c(5,3,1)]
 
 # A base Colour
 bg_col <- "white"
@@ -183,10 +149,12 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "The 134 Men Who Will Elect the Next Pope"
+plot_title <- "Age Profile of the 2025 Papal Conclave Electors" |> str_wrap(12)
+str_view(plot_title)
 
-plot_subtitle <- "This graphic shows who will vote for the next pope—organized by rank, personalized by portrait, and color-coded by their appointing pontiff."
-
+plot_subtitle <- "Cardinals eligible to vote in the 2025 conclave span from age 45 to 79, but skew older. Each circle is a cardinal, colored by ecclesiastical order, with names and countries below." |> 
+  str_wrap(25)
+str_view(plot_subtitle)
 ```
 
 ### Get temporary files on images of each Cardinal
@@ -202,20 +170,21 @@ plot_subtitle <- "This graphic shows who will vote for the next pope—organized
 # From: https://programmablesearchengine.google.com/controlpanel/all
 # my_cx <- "GET YOUR CUSTOM SEARCH ENGINE ID HERE"
 
+
 # Improved function to download and save food images
 download_cardinal_potrait <- function(i) {
   
-  api_key <- google_api_key
-  cx <- my_cx
+  google_api_key <- google_api_key
+  my_cx <- my_cx
   
   # Build the API request URL with additional filters
   url <- paste0(
     "https://www.googleapis.com/customsearch/v1?q=",
     URLencode(paste0("Cardinal ", cardinals$name[i], 
-                     " photo potrait")),
-    "&cx=", cx,
+                     " photo")),
+    "&cx=", my_cx,
     "&searchType=image",
-    "&key=", api_key,
+    "&key=", google_api_key,
     # "&imgSize=large",       # Restrict to medium-sized images
     # "&imgType=photo",
     "&num=1"                 # Fetch only one result
@@ -223,46 +192,34 @@ download_cardinal_potrait <- function(i) {
   
   # Make the request
   response <- httr::GET(url)
-  if (response$status_code != 200) {
-    warning("Failed to fetch data for Cardinal: ", 
-            cardinals$name[i])
-    return(NULL)
-  }
+  # if (response$status_code != 200) {
+  #   warning("Failed to fetch data for Cardinal: ", 
+  #           cardinals$name[i])
+  #   return(NULL)
+  # }
   
   # Parse the response
   result <- httr::content(response, "parsed")
   
   # Extract the image URL
-  if (!is.null(result$items)) {
-    image_url <- result$items[[1]]$link
-  } else {
-    warning("No results found for Cardinal: ", cardinals$name[i])
-    return(NULL)
-  }
+  image_url <- result$items[[1]]$link
   
   # Process the image
-  im <- magick::image_read(image_url) |> 
-      image_resize("x300") 
-  
-  # Calculate the new dimension for the square
-  max_dim <- max(image_info(im)$width, image_info(im)$height)
-  
-  # Create a blank white canvas of square size
-  canvas <- image_blank(width = max_dim, 
-                        height = max_dim, 
-                        color = bg_col)
-  
-  # Composite the original image onto the center of the square canvas
-  image_composite(canvas, im, gravity = "center") |> 
+  magick::image_read(image_url) |> 
+    image_resize("x300") |> 
+    
     # Crop the image into a circle 
     # (Credits: https://github.com/doehm/cropcircles)
     cropcircles::circle_crop(
-      border_colour = text_col,
-      border_size = 2
+      border_colour = "black",
+      border_size = 0
     ) |>
+    
     image_read() |> 
-    image_background(color = bg_col) |> 
+    image_background(color = "transparent") |> 
+    
     image_resize("x300") |> 
+    
     # Save or display the result
     image_write(
       here::here(
@@ -273,92 +230,11 @@ download_cardinal_potrait <- function(i) {
 }
 
 # Iterate and download images
-for (i in 132:nrow(cardinals)) {
+for (i in 1:nrow(cardinals)) {
   download_cardinal_potrait(i)
 }
 
-# MANUAALY NOTE DOWN
-# Problematic indices - values for i for which the api did not work
-problem_numbers <- c(
-  7, 8, 15, 26, 27, 51, 76, 84, 95, 101,
-  103, 104, 105, 112, 118, 131
-  )
-```
-
-For some Cardinals, change the text of the query to get it successfully through API
-
-```{r}
-# Improved function to download and save food images
-download_cardinal_potrait_2 <- function(i) {
-  
-  api_key <- google_api_key
-  cx <- my_cx
-  
-  # Build the API request URL with additional filters
-  url <- paste0(
-    "https://www.googleapis.com/customsearch/v1?q=",
-    URLencode(paste0("Cardinal ", cardinals$name[i], 
-                     " photo")),
-    "&cx=", cx,
-    "&searchType=image",
-    "&key=", api_key
-  )
-  
-  # Make the request
-  response <- httr::GET(url)
-  if (response$status_code != 200) {
-    warning("Failed to fetch data for Cardinal: ", 
-            cardinals$name[i])
-    return(NULL)
-  }
-  
-  # Parse the response
-  result <- httr::content(response, "parsed")
-  
-  # Extract the image URL
-  if (!is.null(result$items)) {
-    image_url <- result$items[[1]]$link
-  } else {
-    warning("No results found for Cardinal: ", cardinals$name[i])
-    return(NULL)
-  }
-  
-  # Process the image
-  im <- magick::image_read(image_url) |> 
-      image_resize("x300") 
-  
-  # Calculate the new dimension for the square
-  max_dim <- max(image_info(im)$width, image_info(im)$height)
-  
-  # Create a blank white canvas of square size
-  canvas <- image_blank(width = max_dim, 
-                        height = max_dim, 
-                        color = bg_col)
-  
-  # Composite the original image onto the center of the square canvas
-  image_composite(canvas, im, gravity = "center") |> 
-    # Crop the image into a circle 
-    # (Credits: https://github.com/doehm/cropcircles)
-    cropcircles::circle_crop(
-      border_colour = text_col,
-      border_size = 2
-    ) |>
-    image_read() |> 
-    image_background(color = bg_col) |> 
-    image_resize("x300") |> 
-    # Save or display the result
-    image_write(
-      here::here(
-        "data_vizs", 
-        paste0("temp_cardinals_", i, ".png")
-        )
-    )
-}
-
-# Iterate and download images
-for (i in problem_numbers) {
-  download_cardinal_potrait_2(i)
-}
+problem_numbers <- c(5, 6,  7, 16, 32, 36, 73)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -366,19 +242,59 @@ for (i in problem_numbers) {
 ```{r}
 #| label: eda
 
+# Ensure the table is a tibble
+cardinals <- as_tibble(table_df) |> 
+  janitor::clean_names() |> 
+  mutate(
+    # Extract the date string from raw data
+    born = str_extract(born, "^\\d{1,2} \\w+ \\d{4}"),
+    # Convert to Date format
+    born = dmy(born),  
+    
+    # Calculate age for each cardinal in years
+    age = time_length(
+      interval(
+        start = born, 
+        end = today()), 
+        unit = "years") |> 
+      floor()
+
+  ) |> 
+  mutate(
+    date_consistory = str_extract(
+      consistory, "^\\d{1,2} \\w+ \\d{4}"
+      ) |>  dmy(),
+    pope_consistory = str_remove(
+      consistory, "^\\d{1,2} \\w+ \\d{4}"
+      ) |>  str_trim(),
+    pope_consistory = paste0("Pope ", pope_consistory),
+    .keep = "unused"
+  ) |> 
+  select(-ref) |> 
+  mutate(
+    country = str_remove_all(country, "\\[.*?\\]"),
+    order = fct(order, levels = c("CB", "CP", "CD"))
+  )
+
+# A temporary tibble for nice y-axis
+
+labels_y <- cardinals |> 
+  distinct(age) |> 
+  arrange(age) |> 
+  mutate(labels_age = row_number())
+
+labels_col <- c("cardinal bishops", "cardinal priests", "cardinal deacons") |> 
+  str_to_title()
+
 plotdf1 <- cardinals |> 
   mutate(
     x_var = ((rank - 1) %% 12) + 1,
     y_var = 12 - ((rank - 1) %/% 12),
     image_var = paste0("data_vizs/temp_cardinals_", rank, ".png")
-  )
+  ) |> 
+  left_join(labels_y)
 
-plotdf1 |> 
-  ggplot(aes(rank, age)) +
-  geom_point()
 
-plotdf1 |> 
-  count(pope_consistory)
 ```
 
 ### The Plot
@@ -386,80 +302,114 @@ plotdf1 |>
 ```{r}
 #| label: base-plot
 
+custom_position <- function(...){
+  position_beeswarm(
+    method = "center",
+    cex = 0.01
+  )
+}
 
 g <- plotdf1 |> 
   ggplot(
     mapping = aes(
-      x = x_var,
-      y = y_var
+      x = 1, 
+      y = labels_age,
+      group = 1
     )
   ) +
   ggimage::geom_image(
-    data = plotdf1,
     mapping = aes(image = image_var),
-    size = 0.045
+    size = 0.02,
+    position = custom_position()
   ) +
   geom_point(
-    mapping = aes(colour = pope_consistory),
-    size = 24,
-    fill = NA,
+    size = 11.5,
+    mapping = aes(colour = order),
+    position = custom_position(),
     pch = 21,
-    stroke = 3
+    fill = NA,
+    stroke = 2.5
   ) +
   geom_text(
-    aes(
+    mapping = aes(
+      colour = order, 
       label = paste0(
         str_extract(name, "^\\S+(?:\\s+\\S+)?"), 
-        "\n(", country, ") ",
-        age, " yrs"
-      )
+        "\n(", country, ") "
+      ),
+      y = labels_age - 0.32
     ),
+    position = custom_position(),
     family = "caption_font",
     hjust = 0.5,
     vjust = 1,
-    nudge_y = -0.33,
     lineheight = 0.25,
-    size = bts / 7,
+    size = bts / 10,
     colour = text_col
   ) +
-  geom_text(
-    aes(
-      label = rank
-    ),
-    family = "caption_font",
+  annotate(
+    geom = "label",
+    label = plot_title,
+    x = Inf,
+    y = labels_y |> filter(age == 72) |> pull(labels_age),
+    family = "body_font",
+    size = bts * 0.9,
     hjust = 1,
-    vjust = 0,
-    nudge_y = 0.25,
-    nudge_x = -0.26,
-    size = bts / 4,
-    colour = text_col
+    vjust = 1,
+    lineheight = 0.3,
+    colour = text_hil,
+    label.padding = unit(0.2, "lines"),
+    label.size = NA,
+    fill = NA
   ) +
-  scale_colour_manual(values = mypal) +
-  scale_y_continuous(expand = expansion(c(0.02, 0.02))) +
+  annotate(
+    geom = "label",
+    label = plot_subtitle,
+    x = Inf,
+    y = labels_y |> filter(age == 62) |> pull(labels_age),
+    family = "body_font",
+    size = bts / 2.2,
+    hjust = 1,
+    vjust = 1,
+    lineheight = 0.35,
+    colour = text_hil,
+    label.padding = unit(0.2, "lines"),
+    label.size = NA,
+    fill = NA
+  ) +
+  scale_y_continuous(
+    breaks = labels_y$labels_age,
+    labels = labels_y$age,
+    oob = scales::squish,
+    expand = expansion(c(0.02, 0.03))
+  ) +
+  scale_colour_manual(
+    values = mypal,
+    labels = labels_col
+    ) +
   coord_cartesian(
     clip = "off"
   ) +
   labs(
-    title = plot_title,
-    subtitle = str_wrap(plot_subtitle, 90),
     caption = plot_caption,
-    colour = "Colour indicates the past Holy Pope who appointed that Cardinal"
+    colour = str_wrap("The College of Cardinals is divided into three orders, with precedence in that sequence:", 25),
+    y = "Age of the Cardinal"
   ) +
-  theme_void(
+  theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
     
     # Overall
-    plot.margin = margin(5,5,5,5, "mm"),
+    plot.margin = margin(5,5,10,5, "mm"),
     plot.title.position = "plot",
     panel.background = element_rect(
       fill = NA, colour = NA
     ),
     
     text = element_text(
-      colour = text_col,
+      colour = text_hil,
       lineheight = 0.3,
       hjust = 0.5
     ),
@@ -473,42 +423,71 @@ g <- plotdf1 |>
       hjust = 0.5,
       face = "bold"
     ),
-    plot.subtitle = element_text(
-      colour = text_hil,
-      margin = margin(1,0,0,0, "mm"),
-      size = bts,
-      lineheight = 0.3,
-      hjust = 0.5
-    ),
     plot.caption = element_textbox(
-      margin = margin(5,0,0,0, "mm"),
-      hjust = 0.5,
+      margin = margin(-10,0,0,0, "mm"),
+      hjust = 1,
       colour = text_hil,
-      size = 0.8 * bts,
+      size = 0.6 * bts,
       family = "caption_font"
     ),
     plot.caption.position = "plot",
     
     # Legend
     legend.position = "inside",
-    legend.position.inside = c(1, 0),
-    legend.justification = c(1, 0),
-    legend.direction = "horizontal",
-    legend.margin = margin(0,0,0,0, "mm"),
+    legend.position.inside = c(0.02, 0.02),
+    legend.justification = c(0, 0),
+    legend.direction = "vertical",
+    legend.margin = margin(1,1,1,1, "mm"),
     legend.box.margin = margin(0,0,0,0, "mm"),
     legend.title.position = "top",
     legend.title = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,7,0, "mm"),
+      hjust = 0
     ),
     legend.text = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(4,4,4,2, "mm"),
+      size = bts * 1.2,
+      hjust = 0
+    ),
+    legend.text.position = "right",
+    legend.background = element_rect(
+      fill = alpha(bg_col, 0.7),
+      colour = NA
+    ),
+    
+    # Grid
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(
+      linewidth = 0.3,
+      colour = darken(bg_col, 0.5),
+      linetype = 3
+    ),
+    panel.grid.minor.y = element_blank(),
+    
+    # Axes
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.length.y = unit(0, "mm"),
+    axis.line.y = element_line(
+      colour = text_hil,
+      linewidth = 0.8,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,2,0,0, "mm")
+    ),
+    axis.title.y = element_text(
+      hjust = 0.5,
+      margin = margin(0,2,0,0, "mm")
     )
   )
 
 ggsave(
   filename = here::here(
     "data_vizs",
-    "viz_papal_conclave_2025.png"
+    "viz_papal_conclave_2025_2.png"
   ),
   plot = g,
   width = 400,
@@ -529,13 +508,13 @@ library(magick)
 
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "viz_papal_conclave_2025.png")) |> 
+                      "viz_papal_conclave_2025_2.png")) |> 
   image_resize(geometry = "x400") |> 
   image_write(
     here::here(
       "data_vizs", 
       "thumbnails", 
-      "viz_papal_conclave_2025.png"
+      "viz_papal_conclave_2025_2.png"
     )
   )
 
@@ -561,7 +540,8 @@ pacman::p_load(
   magick,               # Download images and edit them
   ggimage,              # Display images in ggplot2
   patchwork,            # Composing Plots
-  rvest                 # Web-Scraping
+  rvest,                # Web-Scraping
+  ggbeeswarm            # Beeswarm Plots
 )
 
 
@@ -579,40 +559,4 @@ sessioninfo::session_info()$packages |>
     use_search = TRUE
   ) |> 
   gtExtras::gt_theme_espn()
-```
-
-A beeswarm plot
-
-```{r}
-
-pacman::p_load(ggbeeswarm)
-
-plotdf1 |> 
-  count(order)
-
-plotdf1 |> 
-  ggplot(
-    mapping = aes(
-      x = 1, 
-      y = age %/% 2
-    )
-  ) +
-  geom_point(
-    mapping = aes(colour = order),
-    position = position_beeswarm(
-      method = "hex"
-    )
-  ) +
-  geom_text(
-    mapping = aes(colour = order, label = rank),
-    position = position_beeswarm(
-      side = 0,
-      method = "hex"
-    )
-  )
-  scale_y_continuous(
-    limits = c(49, 80),
-    oob = scales::squish
-  )
-  coord_flip()
 ```
