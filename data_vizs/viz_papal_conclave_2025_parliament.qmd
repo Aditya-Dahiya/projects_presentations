@@ -307,12 +307,27 @@ plotdf2 <- cardinals |>
       .default = continent
     )
   ) |> 
-  select(rank, name, country, iso3c, continent, born, order, pope_consistory) |> 
+  #select(rank, name, country, iso3c, continent, born, order, pope_consistory) |> 
   mutate(image_var = paste0("data_vizs/temp_cardinals_", rank, ".png"))
 
 # plotdf2  |> 
 #   count(continent, country)
 
+# Continents Data
+interact_legend <- plotdf3 |> 
+  arrange(continent, country) |> 
+  mutate(label1 = paste0(name, " (", country,")")) |> 
+  group_by(continent) |> 
+  mutate(label2 = row_number()) |> 
+  summarise(
+    label3 = paste0(label2, ". ", label1, collapse = "\n")
+  )
+
+get_legend_data <- function(x){
+  interact_legend |> 
+    filter(continent = x) |> 
+    pull(label3)
+}
 ```
 
 ### Getting a parliament layout
@@ -578,4 +593,322 @@ sessioninfo::session_info()$packages |>
     use_search = TRUE
   ) |> 
   gtExtras::gt_theme_espn()
+```
+
+### Interactive Version
+
+```{r}
+#| label: interactive
+#| fig-cap: "An interactive visualization on Cardinal Electors for the Papal Conclave 2025: A circle of faith from every corner of the world, with Europe contributing the largest number."
+#| eval: true
+#| error: false
+#| warning: false
+#| message: false
+#| fig-height: 14
+#| fig-width: 10
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork,            # Composing Plots
+  rvest,                # Web-Scraping
+  ggbeeswarm,           # Beeswarm Plots
+  ggparliament,         # Parliament Layout computations
+  ggiraph               # Interactive Visualization
+)
+
+plot_title <- "The 134 cardinals who will elect the next Pope" |> str_wrap(15)
+
+# A base Colour
+bg_col <- "white"
+
+# Colour for highlighted text
+text_hil <- "grey30"
+
+# Colour for the text
+text_col <- "grey30"
+
+line_col <- "grey30"
+
+
+# Load Data --------------------------------------------------
+# URL of the Wikipedia page
+# Read the HTML content of the page
+page <- read_html("https://en.wikipedia.org/wiki/Cardinal_electors_in_the_2025_papal_conclave")
+
+# Extract the first table (which contains the list of cardinals)
+table_df <- page |> 
+  html_table(fill = TRUE)
+table_df <- table_df[[1]]
+
+rm(page)
+
+# Data Wrangling --------------------------------------------
+
+# Ensure the table is a tibble
+cardinals <- as_tibble(table_df) |> 
+  janitor::clean_names() |> 
+  mutate(
+    # Extract the date string from raw data
+    born = str_extract(born, "^\\d{1,2} \\w+ \\d{4}"),
+    # Convert to Date format
+    born = dmy(born),  
+    
+    # Calculate age for each cardinal in years
+    age = time_length(
+      interval(
+        start = born, 
+        end = today()), 
+        unit = "years") |> 
+      floor()
+
+  ) |> 
+  mutate(
+    date_consistory = str_extract(
+      consistory, "^\\d{1,2} \\w+ \\d{4}"
+      ) |>  dmy(),
+    pope_consistory = str_remove(
+      consistory, "^\\d{1,2} \\w+ \\d{4}"
+      ) |>  str_trim(),
+    pope_consistory = paste0("Pope ", pope_consistory),
+    .keep = "unused"
+  ) |> 
+  select(-ref) |> 
+  mutate(
+    country = str_remove_all(country, "\\[.*?\\]"),
+    order = fct(order, levels = c("CB", "CP", "CD"))
+  )
+
+
+plotdf2 <- cardinals |> 
+  # Get ISO 3 code for countries, so that we can add continents
+  mutate(
+    country = if_else(country == "Jerusalem", "Israel", country),
+    iso3c = countrycode::countrycode(
+      country,
+      origin = "country.name.en",
+      destination = "iso3c"
+    )
+  ) |> 
+  
+  # Add continents based on countries
+  left_join(
+    rnaturalearth::ne_countries(returnclass = "sf") |> 
+      sf::st_drop_geometry() |> 
+      mutate(iso_a3 = if_else(name == "France", "FRA", iso_a3)) |> 
+      select(iso_a3, continent) |> 
+      rename(iso3c = iso_a3)
+  ) |> 
+  mutate(
+    continent = case_when(
+      iso3c == "CPV" ~ "Europe",
+      iso3c == "MLT" ~ "Europe",
+      iso3c == "SGP" ~ "Asia",
+      iso3c == "HKG" ~ "Asia",
+      iso3c == "TON" ~ "Oceania",
+      .default = continent
+    )
+  ) |> 
+  #select(rank, name, country, iso3c, continent, born, order, pope_consistory) |> 
+  mutate(image_var = paste0("data_vizs/temp_cardinals_", rank, ".png"))
+
+# plotdf2  |> 
+#   count(continent, country)
+
+# Parliament Layout -----------------------------------------------
+
+# The number of rows we want in the parliament layout
+number_of_rows <- 5
+
+# Continents count and their order
+continent_counts_df <- plotdf2 |> 
+  count(continent, sort = T) 
+continent_df <- continent_counts_df |> 
+  mutate(
+    continent = fct(
+      continent,
+      levels = continent_counts_df$continent
+    )
+  )
+
+# Improved plotdf2 for making cardinals in same orders: by continent and by rank
+plotdf3 <- plotdf2 |> 
+  mutate(
+    continent = fct(
+      continent,
+      levels = continent_counts_df$continent
+    )
+  ) |> 
+  arrange(continent, country, rank) |> 
+  # An ID to link it up with ggpariament layout
+  mutate(id = row_number()) |> 
+  
+  # Add the parliament layout data
+  left_join(
+    # Computate the parliament layout of Cardinals
+    parliament_data(
+      election_data = continent_df,
+      # type = "semicircle",
+      type = "circle",
+      party_seats = continent_df$n,
+      parl_rows = number_of_rows,
+      plot_order = continent_df$continent
+    ) |> 
+      as_tibble() |> 
+      
+      # Now this gives layout where senior ranked Cardinals are away from the well.
+      # I need to computate straight-line (Euclidean) distance from centre of circle 
+      # (i.e. (0,0)) / semi-circle and get senior ranked caridnals near the well.
+      mutate(
+        depth = sqrt(x^2 + y^2),
+        y_dist = y
+      ) |> 
+      arrange(continent, depth, y_dist) |> 
+      mutate(
+        id = row_number()
+      )
+  )
+
+# Data for interactive Legend -------------------------------------
+
+# Continents Data
+interact_legend <- plotdf3 |> 
+  arrange(continent, country) |> 
+  mutate(label1 = paste0(name, " (", country,")")) |> 
+  group_by(continent) |> 
+  mutate(label2 = row_number()) |> 
+  summarise(
+    label3 = paste0(label2, ". ", label1, collapse = "\n")
+  )
+
+get_legend_data <- function(x){
+  interact_legend |> 
+    filter(continent == x) |> 
+    pull(label3)
+}
+
+# VISUALIZATION ---------------------------------------------------
+
+bts = 24
+mypal <- paletteer::paletteer_d(
+  "MoMAColors::ustwo", 
+  direction = -1
+  ) |> 
+  as.character()
+names(mypal) <- continent_df |> pull(continent)
+
+g <- plotdf3 |> 
+  ggplot(
+    mapping = aes(
+      x = x,
+      y = y,
+      data_id = id
+    )
+  ) +
+  geom_point_interactive(
+    mapping = aes(
+      colour = continent,
+      tooltip = paste0(
+        "Name: ", name, "\n",
+        "Office: ", office, "\n",
+        "Country: ", country, "\n",
+        "Continent: ", continent, "\n",
+        "Age: ", age, " years\n",
+        "Rank / Seniority: ", rank 
+      )
+    ),
+    size = 22,
+    pch = 20
+  ) +
+  annotate(
+    geom = "text",
+    label = plot_title,
+    x = 0,
+    y = 0,
+    # family = "body_font",
+    size = bts * 0.5,
+    hjust = 0.5,
+    vjust = 0.5,
+    lineheight = 0.9,
+    colour = text_hil,
+    fontface = "bold"
+  ) +
+  scale_colour_manual_interactive(
+    values = mypal,
+    labels = continent_df |> 
+              mutate(label = paste0(
+                continent, "<br>(**", n, "**)")) |> 
+              pull(label),
+    data_id = function(x) x,
+    tooltip = get_legend_data
+    ) +
+  coord_fixed(
+    clip = "off"
+  ) +
+  labs(
+    caption = "Data:Wikipedia   |    Code & Graphics: X @adityadahiyaias",
+    colour = "The Continent which each Cardinal belongs to",
+    y = NULL, x = NULL
+  ) +
+  theme_void(
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(5,0,2,0, "mm"),
+    plot.title.position = "plot",
+    
+    text = element_text(
+      colour = text_hil,
+      hjust = 0.5
+    ),
+    
+    # Labels and Strip Text
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.6 * bts,
+      margin = margin(3,0,1,0, "lines")
+    ),
+    plot.caption.position = "plot",
+    
+    # Legend
+    legend.position = "bottom",
+    legend.title.position = "top",
+    legend.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    legend.text = element_textbox(
+      hjust = 0.1
+    ),
+    legend.text.position = "right"
+  )
+
+tooltip_css <- "background-color:white;color:black"
+
+# INTERACTIVITY ----------------------------------------------------
+
+girafe(
+  ggobj = g,
+  options = list(
+    opts_tooltip(
+      css = tooltip_css, 
+      opacity = 0.9
+      ),
+    opts_sizing(width = .7),
+    opts_hover_inv(css = "opacity:0.25;"),
+    opts_hover(css = "fill:white;stroke:black;"),
+    opts_zoom(max = 5)
+  )
+)
 ```
