@@ -1,0 +1,439 @@
+---
+title: "useR 2025: Presentations and Sessions"
+author: "Aditya Dahiya"
+date: "2025-04-30"
+subtitle: "The lineup of presentations scheduled at useR! 2025, categorized by session and date."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_useR_2025.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### **About the Data**
+
+This week's dataset comes from the [useR! 2025](https://user2025.r-project.org/) conference, an annual gathering of R users, developers, and enthusiasts hosted by [Duke University](https://user2025.r-project.org/) in Durham, NC, USA, from August 8–10, 2025 (with a virtual event on August 1). The data, curated by [Mine Çetinkaya-Rundel](https://github.com/mine-cetinkaya-rundel), includes the full schedule of sessions—talks, tutorials, posters, and more—sourced from the conference's submission portal. It contains metadata such as session titles, speakers, abstracts, room locations, and whether a video recording will be available. The dataset, available via the [`tidytuesdayR`](https://github.com/rfordatascience/tidytuesday) R package or directly from [GitHub](https://github.com/rfordatascience/tidytuesday/blob/master/data/2025/2025-04-29/user2025.csv), invites exploration of themes, trends, and opportunities at the conference. Full program details for both [virtual](https://user2025.r-project.org/program/virtual) and [in-person](https://user2025.r-project.org/program/in-person) formats are available on the useR! 2025 website. Participants are encouraged to share their analyses using the hashtag [#useR2025](https://twitter.com/search?q=%23useR2025).
+
+![This graphic displays the lineup of presentations scheduled at useR! 2025, categorized by session and date. Each session is color-coded, with individual talk titles aligned along the y-axis. Horizontal markers group presentations under their respective sessions, while vertical labels indicate the conference dates. Annotations and spacing help highlight the structure of the event, giving a clear visual summary of when and where each talk is taking place.](tidy_useR_2025.png){#fig-1}
+
+## **How I made this graphic?**
+
+To visualize the schedule of presentations at useR! 2025, I first loaded and wrangled the session data using packages from the [**tidyverse**](https://www.tidyverse.org/) ecosystem, including `dplyr` for data manipulation and `ggplot2` for plotting. I utilized [**showtext**](https://github.com/yixuan/showtext) to enable the use of custom Google Fonts and [**ggtext**](https://wilkelab.org/ggtext/) for styled markdown in text elements. [**fontawesome**](https://rstudio.github.io/fontawesome/) icons were embedded to add social media logos in the caption. The session metadata was then arranged using grouping and summarisation to calculate vertical spacing and alignment. I used [**patchwork**](https://patchwork.data-imaginist.com/) for potential compositional flexibility (though not shown here), and [**magick**](https://docs.ropensci.org/magick/) along with [**ggimage**](https://guangchuangyu.github.io/ggimage/) to include the conference logo directly on the plot. Color palettes were selected with help from [**colorspace**](https://colorspace.r-forge.r-project.org/) and [**cols4all**](https://github.com/mtennekes/cols4all). The final plot features titles, sessions, and dates placed precisely along the x-axis, using customized axes, fonts, and layout controls. Everything was neatly saved using `ggsave()` with background color and precise dimensions for clarity in publication or sharing.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork,            # Composing Plots
+  ggbrace               # Drawing Curly braces in ggplot2
+)
+
+# Option 2: Read directly from GitHub
+
+user2025 <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-29/user2025.csv')
+
+user_logo <- image_read("https://user2025.r-project.org/img/logo.png")
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# cols4all::c4a_gui()
+
+mypal <- c("#2165B6", "#B3B3B3")
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey40"
+seecolor::print_color(text_col)
+
+line_col <- "grey40"
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Mine Çetinkaya-Rundel, PositPBC", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_subtitle <- "Presentations scheduled in useR! 2025 at Duke University"
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+pacman::p_load(summarytools)
+user2025 |> 
+  dfSummary() |> 
+  view()
+
+user2025 |> 
+  select(title)
+
+user2025 |> 
+  count(session, sort = T) |> View()
+
+pacman::p_load(tidytext)
+
+user2025 |> 
+  select(keywords) |> 
+  unnest_tokens(word, keywords) |> 
+  count(word, sort = T)
+
+df1 <- user2025 |> 
+  select(date, session, title, speakers) |> 
+  arrange(desc(date), session) |> 
+  mutate(
+    online = date == as_date("2025-08-01")
+  ) |> 
+  mutate(
+    y_var = row_number()
+  )
+
+df2 <- df1 |> 
+  group_by(date) |> 
+  summarise(
+    y_mean = mean(y_var),
+    y_min = min(y_var),
+    y_max = max(y_var)
+  ) |> 
+  mutate(date = paste(day(date), month(date, label = TRUE, abbr = FALSE)))
+
+df3 <- df1 |> 
+  group_by(date, session) |> 
+  summarise(
+    y_mean = mean(y_var),
+    y_min = min(y_var),
+    y_max = max(y_var)
+  )
+
+# Get colour palette from {cols4all}
+# cols4all::c4a_gui()
+mypal2 <- c("#2E91E5", "#E15F99", "#1CA71C", "#FB0D0D", "#DA16FF", "#222A2A", "#B68100", "#750D86", "#EB663B", "#511CFB", "#00A08B", "#FB00D1", "#FC0080", "#B2828D", "#6C7C32", "#778AAE", "#862A16", "#A777F1", "#620042", "#1616A7", "#DA60CA", "#6C4516", "#0D2A63")
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      y = y_var
+    )
+  ) +
+  geom_text(
+    mapping = aes(
+      label = title,
+      colour = session,
+      group = session,
+      x = -0.05
+    ),
+    family = "title_font",
+    size = bts / 10,
+    hjust = 1
+  ) +
+  
+  # SESSION -----------------------------------
+  geom_text(
+    data = df3,
+    mapping = aes(
+      label = session,
+      y = y_mean,
+      x = 0.005,
+      colour = session
+    ),
+    angle = 0,
+    family = "caption_font",
+    size = bts / 4,
+    hjust = 0
+  ) +
+  geom_errorbar(
+    data = df3,
+    mapping = aes(
+      x = 0,
+      ymin = y_min,
+      ymax = y_max,
+      y = y_mean,
+      colour = session
+    ),
+    linetype = 1,
+    width = 0.01
+  ) +
+  
+  # DATE -----------------------------------
+  geom_text(
+    data = df2,
+    mapping = aes(
+      label = date,
+      y = y_mean,
+      x = 0.25
+    ),
+    angle = -90,
+    family = "body_font",
+    colour = text_hil,
+    size = bts / 2
+  ) +
+  geom_errorbar(
+    data = df2,
+    mapping = aes(
+      x = 0.22,
+      ymin = y_min,
+      ymax = y_max,
+      y = y_mean
+    ),
+    colour = text_col,
+    linetype = 1,
+    width = 0.05
+  ) +
+  
+  # ADD LOGO ------------------------------------------------------
+  annotation_custom(
+    grid::rasterGrob(user_logo),
+    xmin = -0.83, xmax = -0.38, 
+    ymin = 105, ymax = 130
+  ) +
+  
+  annotate(
+    geom = "text",
+    label = plot_subtitle,
+    angle = 90,
+    x = -0.7,
+    y = 55,
+    family = "body_font",
+    size = bts / 1.45,
+    # fontface = "bold",
+    hjust = 0.5,
+    vjust = 1,
+    colour = text_hil
+  ) +
+  # stat_brace(
+  #   mapping = aes(
+  #     colour = session,
+  #     group = session,
+  #     x = -0.5
+  #   ),
+  #   rotate = -90,
+  #   width = 0.2
+  # ) +
+  # stat_bracetext(
+  #   mapping = aes(
+  #     colour = session,
+  #     group = session,
+  #     label = session,
+  #     x = -0.8
+  #   ),
+  #   rotate = -90,
+  #   family = "caption_font",
+  #   hjust = 0
+  # ) +
+  scale_y_continuous(
+    expand = expansion(0)
+  ) +
+  scale_x_continuous(
+    limits = c(-0.8, 0.28),
+    expand = expansion(0)
+  ) +
+  scale_colour_manual(values = mypal2) +
+  coord_cartesian(clip = "off") +
+  theme(
+    legend.position = "none"
+  ) +
+  labs(
+    caption = plot_caption,
+    x = NULL,
+    y = NULL
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    legend.position = "none",
+    plot.title.position = "plot",
+    panel.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    
+    # Labels and Strip Text
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.6 * bts,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot"
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_useR_2025.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 520,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_useR_2025.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_useR_2025.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork,            # Composing Plots
+  ggbrace               # Drawing Curly braces in ggplot2
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
