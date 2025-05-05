@@ -1,0 +1,441 @@
+---
+title: "Mapping NSF Grant Losses by Directorate and Grant Type"
+author: "Aditya Dahiya"
+date: "2025-05-05"
+subtitle: "Using {vayr}'s packcircles, grants are plotted as dots by directorate and type. Each dot reflects a terminated NSF grant. Bar plots summarize funding losses."
+categories:
+  - "#TidyTuesday"
+  - "{packcircles}"
+  - "{vayr}"
+image: "thumbnails/tidy_nsf_grants.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+The dataset for this week focuses on a wave of grant terminations by the U.S. National Science Foundation (NSF) under the Trump administration, beginning on April 18, 2025. In an extraordinary and potentially unlawful move, over 1,000 NSF grants—funding a wide range of scientific research and education projects—have been abruptly cancelled, with no option for appeal. These terminations have sparked concern across the scientific community, with researchers warning of long-term harm to U.S. innovation and global scientific leadership. Because the federal government has not disclosed the full list of affected grants, the data were crowdsourced and compiled by [Grant Watch](https://grant-watch.us), drawing contributions from researchers and program administrators. The dataset, curated by Noam Ross and Scott Delaney, includes grant-level details such as funding amounts, institutional affiliations, congressional districts, and project abstracts. Available through the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday), it invites analysis into patterns of funding cuts—by geography, topic, and institutional type—and allows comparisons with broader NSF and NIH funding trends.
+
+![This graphic visualizes approximately 1,400 terminated NSF grants under the Trump administration in 2025, using a packcircles layout. The Y-axis lists nine NSF directorates, while the X-axis categorizes grants into four types: continuous, standard, fellowship, and cooperative. Each dot represents a single grant, arranged via position_circlepack() from the {vayr} package. Cumulative bar plots along the axes display the total funding committed via USAspending.gov for each directorate and grant type. Key findings reveal that STEM Education faced the largest funding cuts, predominantly in continuing grants, while Technology and Innovation saw the most cooperative agreement terminations.](tidy_nsf_grants.png){#fig-1}
+
+## **How I made this graphic?**
+
+# How the Graphic Was Created
+
+The graphic visualizing 1,040 terminated NSF grants was crafted using the [{vayr}](https://alexandercoppock.com/vayr/) R package's `position_circlepack()` to arrange grant dots in a packed layout by directorate and grant type within a [{ggplot2}](https://ggplot2.tidyverse.org/) plot. Data from `nsf_terminations.csv` was processed with [{tidyverse}](https://www.tidyverse.org/) for cleaning and grouping by award type and directorate. Dot sizes reflected funding amounts, colored by directorate using [{paletteer}](https://github.com/EmilHvitfeldt/paletteer)'s palette. Cumulative bar plots, built with [{ggplot2}](https://ggplot2.tidyverse.org/), were added via [{patchwork}](https://patchwork.data-imaginist.com/) to show total funding cuts, with text styled using [{ggtext}](https://github.com/wilkelab/ggtext) and fonts from [{showtext}](https://github.com/yixuan/showtext).
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork,            # Composing Plots
+  vayr,                 # visualize as you randomize
+  packcircles           # Circles Packed layout
+)
+
+# Option 2: Read directly from GitHub
+nsf_terminations <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-05-06/nsf_terminations.csv')
+```
+
+The {[vayr](https://alexandercoppock.com/vayr/)} R package, developed by Alexander Coppock, provides specialized extensions for {ggplot2} to support the "Visualize as You Randomize" principles outlined in his 2020 paper. Designed for randomized experiments, it enhances data visualization by offering position adjustments like position_sunflowerdodge() and position_circlepack() to reduce over-plotting and organize data in "data-space" effectively. These tools help convey experimental design, analysis, and results clearly by mapping design elements to aesthetic parameters. Available on CRAN, {vayr} requires {ggplot2}, {packcircles}, and {withr}, with development versions installable via GitHub. It includes datasets like patriot_act for practical visualization demonstrations.[ ](https://github.com/cran/vayr)
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  grant-watch.us", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_subtitle <- str_wrap("Visualizing 1,040 terminated NSF grants with {vayr}'s packcircles layout. Dots represent individual grants, sized by grant amount, and packed by directorate and grant type. Cumulative bars show total funding cuts.", 80)
+
+str_view(plot_subtitle)
+plot_title <- "Visualizing Trump-Era NSF Funding Cuts"
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+# pacman::p_load(summarytools)
+# pacman::p_load(vayr)
+
+# dfSummary(nsf_terminations) |> 
+#   view()
+
+df1 <- nsf_terminations |> 
+  select(award_type, directorate, usaspending_obligated) |> 
+  drop_na() |> 
+  mutate(
+    directorate = str_remove_all(directorate, "\\\""),
+    directorate = str_wrap(directorate, 20)
+  )
+
+levels_award_type <- df1 |> 
+  count(award_type, sort = T) |> 
+  pull(award_type)
+
+levels_directorate <- df1 |> 
+  count(directorate, sort = T) |> 
+  pull(directorate)
+
+df2 <- df1 |> 
+  mutate(
+    award_type = str_wrap(award_type, 5),
+    directorate = fct(directorate, levels = levels_directorate)
+  ) |> 
+  group_by(award_type, directorate) |> 
+  arrange(desc(usaspending_obligated))
+
+# Main plot
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# mypal <- paletteer::paletteer_d("unikn::pal_unikn_pref")
+mypal <- paletteer::paletteer_d("ltc::hat")
+
+g_base <- df2 |> 
+  ggplot() +
+  geom_point(
+    mapping = aes(
+      x = award_type,
+      y = directorate,
+      size = usaspending_obligated,
+      colour = directorate
+    ),
+    position = position_circlepack(
+      density = 0.05,
+      aspect_ratio = 1
+    ),
+    alpha = 0.6
+  ) +
+  scale_size_continuous(
+    range = c(bts/40, bts/10)
+  ) +
+  scale_x_discrete(
+    expand = expansion(0),
+    position = "top"
+  ) +
+  scale_colour_manual(values = mypal) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    x = NULL, y = NULL
+  ) +
+  theme(
+    
+    # Overall
+    plot.margin = margin(5,5,5,5, "mm"),
+    legend.position = "none",
+    plot.title.position = "plot",
+    panel.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    panel.grid = element_blank(),
+    text = element_text(
+      colour = text_col,
+      lineheight = 0.3,
+      hjust = 0.5
+    ),
+    axis.text.x.top = element_text(
+      margin = margin(0,0,-20,0, "mm")
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,-5,0,0, "mm")
+    )
+  )
+
+# X-Axis Cumulative plot
+add_plot_y <- df2 |> 
+  group_by(award_type) |> 
+  summarise(
+    usaspending_obligated = sum(usaspending_obligated)
+  ) |> 
+  ggplot(
+    mapping = aes(
+      x = award_type,
+      y = usaspending_obligated
+    )
+  ) +
+  geom_col(
+    fill = "grey50"
+  ) +
+  geom_text(
+    mapping = aes(
+      label = number(
+        usaspending_obligated, 
+        prefix = "$",
+        scale_cut = cut_short_scale()
+      )
+    ),
+    vjust = -0.2,
+    family = "body_font",
+    colour = text_col,
+    size = bts / 3
+  ) +
+  coord_cartesian(clip = "off") +
+  scale_y_continuous(
+    expand = expansion(c(0, 0.05))
+  ) +
+  theme_void()
+
+add_plot_x <- df2 |> 
+  group_by(directorate) |> 
+  summarise(
+    usaspending_obligated = sum(usaspending_obligated)
+  ) |> 
+  ggplot(
+    mapping = aes(
+      y = directorate,
+      x = usaspending_obligated,
+      fill = directorate,
+      colour = directorate
+    )
+  ) +
+  geom_col() +
+  geom_text(
+    mapping = aes(
+      label = number(
+        usaspending_obligated, 
+        prefix = "$",
+        scale_cut = cut_short_scale(),
+        accuracy = 1
+      )
+    ),
+    hjust = -0.1,
+    family = "body_font",
+    colour = text_col,
+    size = bts / 3
+  ) +
+  scale_colour_manual(values = mypal) +
+  scale_fill_manual(values = mypal) +
+  coord_cartesian(clip = "off") +
+  scale_x_continuous(expand = expansion(c(0, 0.4))) +
+  theme_void() +
+  theme(
+    legend.position = "none"
+  )
+
+
+custom_design <- ("
+BBBB#
+AAAAC
+AAAAC
+AAAAC
+AAAAC
+AAAAC
+AAAAC
+AAAAC
+")
+
+g <- g_base + add_plot_y + add_plot_x +
+  plot_layout(
+    design = custom_design
+  ) +
+  plot_annotation(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    theme = theme(
+      # Labels and Strip Text
+      plot.title = element_text(
+        colour = text_hil,
+        margin = margin(5,0,5,0, "mm"),
+        size = 2.4 * bts,
+        lineheight = 0.3,
+        hjust = 0.5,
+        family = "body_font",
+        face = "bold"
+      ),
+      plot.subtitle = element_text(
+        colour = text_hil,
+        margin = margin(5,0,5,0, "mm"),
+        size = 1.2 * bts,
+        lineheight = 0.3,
+        hjust = 0.5,
+        family = "body_font"
+      ),
+      plot.caption = element_textbox(
+        margin = margin(5,0,0,0, "mm"),
+        hjust = 0.5,
+        colour = text_hil,
+        size = 0.9 * bts,
+        family = "caption_font"
+      ),
+      plot.caption.position = "plot"
+    )
+  ) &
+  theme(
+    plot.margin = margin(5,5,5,5, "mm")
+  )
+
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_nsf_grants.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 520,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_nsf_grants.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_nsf_grants.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork,            # Composing Plots
+  vayr,                 # visualize as you randomize
+  packcircles           # Circles Packed layout
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
