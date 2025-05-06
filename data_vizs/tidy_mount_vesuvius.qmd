@@ -1,0 +1,287 @@
+---
+title: "....................."
+author: "Aditya Dahiya"
+date: "2025-05-06"
+subtitle: "........................................"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_mount_vesuvius.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This dataset captures seismic activity at [Mount Vesuvius](https://www.ingv.it/somma-vesuvio), one of the most iconic and closely monitored volcanoes in the world, located in Campania, Italy. The data originates from the [Istituto Nazionale di Geofisica e Vulcanologia (INGV)](https://www.ingv.it/), Italy’s national institute for geophysics and volcanology, and is accessible through its [Open Data Portal](https://data.ingv.it/en/). The specific dataset was curated from the [GOSSIP portal](https://terremoti.ov.ingv.it/gossip/vesuvio/index.html), which offers interactive access to seismic records for various volcanic regions. Originally available as individual CSV files in Italian, the dataset was consolidated and partially translated into English for broader usability. It includes variables such as the event’s date, time, location, depth, magnitude, and classification (e.g., earthquake or eruption), with metadata indicating the quality and review level of each observation. This dataset was featured in the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) project for the week of [May 13, 2025](https://github.com/rfordatascience/tidytuesday/blob/master/data/2025/2025-05-13/readme.md), and made available for analysis in R, Python, and Julia. Special thanks to [Libby Heeren](https://github.com/LibbyHeeren) for curating and sharing this valuable resource for public exploration and visualization.
+
+![.........................](tidy_mount_vesuvius.png){#fig-1}
+
+# How the Graphic Was Created
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork             # Composing Plots
+)
+
+# Getting the Data: Using R
+vesuvius <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-05-13/vesuvius.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Barlow",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  .....................", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_subtitle <- str_wrap("........................", 80)
+
+str_view(plot_subtitle)
+plot_title <- "........................."
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+pacman::p_load(summarytools)
+dfSummary(vesuvius) |> 
+  view()
+
+# Get base map for this area
+
+pacman::p_load(ggmap, sf, terra, tidyterra)
+register_stadiamaps("163ea621-3a86-492d-b57d-05e8cdf6a58c")
+
+# Define bounding box coordinates
+xlim <- c(14.415, 14.435)
+ylim <- c(40.81, 40.83)
+
+# Create bbox object
+bbox <- st_bbox(c(xmin = xlim[1], xmax = xlim[2], 
+                  ymin = ylim[1], ymax = ylim[2]), 
+                crs = 4326)
+
+# Convert bbox to sf polygon
+bbox_sf <- st_as_sfc(bbox) |>  st_sf()
+
+base_map <- ggmap::get_stadiamap(
+  bbox = c(
+    left = xlim[1],
+    right = xlim[2],
+    bottom = ylim[1],
+    top = ylim[2]
+  ), 
+  zoom = 16,
+  maptype = "stamen_terrain_background"
+) |> 
+  terra::rast()
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- vesuvius |> 
+  mutate(year = year(time)) |> 
+  filter(year > 2012) |> 
+  ggplot() +
+  geom_spatraster_rgb(
+    data = base_map,
+    maxcell = 1e4
+  ) +
+  geom_point(
+    aes(
+      x = longitude, 
+      y = latitude,
+      colour = duration_magnitude_md,
+      size = duration_magnitude_md
+    )
+  ) |> ggblend::blend(blend = "darken", alpha = 0.75) +
+  coord_sf(
+    xlim = c(14.415, 14.435),
+    ylim = c(40.81, 40.83),
+    default_crs = "EPSG:4326"
+  ) +
+  facet_wrap(~year) +
+  paletteer::scale_colour_paletteer_c(
+    "viridis::turbo",
+    limits = c(0, 2),
+    oob = scales::squish
+    ) +
+  scale_size_continuous(
+    range = c(0.1, 5),
+    transform = "exp"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts,
+    base_line_size = bts/150,
+    base_rect_size = bts/150
+  ) +
+  theme(
+    legend.position = "bottom",
+    
+    # Axes
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.x = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = 0.5 * bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = 05. * bts
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_mount_vesuvius.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_mount_vesuvius.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_mount_vesuvius.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
