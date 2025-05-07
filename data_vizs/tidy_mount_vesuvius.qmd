@@ -57,6 +57,9 @@ pacman::p_load(
   patchwork             # Composing Plots
 )
 
+# Load Geospatial Mapping packages
+pacman::p_load(ggmap, sf, terra, tidyterra)
+
 # Getting the Data: Using R
 vesuvius <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-05-13/vesuvius.csv')
 ```
@@ -135,16 +138,39 @@ plot_title <- "........................."
 ```{r}
 #| label: eda
 
-pacman::p_load(summarytools)
-dfSummary(vesuvius) |> 
-  view()
+# pacman::p_load(summarytools)
+# dfSummary(vesuvius) |> 
+#   view()
 
 # Get base map for this area
 
+# vesuvius |> 
+#   count(year)
+
+df1 <- vesuvius |> 
+  group_by(year) |> 
+  summarise(
+    latitude = mean(latitude, na.rm = TRUE),
+    longitude = mean(longitude, na.rm = TRUE),
+    duration_magnitude_md = mean(duration_magnitude_md, na.rm = TRUE)
+  ) |> 
+  filter(year > 2012) |> 
+  mutate(
+    id = row_number()
+  )
+
+# Same tibble without an year column, to help plot in every facet
+df2 <- df1 |> 
+  select(-year)
+```
+
+### Get geospatial Data
+
+```{r}
 
 # Define bounding box coordinates
-xlim <- c(14.415, 14.435)
-ylim <- c(40.81, 40.83)
+xlim <- c(14.421, 14.433)
+ylim <- c(40.815, 40.826)
 
 # Create bbox object
 bbox <- st_bbox(c(xmin = xlim[1], xmax = xlim[2], 
@@ -161,10 +187,22 @@ base_map <- ggmap::get_stadiamap(
     bottom = ylim[1],
     top = ylim[2]
   ), 
-  zoom = 16,
+  zoom = 14,
   maptype = "stamen_terrain_background"
 ) |> 
   terra::rast()
+
+# Get Elevation Raster
+# pacman::p_load(elevatr)
+# base_map1 <- elevatr::get_elev_raster(
+#   locations = bbox_sf,
+#   z = 10,
+#   prj = st_crs("EPSG:4326")
+# )
+# 
+# base_map2 <- base_map1 |> 
+#   terra::rast()
+# Inset map for overall View
 ```
 
 ### The Plot
@@ -173,35 +211,87 @@ base_map <- ggmap::get_stadiamap(
 #| label: base-plot
 
 g <- vesuvius |> 
-  mutate(year = year(time)) |> 
   filter(year > 2012) |> 
   ggplot() +
+  
+  # Background Map
   geom_spatraster_rgb(
     data = base_map,
-    maxcell = 1e4
+    maxcell = 1e4,
+    alpha = 0.75
+  ) +
+  
+  # Mean points and their progression
+  geom_path(
+    data = df2,
+    mapping = aes(
+      x = longitude, 
+      y = latitude
+    ),
+    arrow = arrow()
+  ) +
+  geom_point(
+    data = df2,
+    mapping = aes(
+      x = longitude, 
+      y = latitude
+    ),
+    alpha = 1,
+    colour = "black",
+    size = 5
+  ) +
+  geom_point(
+    data = df1,
+    mapping = aes(
+      x = longitude, 
+      y = latitude
+    ),
+    alpha = 1,
+    colour = "red",
+    fill = NA,
+    pch = 21,
+    size = 8,
+    stroke = 2
+  ) +
+  scale_fill_wiki_c(
+    limits = c(300, 1200),
+    oob = scales::squish
   ) +
   geom_point(
     aes(
-      x = longitude, 
+      x = longitude,
       y = latitude,
-      colour = duration_magnitude_md,
+    # colour = duration_magnitude_md,
       size = duration_magnitude_md
-    )
-  ) |> ggblend::blend(blend = "darken", alpha = 0.75) +
+    ),
+    position = position_jitter(
+      width = 0.01,
+      height = 0.01
+    ),
+    alpha = 0.3
+  ) +
   coord_sf(
-    xlim = c(14.415, 14.435),
-    ylim = c(40.81, 40.83),
-    default_crs = "EPSG:4326"
+    xlim = xlim,
+    ylim = ylim,
+    default_crs = "EPSG:4326",
+    clip = "on",
+    expand = FALSE
   ) +
   facet_wrap(~year) +
-  paletteer::scale_colour_paletteer_c(
-    "viridis::turbo",
-    limits = c(0, 2),
-    oob = scales::squish
-    ) +
+  # paletteer::scale_colour_paletteer_c(
+  #   "viridis::turbo",
+  #   limits = c(0, 2),
+  #   oob = scales::squish
+  #   ) +
   scale_size_continuous(
-    range = c(0.1, 5),
+    range = c(0.01, 8),
     transform = "exp"
+  ) +
+  labs(
+    x = NULL,
+    y = NULL,
+    colour = "Duration magnitude (Md) of the seismic event,\na measure of its energy release.",
+    size = NULL
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -210,17 +300,49 @@ g <- vesuvius |>
     base_rect_size = bts/150
   ) +
   theme(
+    # Overall
     legend.position = "bottom",
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
     
     # Axes
     axis.ticks.length = unit(0, "mm"),
     axis.text.x = element_text(
       margin = margin(0,0,0,0, "mm"),
-      size = 0.5 * bts
+      size = bts
     ),
     axis.text.y = element_text(
       margin = margin(0,0,0,0, "mm"),
-      size = 05. * bts
+      size = bts
+    ),
+    panel.spacing.x = unit(2, "mm"),
+    panel.spacing.y = unit(2, "mm"),
+    panel.grid = element_line(
+      colour = "black",
+      linewidth = 0.2
+    ),
+    
+    # Strip Text
+    strip.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = 2 * bts,
+      colour = text_col
+    ),
+    
+    # Legend
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
     )
   )
 
