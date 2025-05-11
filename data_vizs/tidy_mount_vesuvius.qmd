@@ -1,10 +1,13 @@
 ---
-title: "....................."
+title: "Tracking Mt. Vesuvius: Seismic Centroids on the Move"
 author: "Aditya Dahiya"
-date: "2025-05-06"
-subtitle: "........................................"
+date: "2025-05-11"
+subtitle: "The graphic highlights a subtle but consistent westward shift in the center of seismic activity at Mount Vesuvius over the past decade."
 categories:
   - "#TidyTuesday"
+  - "Raster"
+  - "Maps"
+  - "{ggmap}"
 image: "thumbnails/tidy_mount_vesuvius.png"
 format:
   html:
@@ -34,9 +37,11 @@ comments:
 
 This dataset captures seismic activity at [Mount Vesuvius](https://www.ingv.it/somma-vesuvio), one of the most iconic and closely monitored volcanoes in the world, located in Campania, Italy. The data originates from the [Istituto Nazionale di Geofisica e Vulcanologia (INGV)](https://www.ingv.it/), Italy’s national institute for geophysics and volcanology, and is accessible through its [Open Data Portal](https://data.ingv.it/en/). The specific dataset was curated from the [GOSSIP portal](https://terremoti.ov.ingv.it/gossip/vesuvio/index.html), which offers interactive access to seismic records for various volcanic regions. Originally available as individual CSV files in Italian, the dataset was consolidated and partially translated into English for broader usability. It includes variables such as the event’s date, time, location, depth, magnitude, and classification (e.g., earthquake or eruption), with metadata indicating the quality and review level of each observation. This dataset was featured in the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) project for the week of [May 13, 2025](https://github.com/rfordatascience/tidytuesday/blob/master/data/2025/2025-05-13/readme.md), and made available for analysis in R, Python, and Julia. Special thanks to [Libby Heeren](https://github.com/LibbyHeeren) for curating and sharing this valuable resource for public exploration and visualization.
 
-![.........................](tidy_mount_vesuvius.png){#fig-1}
+![This graphic shows the geographic distribution of seismic events at Mount Vesuvius from 2013 to 2024, with each earthquake represented as a grey dot sized by its duration magnitude (Md). For each year, the red circle marks the weighted centroid of all events, calculated using Md as the weighting factor. Over the 12-year period, the centroids trace a clear westward shift beginning in 2019, suggesting a possible geographic migration of seismic activity within the region. This trend may warrant further investigation into evolving subsurface dynamics at the volcano.](tidy_mount_vesuvius.png){#fig-1}
 
 # How the Graphic Was Created
+
+To visualize the westward migration of seismic activity near Mount Vesuvius, I used the [**tidyverse**](https://www.tidyverse.org/) suite for data wrangling and [**ggplot2**](https://ggplot2.tidyverse.org/) for plotting. Earthquake data were obtained via [`readr::read_csv()`](https://readr.tidyverse.org/reference/read_delim.html), and weighted centroids by year were computed using [`dplyr::summarise()`](https://dplyr.tidyverse.org/reference/summarise.html) with `weighted.mean()`. A background terrain map was retrieved using [`ggmap::get_stadiamap()`](https://github.com/dkahle/ggmap) and layered with [`terra::rast()`](https://rspatial.org/terra/reference/rast.html). The final plot includes yearly earthquake points sized by `duration_magnitude_md`, annual centroid paths (`geom_path()`), and highlighted centroids (`geom_point()` and `geom_label()`) using a diverging color scale from [**paletteer**](https://emilhvitfeldt.github.io/paletteer/). The plot was styled with custom fonts via [**showtext**](https://github.com/yixuan/showtext) and exported using [`ggsave()`](https://ggplot2.tidyverse.org/reference/ggsave.html).
 
 ### Loading required libraries
 
@@ -115,7 +120,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**  .....................", 
+  "**Data:**   Italian Istituto Nazionale di Geofisica e Vulcanologia (INGV)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -126,10 +131,10 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_subtitle <- str_wrap("........................", 80)
-
+plot_subtitle <- str_wrap("Each dot represents a seismic event at Mount Vesuvius from 2013 to 2024, sized by its magnitude. Annual weighted centroids show a notable westward migration since 2019.", 90)
 str_view(plot_subtitle)
-plot_title <- "........................."
+
+plot_title <- "Mt. Vesuvius: Westward Drift of Seismic Centroids"
 
 ```
 
@@ -147,11 +152,14 @@ plot_title <- "........................."
 # vesuvius |> 
 #   count(year)
 
+# A tibble to compute the mean of earthquakes' latitude and longitude
 df1 <- vesuvius |> 
+  select(year, latitude, longitude, duration_magnitude_md) |> 
   group_by(year) |> 
+  drop_na() |> 
   summarise(
-    latitude = mean(latitude, na.rm = TRUE),
-    longitude = mean(longitude, na.rm = TRUE),
+    latitude = weighted.mean(latitude, w = duration_magnitude_md, na.rm = TRUE),
+    longitude = weighted.mean(longitude, w = duration_magnitude_md, na.rm = TRUE),
     duration_magnitude_md = mean(duration_magnitude_md, na.rm = TRUE)
   ) |> 
   filter(year > 2012) |> 
@@ -161,7 +169,7 @@ df1 <- vesuvius |>
 
 # Same tibble without an year column, to help plot in every facet
 df2 <- df1 |> 
-  select(-year)
+  rename(year1 = year)
 ```
 
 ### Get geospatial Data
@@ -169,7 +177,7 @@ df2 <- df1 |>
 ```{r}
 
 # Define bounding box coordinates
-xlim <- c(14.421, 14.433)
+xlim <- c(14.418, 14.436)
 ylim <- c(40.815, 40.826)
 
 # Create bbox object
@@ -186,10 +194,10 @@ base_map <- ggmap::get_stadiamap(
     right = xlim[2],
     bottom = ylim[1],
     top = ylim[2]
-  ), 
-  zoom = 14,
+  ),
+  zoom = 16,
   maptype = "stamen_terrain_background"
-) |> 
+) |>
   terra::rast()
 
 # Get Elevation Raster
@@ -203,6 +211,16 @@ base_map <- ggmap::get_stadiamap(
 # base_map2 <- base_map1 |> 
 #   terra::rast()
 # Inset map for overall View
+
+# Get a colour palette - good contrast with white
+# cols4all::c4a_gui()
+
+# Built-in transformations include "asn", "atanh", "boxcox", "date", "exp", "hms", "identity", "log", "log10", "log1p", "log2", "logit", "modulus", "probability", "probit", "pseudo_log", "reciprocal", "reverse", "sqrt" and "time".
+
+# vesuvius |> 
+#   ggplot(aes(duration_magnitude_md)) +
+#   geom_boxplot() +
+#   scale_x_continuous(transform = "exp")
 ```
 
 ### The Plot
@@ -217,29 +235,34 @@ g <- vesuvius |>
   # Background Map
   geom_spatraster_rgb(
     data = base_map,
-    maxcell = 1e4,
+    maxcell = 1e5,
     alpha = 0.75
   ) +
   
-  # Mean points and their progression
+  # Mean points: to show in all facets
   geom_path(
     data = df2,
     mapping = aes(
       x = longitude, 
-      y = latitude
+      y = latitude,
+      colour = year1
     ),
-    arrow = arrow()
+    arrow = arrow(),
+    linewidth = 1.5,
+    alpha = 0.9
   ) +
   geom_point(
     data = df2,
     mapping = aes(
       x = longitude, 
-      y = latitude
+      y = latitude,
+      colour = year1
     ),
     alpha = 1,
-    colour = "black",
-    size = 5
+    size = 6
   ) +
+  
+  # Mean points: Highlighting each year's point and labelling year
   geom_point(
     data = df1,
     mapping = aes(
@@ -250,13 +273,34 @@ g <- vesuvius |>
     colour = "red",
     fill = NA,
     pch = 21,
-    size = 8,
-    stroke = 2
+    size = 9,
+    stroke = 2.5
   ) +
-  scale_fill_wiki_c(
-    limits = c(300, 1200),
-    oob = scales::squish
+  geom_label(
+    data = df1,
+    mapping = aes(
+      x = 14.4182,
+      y = 40.826,
+      label = year,
+      colour = year
+    ),
+    size = bts / 2,
+    hjust = 0,
+    vjust = 1,
+    label.padding = unit(0.1, "lines"),
+    label.size = NA,
+    fill = alpha("white", 0.9),
+    family = "title_font",
+    fontface = "bold"
   ) +
+  
+  paletteer::scale_colour_paletteer_c("pals::kovesi.diverging_bky_60_10_c30") +
+  
+  # Fill palette for elevation raster
+  # scale_fill_wiki_c(
+  #   limits = c(300, 1200),
+  #   oob = scales::squish
+  # ) +
   geom_point(
     aes(
       x = longitude,
@@ -268,7 +312,7 @@ g <- vesuvius |>
       width = 0.01,
       height = 0.01
     ),
-    alpha = 0.3
+    alpha = 0.2
   ) +
   coord_sf(
     xlim = xlim,
@@ -277,23 +321,37 @@ g <- vesuvius |>
     clip = "on",
     expand = FALSE
   ) +
-  facet_wrap(~year) +
+  facet_wrap(
+    ~year,
+    nrow = 4, 
+    ncol = 3
+  ) +
   # paletteer::scale_colour_paletteer_c(
   #   "viridis::turbo",
   #   limits = c(0, 2),
   #   oob = scales::squish
   #   ) +
   scale_size_continuous(
-    range = c(0.01, 8),
+    range = c(0.01, 18),
     transform = "exp"
   ) +
   labs(
     x = NULL,
     y = NULL,
-    colour = "Duration magnitude (Md) of the seismic event,\na measure of its energy release.",
-    size = NULL
+    colour = NULL,
+    size = str_wrap("Duration magnitude (Md) of the seismic event (a measure of its energy release).", 45),
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
   ) +
-  theme_minimal(
+  guides(
+    colour = "none",
+    fill = "none",
+    size = guide_legend(
+      nrow = 1
+    )
+  ) +
+  theme_void(
     base_family = "body_font",
     base_size = bts,
     base_line_size = bts/150,
@@ -310,40 +368,60 @@ g <- vesuvius |>
     
     # Axes
     axis.ticks.length = unit(0, "mm"),
-    axis.text.x = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      size = bts
-    ),
-    axis.text.y = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      size = bts
-    ),
-    panel.spacing.x = unit(2, "mm"),
-    panel.spacing.y = unit(2, "mm"),
+    axis.text = element_blank(),
+    panel.spacing.x = unit(5, "mm"),
+    panel.spacing.y = unit(5, "mm"),
     panel.grid = element_line(
       colour = "black",
       linewidth = 0.2
     ),
     
     # Strip Text
-    strip.text = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      size = 2 * bts,
-      colour = text_col
-    ),
+    strip.text = element_blank(),
     
     # Legend
-    legend.title.position = "top",
+    legend.title.position = "left",
     legend.title = element_text(
       margin = margin(0,0,0,0, "mm"),
-      lineheight = 0.3
+      lineheight = 0.3,
+      family = "caption_font"
     ),
     legend.margin = margin(0,0,0,0, "mm"),
     legend.box.margin = margin(0,0,0,0, "mm"),
     legend.text = element_text(
       margin = margin(0,0,0,0, "mm"),
       lineheight = 0.3
-    )
+    ),
+    legend.direction = "horizontal",
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      colour = text_hil,
+      margin = margin(5,0,5,0, "mm"),
+      size = bts * 1.9,
+      lineheight = 0.3,
+      hjust = 0.5,
+      family = "caption_font",
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      colour = text_hil,
+      margin = margin(0,0,5,0, "mm"),
+      size = bts,
+      lineheight = 0.3,
+      hjust = 0.5,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.7 * bts,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm")
   )
 
 ggsave(
@@ -389,13 +467,30 @@ image_read(here::here("data_vizs",
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: false
 
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+  
+  magick,               # Download images and edit them
+  ggimage,              # Display images in ggplot2
+  patchwork             # Composing Plots
+)
+
+# Load Geospatial Mapping packages
+pacman::p_load(ggmap, sf, terra, tidyterra)
+
 
 sessioninfo::session_info()$packages |> 
   as_tibble() |> 
-  select(package, 
+  dplyr::select(package, 
          version = loadedversion, 
          date, source) |> 
-  arrange(package) |> 
+  dplyr::arrange(package) |> 
   janitor::clean_names(
     case = "title"
   ) |> 
