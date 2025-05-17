@@ -1,13 +1,16 @@
 ---
-title: "tidy_nsw_beaches"
+title: "Testing the Waters: Sydney’s Beaches and Bacteria"
 author: "Aditya Dahiya"
-date: "2025-05-14"
-subtitle: "tidy_nsw_beaches"
+date: "2025-05-17"
+subtitle: "An exploration of Sydney Harbour’s swim site safety using {ggplot2}, {sf}, {scatterpie}, {ggtext}, and {ggmap}"
 categories:
   - "#TidyTuesday"
   - "Raster"
   - "Maps"
   - "{ggmap}"
+  - "{scatterpie}"
+  - "{sf}"
+  - "{terra}"
 image: "thumbnails/tidy_nsw_beaches.png"
 format:
   html:
@@ -37,11 +40,11 @@ comments:
 
 This week's dataset explores the water quality of Sydney’s iconic beaches, with a focus on how environmental factors like rainfall impact bacterial contamination at swimming sites. The primary source of data is the [New South Wales Beachwatch program](https://www.beachwatch.nsw.gov.au/waterMonitoring/waterQualityData), which monitors recreational water safety across coastal and estuarine swim spots. The topic has gained particular relevance following [recent news](https://www.abc.net.au/news/2025-01-10/pollution-risks-in-sydney-beaches-contaminated-waterways-rain/104790856.) highlighting pollution risks after heavy rainfall. The dataset, curated by [Jen Richmond (R-Ladies Sydney)](https://github.com/jenrichmondPhD), spans from 1991 to 2025 and includes measurements of enterococci bacteria levels, water temperature, and conductivity, alongside [historical weather data](https://open-meteo.com/) such as daily rainfall and temperature. You can access the data through the {tidytuesdayR} R package or download directly from [GitHub](https://github.com/rfordatascience/tidytuesday/tree/main/data/2025/2025-05-20). This dataset offers a valuable opportunity to analyze trends in water quality over time, assess the impact of precipitation on bacterial contamination, and identify vulnerable swimming sites—perfect for sharpening your data wrangling and visualization skills in [R](https://r4ds.hadley.nz/), [Python](https://github.com/posit-dev/python-tidytuesday-challenge), or [Julia](https://github.com/TidierOrg/TidierTuesday.jl).
 
-![..........................](tidy_nsw_beaches.png){#fig-1}
+![This map visualizes water quality across Sydney Harbour’s swim sites from 1994 to 2025. Each donut chart represents a site, showing the proportion of water samples that exceeded safe limits for *Enterococci* bacteria—levels above 104 CFU per 100 mL are considered unsafe for swimming. Red segments indicate polluted samples, while grey denotes safe ones. Labels display the percentage of unsafe samples. The watercolor basemap provides geographic context, helping highlight which sites have had persistently poor water quality over time. Data source: Beachwatch, New South Wales State Government.](tidy_nsw_beaches.png){#fig-1}
 
 # How the Graphic Was Created
 
-.............
+To create this graphic, I used R and a suite of powerful [tidyverse](https://www.tidyverse.org/) packages for data wrangling and visualization. The data, sourced from the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2025/2025-05-20), included measurements of enterococci bacteria at various Sydney Harbour swim sites. I combined this with weather data using [`dplyr`](https://dplyr.tidyverse.org/) joins and spatially enabled the dataset with the help of [`sf`](https://r-spatial.github.io/sf/) for geospatial operations. A watercolor basemap of Sydney was retrieved via [`ggmap`](https://cran.r-project.org/package=ggmap) and [`terra`](https://rspatial.org/terra/) to act as the visual canvas. I mapped the pollution levels using donut charts embedded into the map with [`scatterpie`](https://cran.r-project.org/package=scatterpie), showing the proportion of unsafe water samples at each location. To style the plot, I used fonts loaded from Google via [`showtext`](https://cran.r-project.org/package=showtext) and integrated social media icons with [`fontawesome`](https://github.com/rstudio/fontawesome). Text elements were enhanced using [`ggtext`](https://wilkelab.org/ggtext/) for markdown rendering, and [`paletteer`](https://emilhvitfeldt.github.io/paletteer/) added a perceptually uniform color scale. Finally, I composed the plot using [`ggplot2`](https://ggplot2.tidyverse.org/) and cleaned up aesthetics with [`theme_void()`](https://ggplot2.tidyverse.org/reference/theme_void.html) and `geom_label_repel()` from [`ggrepel`](https://cran.r-project.org/package=ggrepel) to display percentages clearly without overlap.
 
 ### Loading required libraries
 
@@ -59,7 +62,8 @@ pacman::p_load(
   
   magick,               # Download images and edit them
   ggimage,              # Display images in ggplot2
-  patchwork             # Composing Plots
+  patchwork,            # Composing Plots
+  scatterpie            # Pie-charts within maps
 )
 
 # Load Geospatial Mapping packages
@@ -97,11 +101,11 @@ bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
-text_hil <- "grey40"
+text_hil <- "grey20"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- "grey30"
+text_col <- "grey20"
 seecolor::print_color(text_col)
 
 line_col <- "grey30"
@@ -121,7 +125,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**   Italian Istituto Nazionale di Geofisica e Vulcanologia (INGV)", 
+  "**Data:** Beachwatch: New South Wales State Government", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -132,10 +136,11 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_subtitle <- str_wrap("................", 90)
+plot_subtitle <- str_wrap("Percentage samples found unsafe for swimming: Enterococci bacteria in water > 104 CFU per 100 ml in various sites at Sydney Harbour (1994-2025)", 85) |> 
+  str_replace_all("\\\n", "<br>")
 str_view(plot_subtitle)
 
-plot_title <- "................."
+plot_title <- "Sydney Harbour's Water Quality"
 
 ```
 
@@ -208,136 +213,136 @@ plot_title <- "................."
 # register_stadiamaps(YOUR KEY HERE)
 
 
-df_2025 |> 
-  st_intersection(rectangle) |> 
-  ggplot() +
-  geom_spatraster_rgb(data = base_map) +
-  geom_sf(
-    mapping = aes(
-      colour = polluted
-    )
-  )
-
-df_years <- water_quality |>
-  filter(!is.na(enterococci_cfu_100ml)) |> 
-  left_join(
-     weather |> 
-      select(date, precipitation_mm)
-  ) |> 
-  mutate(
-    polluted = enterococci_cfu_100ml > 104,
-    year = year(date)
-  ) |> 
-  sf::st_as_sf(coords = c("longitude", "latitude")) |> 
-  sf::st_set_crs("EPSG:4326")
-
-# Highest proportion of polluted water
-selected_sites <- df_years |> 
-  st_drop_geometry() |> 
-  group_by(swim_site) |> 
-  summarise(perc = mean(polluted)) |> 
-  arrange(desc(perc)) |> 
-  slice(1:3) |> 
-  pull(swim_site)
-
-
-df_years |> 
-  st_drop_geometry() |> 
-  group_by(swim_site, year) |> 
-  summarise(
-    perc = mean(polluted),
-    n = n()
-  ) |> 
-  filter(n > 20) |> 
-  ggplot() +
-  geom_line(
-    aes(
-      x = year, y = perc,
-      group = swim_site
-    )
-  )
-
-g <- df_years |> 
-  st_intersection(rectangle) |> 
-  # filter(swim_site %in% selected_sites) |> 
-  filter(
-    year == 2024
-  ) |>
-  ggplot() +
-  geom_spatraster_rgb(data = base_map) +
-  geom_sf(
-    mapping = aes(
-      colour = polluted
-    )
-  ) +
-  scale_colour_manual(
-    values = c("grey50", "red")
-  ) +
-  coord_sf(expand = FALSE) +
-  theme_void() +
-  theme(
-    legend.position = "none"
-  )
-
-
-ggsave(
-  filename = here::here(
-    "data_vizs",
-    "tidy_nsw_beaches.png"
-  ),
-  plot = g,
-  width = 40,
-  height = 50,
-  units = "mm",
-  bg = bg_col
-)
+# df_2025 |> 
+#   st_intersection(rectangle) |> 
+#   ggplot() +
+#   geom_spatraster_rgb(data = base_map) +
+#   geom_sf(
+#     mapping = aes(
+#       colour = polluted
+#     )
+#   )
+# 
+# df_years <- water_quality |>
+#   filter(!is.na(enterococci_cfu_100ml)) |> 
+#   left_join(
+#      weather |> 
+#       select(date, precipitation_mm)
+#   ) |> 
+#   mutate(
+#     polluted = enterococci_cfu_100ml > 104,
+#     year = year(date)
+#   ) |> 
+#   sf::st_as_sf(coords = c("longitude", "latitude")) |> 
+#   sf::st_set_crs("EPSG:4326")
+# 
+# # Highest proportion of polluted water
+# selected_sites <- df_years |> 
+#   st_drop_geometry() |> 
+#   group_by(swim_site) |> 
+#   summarise(perc = mean(polluted)) |> 
+#   arrange(desc(perc)) |> 
+#   slice(1:3) |> 
+#   pull(swim_site)
+# 
+# 
+# df_years |> 
+#   st_drop_geometry() |> 
+#   group_by(swim_site, year) |> 
+#   summarise(
+#     perc = mean(polluted),
+#     n = n()
+#   ) |> 
+#   filter(n > 20) |> 
+#   ggplot() +
+#   geom_line(
+#     aes(
+#       x = year, y = perc,
+#       group = swim_site
+#     )
+#   )
+# 
+# g <- df_years |> 
+#   st_intersection(rectangle) |> 
+#   # filter(swim_site %in% selected_sites) |> 
+#   filter(
+#     year == 2024
+#   ) |>
+#   ggplot() +
+#   geom_spatraster_rgb(data = base_map) +
+#   geom_sf(
+#     mapping = aes(
+#       colour = polluted
+#     )
+#   ) +
+#   scale_colour_manual(
+#     values = c("grey50", "red")
+#   ) +
+#   coord_sf(expand = FALSE) +
+#   theme_void() +
+#   theme(
+#     legend.position = "none"
+#   )
+# 
+# 
+# ggsave(
+#   filename = here::here(
+#     "data_vizs",
+#     "tidy_nsw_beaches.png"
+#   ),
+#   plot = g,
+#   width = 40,
+#   height = 50,
+#   units = "mm",
+#   bg = bg_col
+# )
 
 
 # A scatter plot for relation in pollution and prepcipitation
-df1 <- water_quality |>
-  select(date, enterococci_cfu_100ml) |>
-  left_join(
-    weather |>
-      select(date, precipitation_mm)
-  ) |> 
-  mutate(year = year(date))
-
-g <- df1 |>
-  ggplot(
-    aes(
-      x = precipitation_mm,
-      y = enterococci_cfu_100ml
-    )
-  ) +
-  geom_point(
-    alpha = 0.2
-  ) +
-  geom_smooth() +
-  scale_y_continuous(
-    limits = c(0, 500),
-    oob = scales::squish
-  ) +
-  scale_x_continuous(
-    limits = c(0, 40),
-    oob = scales::squish
-  ) +
-  facet_wrap(~year) +
-  theme_gray(
-    base_size = 40,
-    base_family = "body_font"
-  )
-
-ggsave(
-  filename = here::here(
-    "data_vizs",
-    "tidy_nsw_beaches.png"
-  ),
-  plot = g,
-  width = 40,
-  height = 50,
-  units = "cm",
-  bg = bg_col
-)
+# df1 <- water_quality |>
+#   select(date, enterococci_cfu_100ml) |>
+#   left_join(
+#     weather |>
+#       select(date, precipitation_mm)
+#   ) |> 
+#   mutate(year = year(date))
+# 
+# g <- df1 |>
+#   ggplot(
+#     aes(
+#       x = precipitation_mm,
+#       y = enterococci_cfu_100ml
+#     )
+#   ) +
+#   geom_point(
+#     alpha = 0.2
+#   ) +
+#   geom_smooth() +
+#   scale_y_continuous(
+#     limits = c(0, 500),
+#     oob = scales::squish
+#   ) +
+#   scale_x_continuous(
+#     limits = c(0, 40),
+#     oob = scales::squish
+#   ) +
+#   facet_wrap(~year) +
+#   theme_gray(
+#     base_size = 40,
+#     base_family = "body_font"
+#   )
+# 
+# ggsave(
+#   filename = here::here(
+#     "data_vizs",
+#     "tidy_nsw_beaches.png"
+#   ),
+#   plot = g,
+#   width = 40,
+#   height = 50,
+#   units = "cm",
+#   bg = bg_col
+# )
 
 
 # FOCUSSING ON SYDNEY HARBOUR LOCATIONS
@@ -360,6 +365,12 @@ df2 <- water_quality |>
     non_polluted = 1 - polluted
   )
 
+# water_quality |> 
+#   filter(region == "Sydney Harbour") |> 
+#   mutate(year = year(date)) |> 
+#   pull(year) |> 
+#   range()
+
 base_bbox <- df2 |> 
   st_as_sf(
     coords = c("longitude", "latitude")
@@ -371,18 +382,15 @@ base_bbox <- df2 |>
 # GETTING A BASE MAP
 base_map <- ggmap::get_stadiamap(
   bbox = c(
-    left = base_bbox[1], 
-    bottom = base_bbox[2] - 0.03, 
-    right = base_bbox[3], 
-    top = base_bbox[4] + 0.03
+    left = base_bbox[1] - 0.01, 
+    bottom = base_bbox[2] - 0.045, 
+    right = base_bbox[3] + 0.01, 
+    top = base_bbox[4] + 0.045
     ),
-  zoom = 12,
+  zoom = 13,
   maptype = "stamen_watercolor"
 ) |> 
   terra::rast()
-
-pacman::p_load(scatterpie)
-
 
 ```
 
@@ -391,109 +399,116 @@ pacman::p_load(scatterpie)
 ```{r}
 #| label: base-plot
 
-ggplot() +
-  # geom_spatraster_rgb(
-  #   data = base_map
-  # ) +
-  geom_scatterpie(
+g <- ggplot() +
+  geom_spatraster_rgb(
+    data = base_map,
+    maxcell = Inf
+  ) +
+  geom_scatterpie2(
     data = df2,
     mapping = aes(
       x = longitude,
       y = latitude,
-      group = swim_site,
-      r = n / 5e5
+      group = swim_site
     ),
-    cols = c("polluted", "non_polluted")
+    cols = c("polluted", "non_polluted"),
+    colour = "transparent",
+    donut_radius = 0.6
   ) +
   ggrepel::geom_label_repel(
     data = df2,
     mapping = aes(
       x = longitude,
       y = latitude,
-      label = paste0(round(polluted * 100, 1), "%")
+      label = paste0(round(polluted * 100, 1), "%"),
+      colour = polluted
     ),
-    nudge_x = 0.005,
-    nudge_y = 0.005
+    nudge_x = 0.006,
+    nudge_y = 0.007,
+    label.size = NA,
+    label.padding = unit(0.3, "lines"),
+    label.r = unit(0.2, "lines"),
+    fill = alpha("white", 0.8),
+    min.segment.length = unit(10, "mm"),
+    size = bts / 2,
+    family = "caption_font",
+    fontface = "bold",
+    segment.color = "grey40"
   ) +
+  paletteer::scale_colour_paletteer_c(
+    "pals::kovesi.diverging_linear_bjr_30_55_c53"
+    ) +
   coord_sf(
     crs = "EPSG:4326",
-    default_crs = "EPSG:4326"
+    default_crs = "EPSG:4326",
+    expand = FALSE
   ) +
   scale_fill_manual(
-    values = c("red", "grey")
-  )
-
-
-
-
-
+    values = c("red", "grey50")
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
   theme_void(
     base_family = "body_font",
     base_size = bts,
-    base_line_size = bts/150,
-    base_rect_size = bts/150
+    base_line_size = bts / 100,
+    base_rect_size = bts / 100
   ) +
   theme(
     # Overall
-    legend.position = "bottom",
+    legend.position = "none",
     text = element_text(
       margin = margin(0,0,0,0, "mm"),
       colour = text_col,
       lineheight = 0.3
     ),
     
-    # Axes
-    axis.ticks.length = unit(0, "mm"),
-    axis.text = element_blank(),
-    panel.spacing.x = unit(5, "mm"),
-    panel.spacing.y = unit(5, "mm"),
-    panel.grid = element_line(
-      colour = "black",
-      linewidth = 0.2
-    ),
-    
-    # Strip Text
-    strip.text = element_blank(),
-    
-    # Legend
-    legend.title.position = "left",
-    legend.title = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      lineheight = 0.3,
-      family = "caption_font"
-    ),
-    legend.margin = margin(0,0,0,0, "mm"),
-    legend.box.margin = margin(0,0,0,0, "mm"),
-    legend.text = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      lineheight = 0.3
-    ),
-    legend.direction = "horizontal",
-    
     # Labels and Strip Text
-    plot.title = element_text(
+    plot.title = element_textbox(
       colour = text_hil,
-      margin = margin(5,0,5,0, "mm"),
-      size = bts * 1.9,
+      margin = margin(10,0,-40,0, "mm"),
+      size = bts * 2.5,
       lineheight = 0.3,
       hjust = 0.5,
-      family = "caption_font",
-      face = "bold"
+      halign = 0.5,
+      vjust = 0.5,
+      valign = 0.5,
+      family = "title_font",
+      face = "bold",
+      fill = alpha("white", 0.7),
+      box.color = NA,
+      padding = unit(0.7, "lines"),
+      r = unit(5, "mm")
     ),
-    plot.subtitle = element_text(
+    plot.subtitle = element_textbox(
       colour = text_hil,
-      margin = margin(0,0,5,0, "mm"),
-      size = bts,
+      margin = margin(55,0,-75,0, "mm"),
+      size = bts * 1.2,
       lineheight = 0.3,
       hjust = 0.5,
-      family = "body_font"
+      halign = 0.5,
+      vjust = 0.5,
+      valign = 0.5,
+      family = "caption_font",
+      fill = alpha("white", 0.7),
+      box.color = NA,
+      padding = unit(0.5, "lines"),
+      r = unit(5, "mm")
     ),
     plot.caption = element_textbox(
-      margin = margin(5,0,0,0, "mm"),
+      margin = margin(-20,0,10,0, "mm"),
       hjust = 0.5,
+      halign = 0.5,
       colour = text_hil,
       size = 0.7 * bts,
-      family = "caption_font"
+      family = "caption_font",
+      fill = alpha("white", 0.6),
+      box.color = NA,
+      padding = unit(0.3, "lines"),
+      r = unit(5, "mm")
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
