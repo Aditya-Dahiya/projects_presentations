@@ -11,7 +11,7 @@ categories:
   - "{scatterpie}"
   - "{sf}"
   - "{terra}"
-image: "thumbnails/tidy_dd_monsters.png"
+image: "thumbnails/tidy_usa_measles.png"
 format:
   html:
     code-fold: true
@@ -36,11 +36,11 @@ comments:
     repo: Aditya-Dahiya/projects_presentations
 ---
 
-### About the Data
+### **About the Data**
 
-This week’s [#TidyTuesday](https://tidytuesday.netlify.app/) dataset dives into the monstrous depths of the [2024 System Reference Document for *Dungeons & Dragons*](https://tidytues.day/2024/2024-12-17), offering a bestiary full of creature stats and storytelling potential. Curated by [Jon Harmon](https://github.com/jonthegeek) from the [Data Science Learning Community](https://dslearning.substack.com/), the [`monsters.csv`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-05-27/monsters.csv) file contains detailed attributes of dozens of D&D monsters, including their size, type, challenge rating, ability scores, alignments, languages, and special abilities. Whether you're interested in identifying which types of monsters boast the highest Strength or the widest range of challenge ratings, or you're analyzing language distribution for monster communication, this dataset presents a wide canvas for exploration.
+This dataset presents **provisional global measles and rubella case reports** compiled by the [World Health Organization (WHO)](https://www.who.int/), and was downloaded on [June 12, 2025](https://immunizationdata.who.int/global?topic=Provisional-measles-and-rubella-data&location=). It includes both **monthly** and **annual** figures reported by WHO Member States, covering suspected, clinically-compatible, epidemiologically-linked, and laboratory-confirmed cases. The **`cases_month.csv`** file provides monthly data by country and region, while the **`cases_year.csv`** file aggregates annual totals alongside population estimates and incidence rates. As noted by WHO, all data are **provisional** and subject to updates; official statistics are released each July through the [WHO–UNICEF joint data collection](https://immunizationdata.who.int/global/wiise-detail-page/measles-reported-cases-and-incidence). Users citing figures from this dataset should clearly reference the source and date, e.g., *"provisional data based on monthly reports to WHO (Geneva) as of June 2025."* The data has drawn attention amid rising [measles cases in the USA](https://abcnews.go.com/Health/measles-cases-reach-1046-us-infections-confirmed-30/story?id=122108194), but it underscores that [measles remains a global threat](https://www.cdc.gov/global-measles-vaccination/data-research/global-measles-outbreaks/index.html). This week's dataset was curated by [Jen Richmond](https://github.com/jenrichmond) of [R-Ladies Sydney](https://rladiessydney.org/) for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) data science community.
 
-![...............................](tidy_dd_monsters.png){#fig-1}
+![...............................](tidy_usa_measles.png){#fig-1}
 
 # How the Graphic Was Created
 
@@ -65,7 +65,11 @@ pacman::p_load(
   patchwork             # Composing Plots
 )
 
-monsters <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-05-27/monsters.csv')
+# Option 2: Read directly from GitHub
+
+cases_month <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-24/cases_month.csv')
+
+cases_year <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-24/cases_year.csv')
 ```
 
 ### Visualization Parameters
@@ -119,7 +123,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** Beachwatch: New South Wales State Government", 
+  "**Data:** World Health Organization", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -143,6 +147,25 @@ plot_title <- "............................"
 ```{r}
 #| label: eda
 
+pacman::p_load(summarytools)
+
+dfSummary(cases_month) |> view()
+
+dfSummary(cases_year) |> view()
+
+df1 <- cases_year |> 
+  select(country, iso3, year, measles_incidence_rate_per_1000000_total_population, rubella_incidence_rate_per_1000000_total_population) |> 
+  rename(
+    measles_incidence = measles_incidence_rate_per_1000000_total_population,
+    rubella_incidence = rubella_incidence_rate_per_1000000_total_population
+  )
+  
+df2 <- rnaturalearth::ne_countries(returnclass = "sf") |> 
+  select(iso_a3, name, geometry) |> 
+  rename(iso3 = iso_a3) |> 
+  filter(iso3 != "ATA")
+
+
 ```
 
 ### The Plot
@@ -150,8 +173,26 @@ plot_title <- "............................"
 ```{r}
 #| label: base-plot
 
-
-
+g <- df2 |> 
+  left_join(df1) |> 
+   ggplot(
+    mapping = aes(
+      fill = measles_incidence,
+      geometry = geometry
+    )
+  ) +
+  geom_sf(
+    linewidth = 0.2,
+    colour = "grey10"
+  ) +
+  facet_wrap(~ year, ncol = 3) +
+  coord_sf(expand = FALSE) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::PuRd",
+    direction = -1,
+    limits = c(0, 50),
+    oob = scales::squish
+  ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
@@ -175,7 +216,7 @@ plot_title <- "............................"
     # Labels and Strip Text
     plot.title = element_textbox(
       colour = text_hil,
-      margin = margin(10,0,-40,0, "mm"),
+      margin = margin(10,0,10,0, "mm"),
       size = bts * 2.5,
       lineheight = 0.3,
       hjust = 0.5,
@@ -191,7 +232,7 @@ plot_title <- "............................"
     ),
     plot.subtitle = element_textbox(
       colour = text_hil,
-      margin = margin(55,0,-75,0, "mm"),
+      margin = margin(5,0,5,0, "mm"),
       size = bts * 1.2,
       lineheight = 0.3,
       hjust = 0.5,
@@ -205,7 +246,7 @@ plot_title <- "............................"
       r = unit(5, "mm")
     ),
     plot.caption = element_textbox(
-      margin = margin(-20,0,10,0, "mm"),
+      margin = margin(5,0,5,0, "mm"),
       hjust = 0.5,
       halign = 0.5,
       colour = text_hil,
@@ -224,7 +265,7 @@ plot_title <- "............................"
 ggsave(
   filename = here::here(
     "data_vizs",
-    "tidy_dd_monsters.png"
+    "tidy_usa_measles.png"
   ),
   plot = g,
   width = 400,
@@ -245,13 +286,13 @@ library(magick)
 
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "tidy_dd_monsters.png")) |> 
+                      "tidy_usa_measles.png")) |> 
   image_resize(geometry = "x400") |> 
   image_write(
     here::here(
       "data_vizs", 
       "thumbnails", 
-      "tidy_dd_monsters.png"
+      "tidy_usa_measles.png"
     )
   )
 
