@@ -1,16 +1,12 @@
 ---
-title: ".................."
+title: "The Measles Map: Country-wise Incidence Since 2014"
 author: "Aditya Dahiya"
-date: "2025-05-30"
-subtitle: "............................"
+date: "2025-07-02"
+subtitle: "Facetted world map showing annual measles cases per million from 2014 to 2025 using provisional WHO data."
 categories:
   - "#TidyTuesday"
-  - "Raster"
   - "Maps"
-  - "{ggmap}"
-  - "{scatterpie}"
   - "{sf}"
-  - "{terra}"
 image: "thumbnails/tidy_usa_measles.png"
 format:
   html:
@@ -40,11 +36,9 @@ comments:
 
 This dataset presents **provisional global measles and rubella case reports** compiled by the [World Health Organization (WHO)](https://www.who.int/), and was downloaded on [June 12, 2025](https://immunizationdata.who.int/global?topic=Provisional-measles-and-rubella-data&location=). It includes both **monthly** and **annual** figures reported by WHO Member States, covering suspected, clinically-compatible, epidemiologically-linked, and laboratory-confirmed cases. The **`cases_month.csv`** file provides monthly data by country and region, while the **`cases_year.csv`** file aggregates annual totals alongside population estimates and incidence rates. As noted by WHO, all data are **provisional** and subject to updates; official statistics are released each July through the [WHO–UNICEF joint data collection](https://immunizationdata.who.int/global/wiise-detail-page/measles-reported-cases-and-incidence). Users citing figures from this dataset should clearly reference the source and date, e.g., *"provisional data based on monthly reports to WHO (Geneva) as of June 2025."* The data has drawn attention amid rising [measles cases in the USA](https://abcnews.go.com/Health/measles-cases-reach-1046-us-infections-confirmed-30/story?id=122108194), but it underscores that [measles remains a global threat](https://www.cdc.gov/global-measles-vaccination/data-research/global-measles-outbreaks/index.html). This week's dataset was curated by [Jen Richmond](https://github.com/jenrichmond) of [R-Ladies Sydney](https://rladiessydney.org/) for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) data science community.
 
-![...............................](tidy_usa_measles.png){#fig-1}
+![Facetted world map showing annual measles incidence (new cases per million population) from 2014 to 2025. Data are provisional and sourced from monthly WHO reports. Incidence values include suspected, confirmed, and epidemiologically linked cases as reported by Member States. Population estimates are based on WHO figures.](tidy_usa_measles.png){#fig-1}
 
 # How the Graphic Was Created
-
-...............
 
 ### Loading required libraries
 
@@ -59,9 +53,7 @@ pacman::p_load(
   ggtext,               # Markdown text support for ggplot2
   showtext,             # Display fonts in ggplot2
   colorspace,           # Lighten and Darken colours
-  
-  magick,               # Download images and edit them
-  ggimage,              # Display images in ggplot2
+
   patchwork             # Composing Plots
 )
 
@@ -134,11 +126,10 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_subtitle <- str_wrap(".......................", 85) |> 
-  str_replace_all("\\\n", "<br>")
+plot_subtitle <- str_wrap("Measles Incidence (New cases per million population)", 85)
 str_view(plot_subtitle)
 
-plot_title <- "............................"
+plot_title <- "Measles Incidence"
 
 ```
 
@@ -147,25 +138,39 @@ plot_title <- "............................"
 ```{r}
 #| label: eda
 
-pacman::p_load(summarytools)
+# pacman::p_load(summarytools)
 
-dfSummary(cases_month) |> view()
+# dfSummary(cases_month) |> view()
 
-dfSummary(cases_year) |> view()
+# dfSummary(cases_year) |> view()
 
 df1 <- cases_year |> 
   select(country, iso3, year, measles_incidence_rate_per_1000000_total_population, rubella_incidence_rate_per_1000000_total_population) |> 
   rename(
     measles_incidence = measles_incidence_rate_per_1000000_total_population,
     rubella_incidence = rubella_incidence_rate_per_1000000_total_population
-  )
-  
+  ) |> 
+  complete(
+    iso3,
+    year = 2014:2025
+  ) |> 
+  filter(!is.na(year))
+
+rnaturalearth::ne_countries(returnclass = "sf") |> 
+  select(iso_a3, name, geometry) |> 
+  sf::st_drop_geometry() |> 
+  rename(iso3 = iso_a3) |> 
+  as_tibble() |> 
+  distinct(iso3)
+
 df2 <- rnaturalearth::ne_countries(returnclass = "sf") |> 
   select(iso_a3, name, geometry) |> 
   rename(iso3 = iso_a3) |> 
   filter(iso3 != "ATA")
 
-
+plotdf <- df1 |> 
+  left_join(df2) |> 
+  sf::st_as_sf()
 ```
 
 ### The Plot
@@ -173,8 +178,8 @@ df2 <- rnaturalearth::ne_countries(returnclass = "sf") |>
 ```{r}
 #| label: base-plot
 
-g <- df2 |> 
-  left_join(df1) |> 
+g <- plotdf |> 
+  filter(year >= 2014) |> 
    ggplot(
     mapping = aes(
       fill = measles_incidence,
@@ -182,21 +187,26 @@ g <- df2 |>
     )
   ) +
   geom_sf(
-    linewidth = 0.2,
-    colour = "grey10"
+    linewidth = 0.1,
+    colour = "grey20"
   ) +
-  facet_wrap(~ year, ncol = 3) +
-  coord_sf(expand = FALSE) +
+  facet_wrap(~ year, ncol = 2) +
+  coord_sf(
+    crs = "ESRI:54030", 
+    expand = FALSE
+  ) +
   paletteer::scale_fill_paletteer_c(
     "grDevices::PuRd",
     direction = -1,
     limits = c(0, 50),
-    oob = scales::squish
+    oob = scales::squish,
+    na.value = "white"
   ) +
   labs(
-    title = plot_title,
+    # title = plot_title,
     subtitle = plot_subtitle,
-    caption = plot_caption
+    caption = plot_caption,
+    fill = "New cases\nin the country\n(per million\npopulation)"
   ) +
   theme_void(
     base_family = "body_font",
@@ -206,7 +216,6 @@ g <- df2 |>
   ) +
   theme(
     # Overall
-    legend.position = "none",
     text = element_text(
       margin = margin(0,0,0,0, "mm"),
       colour = text_col,
@@ -214,26 +223,10 @@ g <- df2 |>
     ),
     
     # Labels and Strip Text
-    plot.title = element_textbox(
-      colour = text_hil,
-      margin = margin(10,0,10,0, "mm"),
-      size = bts * 2.5,
-      lineheight = 0.3,
-      hjust = 0.5,
-      halign = 0.5,
-      vjust = 0.5,
-      valign = 0.5,
-      family = "title_font",
-      face = "bold",
-      fill = alpha("white", 0.7),
-      box.color = NA,
-      padding = unit(0.7, "lines"),
-      r = unit(5, "mm")
-    ),
     plot.subtitle = element_textbox(
       colour = text_hil,
-      margin = margin(5,0,5,0, "mm"),
-      size = bts * 1.2,
+      margin = margin(10,0,0,0, "mm"),
+      size = bts * 2,
       lineheight = 0.3,
       hjust = 0.5,
       halign = 0.5,
@@ -246,7 +239,7 @@ g <- df2 |>
       r = unit(5, "mm")
     ),
     plot.caption = element_textbox(
-      margin = margin(5,0,5,0, "mm"),
+      margin = margin(0,0,5,0, "mm"),
       hjust = 0.5,
       halign = 0.5,
       colour = text_hil,
@@ -259,7 +252,25 @@ g <- df2 |>
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
-    plot.margin = margin(5,5,5,5, "mm")
+    plot.margin = margin(5,5,5,5, "mm"),
+    panel.spacing.y = unit(0, "mm"),
+    legend.position.inside = c(1, 0.5),
+    legend.justification = c(1, 0.5),
+    legend.direction = "vertical",
+    legend.key.width = unit(5, "mm"),
+    legend.key.height = unit(40, "mm"),
+    legend.text.position = "right",
+    legend.title.position = "top",
+    legend.title = element_text(
+      margin = margin(0,0,10,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.3,
+      family = "caption_font"
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,3, "mm"),
+      size = 1.5 * bts
+    )
   )
 
 ggsave(
@@ -314,12 +325,10 @@ pacman::p_load(
   ggtext,               # Markdown text support for ggplot2
   showtext,             # Display fonts in ggplot2
   colorspace,           # Lighten and Darken colours
-  
-  magick,               # Download images and edit them
-  ggimage,              # Display images in ggplot2
-  patchwork,            # Composing Plots
-  scatterpie            # Pie-charts within maps
+
+  patchwork             # Composing Plots
 )
+
 
 sessioninfo::session_info()$packages |> 
   as_tibble() |> 
