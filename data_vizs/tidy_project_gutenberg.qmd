@@ -1,0 +1,300 @@
+---
+title: "tidy_project_gutenberg"
+author: "Aditya Dahiya"
+date: "2025-07-09"
+subtitle: "tidy_project_gutenberg_tidy_project_gutenberg"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_project_gutenberg.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## **About the Data**
+
+This week’s dataset, curated by [Jon Harmon](https://github.com/jonthegeek) for the [TidyTuesday](https://github.com/rfordatascience/tidytuesday) project (week of [June 3, 2025](https://github.com/rfordatascience/tidytuesday/blob/master/data/2025/2025-06-03/readme.md)), features rich metadata from [Project Gutenberg](https://www.gutenberg.org/), the oldest digital library of public domain texts. The data is accessed using the [`{gutenbergr}` R package](https://docs.ropensci.org/gutenbergr/), which allows users to search, download, and analyze tens of thousands of public domain works. The dataset is split across four CSV files: [`gutenberg_authors.csv`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-03/gutenberg_authors.csv), [`gutenberg_languages.csv`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-03/gutenberg_languages.csv), [`gutenberg_metadata.csv`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-03/gutenberg_metadata.csv), and [`gutenberg_subjects.csv`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-06-03/gutenberg_subjects.csv). These files include detailed information on author identities and aliases, language availability (using [ISO 639 language codes](https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes)), book titles, bookshelf classifications, and [Library of Congress Subject Headings (LCSH)](https://id.loc.gov/authorities/subjects.html). The dataset supports multilingual analysis, investigation into author duplication via `gutenberg_author_id`, and potential improvements to metadata curation. Whether you're using [R](https://www.r-project.org/), [Python](https://www.python.org/), or [Julia](https://julialang.org/), the data can be accessed either via TidyTuesday libraries or directly from the [GitHub repository](https://github.com/rfordatascience/tidytuesday/tree/master/data/2025/2025-06-03). This is a perfect opportunity to explore literary data, build visualizations in [Quarto](https://quarto.org/), create [Shiny apps](https://shiny.posit.co/), or contribute to the weekly conversation using the hashtags [#TidyTuesday](https://twitter.com/search?q=%23tidytuesday&src=typed_query) and [#PydyTuesday](https://twitter.com/search?q=%23pydytuesday).
+
+![tidy_project_gutenberg](tidy_project_gutenberg.png){#fig-1}
+
+# How the Graphic Was Created
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf                    # Making maps
+)
+
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Barlow",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Barlow Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Barlow Semi Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Jon Harmon and {gutenbergr}", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_subtitle <- str_wrap("....................", 85)
+str_view(plot_subtitle)
+
+plot_title <- "...................."
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+
+
+  labs(
+    fill = "Whose prices were higher",
+    linetype = NULL,
+    y = "Price (per gallon)",
+    x = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts,
+    base_line_size = bts / 200,
+    base_rect_size = bts / 200
+  ) +
+  theme(
+   
+     # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.caption = element_textbox(
+      margin = margin(0,0,5,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = 0.7 * bts,
+      family = "caption_font",
+      fill = alpha("white", 0.6),
+      box.color = NA,
+      padding = unit(0.3, "lines"),
+      r = unit(5, "mm")
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm"),
+    
+    
+    # Legend
+    legend.position = "inside",
+    legend.position.inside = c(0.02, 0.6),
+    legend.justification = c(0, 1),
+    legend.direction = "vertical",
+    
+    legend.text.position = "right",
+    legend.title.position = "top",
+    
+    legend.title = element_text(
+      margin = margin(0,0,10,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.3,
+      family = "caption_font"
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,3, "mm"),
+      size = 1.5 * bts
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.spacing = unit(0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    legend.key.width = unit(20, "mm"),
+    legend.spacing.y = unit(10, "mm"),
+    
+    # Axes
+    axis.ticks.length = unit(4, "mm"),
+    axis.ticks = element_line(
+      linewidth = bts / 100,
+      colour = text_col
+    ),
+    panel.grid.major = element_line(
+      colour = alpha(text_col, 0.4),
+      linewidth = bts / 300,
+      linetype = 1
+    ),
+    panel.grid.minor = element_line(
+      colour = alpha(text_col, 0.2),
+      linewidth = bts / 400,
+      linetype = 1
+    ),
+    axis.line = element_line(
+      colour = text_col,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.title.y = element_text(
+      margin = margin(0,-2,0,0, "mm"),
+      hjust = 0.8
+    ),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_project_gutenberg.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_project_gutenberg.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_project_gutenberg.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
