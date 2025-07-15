@@ -1,0 +1,406 @@
+---
+title: "tidy_british_library_funding"
+author: "Aditya Dahiya"
+date: "2025-07-15"
+subtitle: "tidy_british_library_funding"
+categories:
+  - "#TidyTuesday"
+  - "Bar Chart"
+image: "thumbnails/tidy_british_library_funding.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+### About the Data
+
+This week's dataset explores the funding patterns of the [British Library](https://www.bl.uk/) over the past few decades. Compiled and generously shared by [Andy Jackson](https://anjackson.net/2024/11/27/updating-the-data-on-british-library-funding/), the data builds on his earlier post, [“Invisible Memory Machines”](https://anjackson.net/2024/05/14/invisible-memory-machines/), and was inspired by [David Rosenthal’s 2017 analysis](https://blog.dshr.org/2017/08/preservation-is-not-technical-problem.html) on the decline in inflation-adjusted library income. Andy gathered and cleaned the data with some effort, and later posted updates [here](https://anjackson.net/2024/11/29/british-library-funding-breakdown-trends/) and [on BlueSky](https://bsky.app/profile/anjacks0n.bsky.social/post/3lbyvepb5oc22). The dataset, available via [this Google Sheet](https://docs.google.com/spreadsheets/d/1uxjiuWYZrALF2mthmiYbUPieu1dEdEwv9GB8dEAizso/edit?gid=0#gid=0), breaks down British Library funding by source (grant-in-aid, voluntary donations, investments, services, and others) from 1999 onwards, in both nominal and inflation-adjusted terms (using the [Bank of England’s inflation calculator](https://www.bankofengland.co.uk/monetary-policy/inflation/inflation-calculator)). You can load the data in R via the [`tidytuesdayR`](https://github.com/rfordatascience/tidytuesday) package or directly from [GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-15/bl_funding.csv). Python and Julia users can explore the dataset using [`pydytuesday`](https://github.com/posit-dev/python-tidytuesday-challenge) or [`TidierTuesday.jl`](https://github.com/TidierOrg/TidierTuesday.jl). Thanks to [Jon Harmon](https://github.com/jonthegeek) and the Data Science Learning Community for curating this week’s #TidyTuesday dataset.
+
+![..................](tidy_british_library_funding.png){#fig-1}
+
+# How the Graphic Was Created
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+bl_funding <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-15/bl_funding.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 120
+
+mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
+mypal <- c("#DD75D3", "#E16305", "#F2CB05", "#719F4F", "#7E8CFF")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Andy Jackson & David Rosenthal; British Library", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_subtitle <- str_wrap(".......................", 90)
+str_view(plot_subtitle)
+
+plot_title <- "..............................."
+
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+bl_funding |> 
+  summarytools::dfSummary() |> 
+  summarytools::view()
+
+
+#  mutate(
+#    year = as_factor(year)
+#  )
+
+# A tibble for labels of the variables I am interested in
+
+bl_funding_labels <- tibble::tibble(
+  type = c(
+    "gia_y2000_gbp_millions",
+    "voluntary_y2000_gbp_millions",
+    "investment_y2000_gbp_millions",
+    "services_y2000_gbp_millions",
+    "other_y2000_gbp_millions"
+  ),
+  short_descrip = c(
+    "Grant-in-aid",
+    "Voluntary",
+    "Investments",
+    "Services",
+    "Other"
+  ),
+  long_descrip = c(
+    "Core UK government funding (grant-in-aid), adjusted to year 2000 GBP.",
+    "Donations and contributions including valued gifted items, in year 2000 GBP.",
+    "Returns from savings and investments, in year 2000 GBP.",
+    "Income from services like document supply, in year 2000 GBP.",
+    "Other income not categorized elsewhere, in year 2000 GBP."
+  )
+)
+
+df1 <- bl_funding |> 
+  select(year, contains("y2000")) |> 
+  select(-contains("total")) |> 
+  select(-contains("percentage")) |> 
+  pivot_longer(
+    cols = -year,
+    names_to = "type",
+    values_to = "funding"
+  ) |> 
+  left_join(bl_funding_labels)
+
+
+df1
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = year,
+      y = funding,
+      fill = short_descrip,
+      label = short_descrip,
+      colour = short_descrip
+    )
+  ) +
+  geom_stream(
+    type = "proportional",
+    colour = bg_col,
+    alpha = 0.6
+  ) +
+  geom_stream_label(
+    type = "proportional",
+    hjust = "inside",
+    size = bts / 5,
+    family = "title_font",
+    fontface = "bold"
+  ) +
+  scale_fill_manual(
+    values = mypal,
+    labels = bl_funding_labels$long_descrip
+  ) +
+  scale_colour_manual(values = darken(mypal, 0.6)) +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_y_continuous(expand = expansion(0)) +
+  labs(
+    fill = NULL,
+    y = "Percentage contribution to total annual funding to the British Library",
+    x = "Year",
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    fill = NULL
+  ) +
+  guides(colour = "none") +
+  coord_cartesian(clip = "off") +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(10,0,0,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.5 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,10,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = 0.8 * bts,
+      family = "body_font"
+    ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,0,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = 0.7 * bts,
+      family = "caption_font",
+      fill = alpha("white", 0.6),
+      box.color = NA,
+      padding = unit(0.3, "lines"),
+      r = unit(5, "mm")
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm"),
+    
+    
+    # Legend
+    legend.position = "bottom",
+    legend.justification = c(0.5, 1),
+    legend.direction = "vertical",
+    legend.text.position = "right",
+    
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.3,
+      family = "body_font"
+    ),
+    legend.text = element_text(
+      margin = margin(3,0,3,3, "mm"),
+      size = bts * 0.9,
+      family = "caption_font"
+    ),
+    
+    legend.key.spacing.y = unit(1, "mm"),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.spacing = unit(0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    
+    legend.background = element_rect(
+      fill = NA, colour = NA
+    ),
+    
+    legend.key.width = unit(10, "mm"),
+    legend.spacing.y = unit(1, "mm"),
+    
+    # Axes
+    axis.ticks.length = unit(2, "mm"),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    axis.title.x = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.x = element_text(
+      margin = margin(3,0,0,0, "mm"),
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 0.5 * bts
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_british_library_funding.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_british_library_funding.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_british_library_funding.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
