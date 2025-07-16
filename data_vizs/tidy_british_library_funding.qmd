@@ -1,11 +1,11 @@
 ---
-title: "tidy_british_library_funding"
+title: "The contracting Services Stream for British Library"
 author: "Aditya Dahiya"
 date: "2025-07-15"
-subtitle: "tidy_british_library_funding"
+subtitle: "Stream plot showing proportional funding sources from 1999-2024. Services revenue has steadily declined."
 categories:
   - "#TidyTuesday"
-  - "Bar Chart"
+  - "Stream Plot"
 image: "thumbnails/tidy_british_library_funding.png"
 format:
   html:
@@ -35,9 +35,11 @@ comments:
 
 This week's dataset explores the funding patterns of the [British Library](https://www.bl.uk/) over the past few decades. Compiled and generously shared by [Andy Jackson](https://anjackson.net/2024/11/27/updating-the-data-on-british-library-funding/), the data builds on his earlier post, [“Invisible Memory Machines”](https://anjackson.net/2024/05/14/invisible-memory-machines/), and was inspired by [David Rosenthal’s 2017 analysis](https://blog.dshr.org/2017/08/preservation-is-not-technical-problem.html) on the decline in inflation-adjusted library income. Andy gathered and cleaned the data with some effort, and later posted updates [here](https://anjackson.net/2024/11/29/british-library-funding-breakdown-trends/) and [on BlueSky](https://bsky.app/profile/anjacks0n.bsky.social/post/3lbyvepb5oc22). The dataset, available via [this Google Sheet](https://docs.google.com/spreadsheets/d/1uxjiuWYZrALF2mthmiYbUPieu1dEdEwv9GB8dEAizso/edit?gid=0#gid=0), breaks down British Library funding by source (grant-in-aid, voluntary donations, investments, services, and others) from 1999 onwards, in both nominal and inflation-adjusted terms (using the [Bank of England’s inflation calculator](https://www.bankofengland.co.uk/monetary-policy/inflation/inflation-calculator)). You can load the data in R via the [`tidytuesdayR`](https://github.com/rfordatascience/tidytuesday) package or directly from [GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-15/bl_funding.csv). Python and Julia users can explore the dataset using [`pydytuesday`](https://github.com/posit-dev/python-tidytuesday-challenge) or [`TidierTuesday.jl`](https://github.com/TidierOrg/TidierTuesday.jl). Thanks to [Jon Harmon](https://github.com/jonthegeek) and the Data Science Learning Community for curating this week’s #TidyTuesday dataset.
 
-![..................](tidy_british_library_funding.png){#fig-1}
+![Stream plot displaying the proportional contribution of five funding sources to British Library's total annual income from 1999-2024. Data shows grant-in-aid (core government funding), voluntary contributions and donations, investment returns, services revenue, and other income streams. All values adjusted to year 2000 GBP to account for inflation effects over the 25-year period.](tidy_british_library_funding.png){#fig-1}
 
 # How the Graphic Was Created
+
+This stream plot visualization was created using R's [`ggplot2`](https://ggplot2.tidyverse.org/) ecosystem with several specialized packages. The core visualization relies on the [`ggstream`](https://github.com/davidsjoberg/ggstream) package, which provides the `geom_stream()` function to create proportional stream plots that show how different funding sources contribute to the total over time. You used `geom_stream_label()` from the same package to add category labels directly onto the stream areas. The data was reshaped using [`tidyverse`](https://www.tidyverse.org/) functions like `pivot_longer()` to transform the wide-format funding columns into a long format suitable for the stream plot. Typography was enhanced with [`showtext`](https://github.com/yixuan/showtext) to load Google Fonts (Saira family fonts), while [`ggtext`](https://github.com/wilkelab/ggtext) enabled markdown formatting in plot elements like the caption. The color palette was sourced from [`paletteer`](https://github.com/EmilHvitfeldt/paletteer) and adjusted using [`colorspace`](https://colorspace.r-forge.r-project.org/)'s `darken()` function for the text colors. The [`scales`](https://scales.r-lib.org/) package provided the `label_percent()` function to format the y-axis as percentages, effectively highlighting the key finding that **the Services funding stream (representing income from document supply services) shows a consistent decline in its proportional contribution to the British Library's total funding over the analyzed period.**
 
 ### Loading required libraries
 
@@ -53,7 +55,8 @@ pacman::p_load(
   showtext,             # Display fonts in ggplot2
   colorspace,           # Lighten and Darken colours
 
-  patchwork             # Composing Plots
+  patchwork,            # Composing Plots
+  ggstream              # Stream Plots with ggplot2
 )
 
 bl_funding <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-15/bl_funding.csv')
@@ -71,12 +74,12 @@ font_add_google("Saira",
 
 # Font for the caption
 font_add_google("Saira Condensed",
-  family = "caption_font"
+  family = "body_font"
 ) 
 
 # Font for plot text
 font_add_google("Saira Extra Condensed",
-  family = "body_font"
+  family = "caption_font"
 ) 
 
 showtext_auto()
@@ -113,7 +116,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** Andy Jackson & David Rosenthal; British Library", 
+  "**Data:** Andy Jackson & David Rosenthal", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -124,10 +127,10 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_subtitle <- str_wrap(".......................", 90)
+plot_subtitle <- str_wrap("Five funding streams reveal shifting revenue patterns over 25 years. Document supply services dropped from significant income source to negligible, as core government funding became increasingly dominant.", 75)
 str_view(plot_subtitle)
 
-plot_title <- "..............................."
+plot_title <- "Services Revenue Declining at the British Library"
 
 ```
 
@@ -136,9 +139,9 @@ plot_title <- "..............................."
 ```{r}
 #| label: eda
 
-bl_funding |> 
-  summarytools::dfSummary() |> 
-  summarytools::view()
+# bl_funding |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
 
 
 #  mutate(
@@ -182,8 +185,6 @@ df1 <- bl_funding |>
   ) |> 
   left_join(bl_funding_labels)
 
-
-df1
 ```
 
 ### The Plot
@@ -208,8 +209,9 @@ g <- df1 |>
   ) +
   geom_stream_label(
     type = "proportional",
-    hjust = "inside",
-    size = bts / 5,
+    hjust = "inward",
+    size = bts / 3,
+    true_range = "min_x",
     family = "title_font",
     fontface = "bold"
   ) +
@@ -219,11 +221,14 @@ g <- df1 |>
   ) +
   scale_colour_manual(values = darken(mypal, 0.6)) +
   scale_x_continuous(expand = expansion(0)) +
-  scale_y_continuous(expand = expansion(0)) +
+  scale_y_continuous(
+    expand = expansion(0),
+    labels = scales::label_percent()
+  ) +
   labs(
     fill = NULL,
     y = "Percentage contribution to total annual funding to the British Library",
-    x = "Year",
+    x = NULL,
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
@@ -250,7 +255,7 @@ g <- df1 |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 1.5 * bts,
+      size = 1.6 * bts,
       family = "body_font",
       face = "bold"
       ),
@@ -258,8 +263,8 @@ g <- df1 |>
       margin = margin(5,0,10,0, "mm"),
       hjust = 0.5,
       colour = text_hil,
-      size = 0.8 * bts,
-      family = "body_font"
+      size = 1.2 * bts,
+      family = "caption_font"
     ),
     plot.caption = element_textbox(
       margin = margin(5,0,0,0, "mm"),
@@ -292,8 +297,8 @@ g <- df1 |>
     ),
     legend.text = element_text(
       margin = margin(3,0,3,3, "mm"),
-      size = bts * 0.9,
-      family = "caption_font"
+      size = bts * 0.7,
+      family = "body_font"
     ),
     
     legend.key.spacing.y = unit(1, "mm"),
@@ -305,7 +310,7 @@ g <- df1 |>
       fill = NA, colour = NA
     ),
     
-    legend.key.width = unit(10, "mm"),
+    legend.key.width = unit(20, "mm"),
     legend.spacing.y = unit(1, "mm"),
     
     # Axes
@@ -315,7 +320,8 @@ g <- df1 |>
     axis.line = element_blank(),
     axis.title.y = element_text(
       margin = margin(0,0,0,0, "mm"),
-      hjust = 0.5
+      hjust = 0.5,
+      size = 0.8 * bts
     ),
     axis.title.x = element_text(
       margin = margin(0,0,0,0, "mm"),
@@ -326,10 +332,12 @@ g <- df1 |>
     ),
     axis.text.x = element_text(
       margin = margin(3,0,0,0, "mm"),
-      angle = 90,
-      vjust = 0.5,
-      hjust = 1,
-      size = 0.5 * bts
+      size = bts
+    ),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.5,
+      colour = text_col
     )
   )
 
