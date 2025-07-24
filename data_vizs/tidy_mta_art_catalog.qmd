@@ -1,0 +1,506 @@
+---
+title: "Spatial Data Visualization in R: NYC Subway Art Map"
+author: "Aditya Dahiya"
+date: "2025-07-24"
+subtitle: "Combining geocoding, spatial cropping, smart labeling, and base maps with tidygeocoder, sf, ggrepel, and ggmap"
+categories:
+  - "#TidyTuesday"
+  - "{sf}"
+  - "Maps"
+  - "Geocoding"
+  - "{tidygeocoder}"
+image: "thumbnails/tidy_mta_art_catalog.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This dataset comes from the [New York Metropolitan Transportation Authority (MTA) Permanent Art Catalog](https://data.ny.gov/stories/s/u2va-fuuf), which documents public artworks commissioned through the MTA's Permanent Art Program. Administered by [MTA Arts & Design](https://www.mta.info/about-mta/arts-design) (formerly Arts for Transit), this program commissions public art installations that are viewed by millions of daily commuters and visitors across the MTA's subway and rail systems. The program works collaboratively with architects and engineers from [MTA NYC Transit](https://www.mta.info/agency/new-york-city-transit), [Long Island Rail Road](https://www.mta.info/lirr), and [Metro-North Railroad](https://www.mta.info/mnr) to integrate artwork into station renovations using materials native to the transit system including mosaic, ceramic, tile, bronze, steel, and glass. Artists are selected through a competitive process involving panels of visual arts professionals and community representatives. The dataset provides comprehensive information about each artwork including the station location, transit lines served, artist details, installation dates, materials used, and descriptive information, offering a unique window into one of the world's largest public art collections integrated into urban transit infrastructure.
+
+![A map of public artworks displayed across Manhattan's subway stations, showing the Metropolitan Transportation Authority's permanent art collection. Each label identifies the artwork title, artist, and station location along the transit network.](tidy_mta_art_catalog.png){#fig-1}
+
+# How the Graphic Was Created
+
+This visualization was built using R's powerful ecosystem of spatial and visualization packages. The workflow began by geocoding subway station names using [`tidygeocoder`](https://jessecambon.github.io/tidygeocoder/) to obtain precise coordinates, then converting the data to spatial format with [`sf`](https://r-spatial.github.io/sf/). The base map was created using [`ggmap`](https://github.com/dkahle/ggmap) with Stadia Maps terrain tiles, processed as raster data through [`terra`](https://rspatial.org/terra/). NYC subway line geometries were loaded from a shapefile, spatially cropped to the Manhattan area, and overlaid on the map. The challenging task of labeling multiple artworks without overlap was solved using [`ggrepel`](https://ggrepel.slowkow.com/), which intelligently positions labels on opposite sides of the map based on longitude coordinates. Custom nudging variables and curved connection segments ensure clean, readable labels that don't obscure the underlying geography.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+mta_art <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-22/mta_art.csv')
+station_lines <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-22/station_lines.csv')
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 120
+
+mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
+mypal <- c("#DD75D3", "#E16305", "#F2CB05", "#719F4F", "#7E8CFF")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Metropolitan Transportation Authority (New York City)", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Art Underground: NYC Subway Gallery"
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+pacman::p_load(summarytools)
+
+mta_art |> dfSummary() |> view()
+
+station_lines |> dfSummary() |> view()
+
+pacman::p_load(tidygeocoder)
+
+
+# Try to get geographical locations of the maps
+df1 <- station_lines |> 
+  distinct(station_name) |> 
+  mutate(station_name = paste0(station_name, " Station, New York City")) |> 
+  geocode(
+    station_name, method = 'osm', 
+    lat = latitude , long = longitude
+  )
+
+df2 <- df1 |> 
+  drop_na() |> 
+  mutate(
+    full_station_name = station_name,
+    station_name = str_remove(station_name, " Station, New York City")
+  ) |> 
+  st_as_sf(
+    coords = c("longitude", "latitude"),
+    crs = "EPSG:4326"
+  )
+
+df3 <- df2 |> 
+  bind_cols(
+    st_coordinates(df2) |> janitor::clean_names()
+  )
+
+
+plotdf <- mta_art |> 
+  left_join(df3) |> 
+  filter(!is.na(x) & !is.na(y)) |> 
+  
+  # Remove values outside my map's bounding box
+  filter(x < -73.83 & x > -74.1) |> 
+  filter(y < 40.88 & y > 40.6) |> 
+  st_as_sf() |> 
+  
+  # Add a minor jitter in the positions to prevent overlaps in multiple
+  # artworks within the same subway station
+  st_jitter(0.001)
+
+mid_lon <- mean(plotdf$x, na.rm = T)
+
+mid_lat <- mean(plotdf$y, na.rm = T)
+
+# Create new directional variables using tidyverse
+plotdf2 <- plotdf |> 
+  select(-agency, -art_image_link, -art_description, art_date, -line) |> 
+  
+  # Create the directional variables
+  mutate(
+    # lon_var: east if longitude > mid_lon, west otherwise
+    lon_var = case_when(
+      x > mid_lon ~ "east",
+      x <= mid_lon ~ "west"
+    ),
+    # lat_var: north if latitude > mid_lat, south otherwise
+    lat_var = case_when(
+      y > mid_lat ~ "north",
+      y <= mid_lat ~ "south"
+    ),
+    
+    # nudge_x_var to create a variable for nudge x with ggrepel
+    nudge_x_var = if_else(
+      lon_var == "east", 
+      -73.82 - x,
+      -74.05 - x
+    ),
+    segment_curv_var = if_else(
+      lat_var == "north",
+      -0.5,
+      0.5
+    )
+  )
+```
+
+### Getting New York City Base Map
+
+```{r}
+pacman::p_load(ggmap, tidyterra)
+
+# Define your bounding box
+my_bbox <- c(
+  bottom = 40.6, 
+  top = 40.88,
+  left = -74.08, 
+  right = -73.78
+)
+
+base_map_rast <- get_stadiamap(
+  bbox = my_bbox,
+  zoom = 11,
+  maptype = "stamen_terrain_background"
+) |> 
+  terra::rast()
+
+ggplot() +
+  geom_spatraster_rgb(
+    data = base_map_rast
+  )
+```
+
+### Get New York City Subway Lines
+
+```{r}
+# Source: https://geo.nyu.edu/catalog/nyu-2451-34758
+
+
+
+subway_lines <- read_sf("C:/Users/dradi/Downloads/nyu_2451_34758/routes_nyc_subway_may2016.shp") |> 
+  st_transform("EPSG:4326") |> 
+  # Fix invalid geometries
+  mutate(geometry = st_make_valid(geometry))
+
+st_crs(subway_lines)
+
+st_crop(subway_lines, 
+                               c(xmin = my_bbox["left"], 
+                                 ymin = my_bbox["bottom"],
+                                 xmax = my_bbox["right"], 
+                                 ymax = my_bbox["top"]))
+
+subway_lines |> 
+  ggplot() +
+  geom_sf()
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# A jitter position for removing overlapping points in 
+# some central Subway Stations in New York City
+
+g <- ggplot() +
+  
+  geom_spatraster_rgb(
+    data = base_map_rast,
+    alpha = 0.7
+  ) +
+  geom_sf(
+    data = subway_lines,
+    colour = "darkred",
+    linewidth = 0.5
+  ) +
+  
+  geom_sf(
+    data = plotdf2,
+    alpha = 0.6,
+    size = 3,
+    pch = 19
+  ) +
+  
+  # West side stations' labels
+  ggrepel::geom_label_repel(
+    data = plotdf2 |> filter(lon_var == "west"),
+    mapping = aes(
+      geometry = geometry,
+      label = paste0(
+        str_sub(art_title, 1, 20), 
+        "  (", 
+        str_sub(artist, 1, 15), 
+        ")  ", 
+        str_sub(station_name, 1, 10),
+        " Stn. "
+      ),
+      segment.curvature = segment_curv_var
+    ),
+    
+    nudge_x = plotdf2 |> filter(lon_var == "west") |> pull(nudge_x_var),
+    direction = "y",
+    
+    stat = "sf_coordinates",
+    seed = 42,
+    hjust = 1,
+    arrow = arrow(
+      ends = "first",
+      length = unit(0.4, "mm")
+    ),
+
+    min.segment.length = unit(0.05, "mm"),
+    segment.size = 0.15,
+    segment.color = alpha("black", 0.4),
+    lineheight = 0.25,
+    size = 6,
+    family = "caption_font",
+    
+    fill = alpha("white", 0.6),
+    label.padding = 0.2,
+    label.r = 0.1,
+    label.size = NA
+  ) +
+  
+  
+  # East side stations' labels
+  ggrepel::geom_label_repel(
+    data = plotdf2 |> filter(lon_var == "east"),
+    mapping = aes(
+      geometry = geometry,
+      label = paste0(
+        str_sub(art_title, 1, 20), 
+        "  (", 
+        str_sub(artist, 1, 15), 
+        ")  ", 
+        str_sub(station_name, 1, 10),
+        " Stn. "
+      ),
+      segment.curvature = -segment_curv_var
+    ),
+    
+    nudge_x = plotdf2 |> filter(lon_var == "east") |> pull(nudge_x_var),
+    direction = "y",
+    
+    stat = "sf_coordinates",
+    seed = 42,
+    hjust = 0,
+    arrow = arrow(
+      ends = "first",
+      length = unit(0.4, "mm")
+    ),
+
+    min.segment.length = unit(0.05, "mm"),
+    segment.size = 0.15,
+    segment.color = alpha("black", 0.4),
+    lineheight = 0.25,
+    size = 6,
+    family = "caption_font",
+    
+    fill = alpha("white", 0.6),
+    label.padding = 0.2,
+    label.r = 0.1,
+    label.size = NA
+  ) +
+  
+  coord_sf(
+    xlim = c(-74.08, -73.78),
+    ylim = c(40.60,  40.88),
+    default_crs = "EPSG:4326",
+    clip = "on",
+    expand = FALSE
+  ) +
+  labs(
+    title = plot_title,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.caption = element_textbox(
+      margin = margin(-5,0,5,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = 0.5 * bts,
+      family = "caption_font",
+      fill = alpha("white", 0.6),
+      box.color = NA,
+      padding = unit(0.3, "lines"),
+      r = unit(5, "mm")
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(0,0,0,0, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_mta_art_catalog.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_mta_art_catalog.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_mta_art_catalog.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
