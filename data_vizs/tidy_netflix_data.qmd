@@ -1,0 +1,391 @@
+---
+title: "tidy_netflix_data"
+author: "Aditya Dahiya"
+date: "2025-07-29"
+subtitle: "................."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_mta_art_catalog.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This analysis uses Netflix viewing data from the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday) (Week 30, 2025), which compiles viewing statistics from Netflix's official [Engagement Reports](https://about.netflix.com/en/news/what-we-watched-the-first-half-of-2025) spanning late 2023 through the first half of 2025. The dataset, curated by [Jen Richmond from RLadies-Sydney](https://github.com/jenrichmond), captures approximately 99% of all Netflix viewing activity, representing over 95 billion hours of content consumption across a diverse range of genres and languages. The data includes two main components: movies and TV shows, with detailed information on viewing hours, release dates, runtime, global availability status, and calculated view counts (derived from hours viewed divided by runtime). This comprehensive dataset provides insights into viewing patterns, content performance over time, and the relationship between release timing and audience engagement on the world's leading streaming platform.
+
+![...................](tidy_netflix_data.png){#fig-1}
+
+# How the Graphic Was Created
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-29/movies.csv')
+
+shows <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-29/shows.csv')
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 120
+
+mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
+mypal <- c("#DD75D3", "#E16305", "#F2CB05", "#719F4F", "#7E8CFF")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Netflix & Jen Richmond", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "tidy_netflix_data"
+
+plot_subtitle <- "tidy_netflix_data"
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# Credits: Claude Sonnet 4.0
+# Function to convert runtime string to duration
+convert_runtime <- function(runtime_string) {
+  # Extract hours, minutes, and seconds using regex
+  hours <- str_extract(runtime_string, "\\d+(?=H)") |> as.numeric()
+  minutes <- str_extract(runtime_string, "\\d+(?=M)") |> as.numeric()
+  seconds <- str_extract(runtime_string, "\\d+(?=S)") |> as.numeric()
+  
+  # Replace NA with 0
+  hours <- ifelse(is.na(hours), 0, hours)
+  minutes <- ifelse(is.na(minutes), 0, minutes)
+  seconds <- ifelse(is.na(seconds), 0, seconds)
+  
+  # Create duration object
+  duration(hours = hours, minutes = minutes, seconds = seconds)
+}
+
+# Apply to movies dataframe
+movies <- movies |> 
+  mutate(runtime_duration = convert_runtime(runtime))
+
+# Apply to shows dataframe
+shows <- shows |> 
+  mutate(runtime_duration = convert_runtime(runtime))
+
+
+# Explore the data with summarytools
+# pacman::p_load(summarytools)
+
+# movies |> 
+#   dfSummary() |> 
+#   view()
+#   
+# 
+# shows |> 
+#   dfSummary() |> 
+#   view()
+
+
+# Some trial examples to detect pattern in shows and movies duration
+shows |> 
+  ggplot(
+    mapping = aes(
+      x = as.numeric(runtime_duration, "hours")
+    )
+  ) +
+  geom_boxplot(alpha = 0.2) +
+  scale_x_log10(name = "Runtime (hours)")
+
+shows |> 
+  ggplot(
+    mapping = aes(
+      x = as.numeric(runtime_duration, "hours"),
+      y = hours_viewed
+    )
+  ) +
+  geom_point(
+    alpha = 0.3
+  ) +
+  geom_smooth() +
+  scale_x_log10(name = "Runtime (hours)")
+  
+  
+shows |> 
+  ggplot(
+    mapping = aes(
+      x = as.numeric(runtime_duration, "hours"),
+      y = hours_viewed
+    )
+  ) +
+  geom_violin() +
+  scale_x_log10(name = "Runtime (hours)")
+
+
+########### Took some Ideas from AI: Claude Sonnet 4.0
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(ggridges)    # For ridge plots
+library(hexbin)      # For hexagonal binning
+library(ggbeeswarm)  # For beeswarm plots
+library(gghalves)    # For half violin plots
+library(patchwork)   # For combining plots
+
+# Convert runtime to hours for better visualization
+movies <- movies |> 
+  mutate(runtime_hours = as.numeric(runtime_duration, "hours"))
+
+shows <- shows |> 
+  mutate(runtime_hours = as.numeric(runtime_duration, "hours"))
+
+# 3. RIDGE PLOT - Shows distribution of views across runtime bins
+df1 <- bind_rows(
+  movies %>% mutate(type = "Movies"),
+  shows %>% mutate(type = "Shows")
+) |> 
+  select(type, runtime_hours, hours_viewed, views) |> 
+  filter(runtime_hours > (1/6) & runtime_hours < 100) |> 
+  mutate(runtime_bin = cut(runtime_hours, 
+                          breaks = c(0.2, 0.5, 1, 1.5, 2, 3, 5, Inf),
+                          labels = c("10-30min", "30min-1h", "1-1.5h", 
+                                   "1.5-2h", "2-3h", "3-5h", "5-100h"))) |> 
+  filter(!is.na(runtime_bin)) 
+  
+pacman::p_load(ggridges)
+
+df1 |> 
+  ggplot(
+    mapping = aes(
+      x = views, 
+      y = runtime_bin, 
+      fill = type
+    )
+  ) +
+  geom_density_ridges(alpha = 0.4, scale = 2) +
+  scale_x_continuous(
+    labels = label_number(scale = 1e-6, suffix = "M"),
+    limits = c(5e4, 1e8),
+    transform = "log10"
+  ) +
+  # facet_wrap(~type, nrow = 1) +
+  labs(title = "View Distribution Across Runtime Categories",
+       subtitle = "Ridge plots reveal optimal duration ranges",
+       x = "Views (Log Scale)", y = "Runtime Categories") +
+  theme_minimal()
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+
+
+
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.caption = element_textbox(
+      margin = margin(-5,0,5,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = 0.5 * bts,
+      family = "caption_font",
+      fill = alpha("white", 0.6),
+      box.color = NA,
+      padding = unit(0.3, "lines"),
+      r = unit(5, "mm")
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(0,0,0,0, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_netflix_data.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_netflix_data.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_netflix_data.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
