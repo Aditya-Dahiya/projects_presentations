@@ -1,11 +1,13 @@
 ---
-title: "tidy_netflix_data"
+title: "Netflix Movie Runtimes vs. Viewership"
 author: "Aditya Dahiya"
-date: "2025-07-29"
-subtitle: "................."
+date: "2025-07-30"
+subtitle: "Creating ridge-density plots and uncovering viewership patterns in Netflix's movie catalog."
 categories:
   - "#TidyTuesday"
-image: "thumbnails/tidy_mta_art_catalog.png"
+  - "{ggridges}"
+  - "Density Ridges Plot"
+image: "thumbnails/tidy_netflix_data.png"
 format:
   html:
     code-fold: true
@@ -35,9 +37,11 @@ comments:
 
 This analysis uses Netflix viewing data from the [TidyTuesday project](https://github.com/rfordatascience/tidytuesday) (Week 30, 2025), which compiles viewing statistics from Netflix's official [Engagement Reports](https://about.netflix.com/en/news/what-we-watched-the-first-half-of-2025) spanning late 2023 through the first half of 2025. The dataset, curated by [Jen Richmond from RLadies-Sydney](https://github.com/jenrichmond), captures approximately 99% of all Netflix viewing activity, representing over 95 billion hours of content consumption across a diverse range of genres and languages. The data includes two main components: movies and TV shows, with detailed information on viewing hours, release dates, runtime, global availability status, and calculated view counts (derived from hours viewed divided by runtime). This comprehensive dataset provides insights into viewing patterns, content performance over time, and the relationship between release timing and audience engagement on the world's leading streaming platform.
 
-![...................](tidy_netflix_data.png){#fig-1}
+![This visualization displays the distribution of Netflix movie viewership across 13 runtime categories, from under 30 minutes to over 3 hours. Each row shows a density ridge plot revealing the spread of viewership within that duration category, overlaid with boxplots indicating quartiles and outliers. Red dots mark the trimmed mean viewership for each category, while numbers on the right show the count of movies in each runtime bin. The x-axis uses a logarithmic scale to accommodate the wide range of viewership values.](tidy_netflix_data.png){#fig-1}
 
 # How the Graphic Was Created
+
+This visualization was created using R and the [tidyverse](https://www.tidyverse.org/) ecosystem, combining multiple layers to reveal Netflix movie viewership patterns across runtime categories. I first converted the runtime strings (e.g., "1H 30M 0S") into numerical hours using [lubridate's](https://lubridate.tidyverse.org/) `duration()` function and custom regex extraction. The movies were then binned into 13 ordered runtime categories using [`cut()`](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/cut) with carefully defined breaks from \<30 minutes to \>3 hours. The core visualization layers three complementary geoms: [`geom_density_ridges()`](https://wilkelab.org/ggridges/) from the [ggridges package](https://wilkelab.org/ggridges/) to show the distribution shape of viewership within each runtime category, [`geom_boxplot()`](https://ggplot2.tidyverse.org/reference/geom_boxplot.html) to display statistical summaries (quartiles and outliers), and [`geom_point()`](https://ggplot2.tidyverse.org/reference/geom_point.html) to highlight the trimmed mean viewership for each category. The color palette was sourced from [paletteer](https://emilhvitfeldt.github.io/paletteer/) using the "khroma::smoothrainbow" scheme, while text formatting utilized [Google Fonts](https://fonts.google.com/) via [showtext](https://github.com/yixuan/showtext) and [ggtext](https://wilkelab.org/ggtext/) for enhanced typography. The x-axis employs a log10 transformation with [scales](https://scales.r-lib.org/) formatting to handle the wide range of viewership values, and custom annotations display the count of movies in each duration category to provide context for the distributions.
 
 ### Loading required libraries
 
@@ -53,7 +57,9 @@ pacman::p_load(
   showtext,             # Display fonts in ggplot2
   colorspace,           # Lighten and Darken colours
 
-  patchwork             # Composing Plots
+  patchwork,            # Composing Plots
+  ggridges,             # Making ridgeline plot 
+  gghalves              # Half geoms in ggplot2
 )
 
 movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-07-29/movies.csv')
@@ -99,10 +105,7 @@ seecolor::print_color(text_col)
 line_col <- "grey30"
 
 # Define Base Text Size
-bts <- 120
-
-mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
-mypal <- c("#DD75D3", "#E16305", "#F2CB05", "#719F4F", "#7E8CFF")
+bts <- 80
 
 # Caption stuff for the plot
 sysfonts::font_add(
@@ -127,9 +130,12 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_netflix_data"
+plot_title <- "Movie Duration vs. Viewership Patterns"
 
-plot_subtitle <- "tidy_netflix_data"
+plot_subtitle <- "While most Netflix movies fall between 90-150 minutes, the highest average viewership belongs to extreme outliers. Short films under 30 minutes and epic movies over 3 hours capture the most viewer attention per title, despite being fewer in number." |> 
+  str_wrap(85)
+
+str_view(plot_subtitle)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -156,11 +162,21 @@ convert_runtime <- function(runtime_string) {
 
 # Apply to movies dataframe
 movies <- movies |> 
-  mutate(runtime_duration = convert_runtime(runtime))
+  mutate(
+    # Convert duration to a numerical / time duration variable
+    runtime_duration = convert_runtime(runtime),
+    # Convert runtime to hours for better visualization
+    runtime_hours = as.numeric(runtime_duration, "hours")
+  )
 
 # Apply to shows dataframe
 shows <- shows |> 
-  mutate(runtime_duration = convert_runtime(runtime))
+  mutate(
+    # Convert duration to a numerical / time duration variable
+    runtime_duration = convert_runtime(runtime),
+    # Convert runtime to hours for better visualization
+    runtime_hours = as.numeric(runtime_duration, "hours")
+  )
 
 
 # Explore the data with summarytools
@@ -177,91 +193,97 @@ shows <- shows |>
 
 
 # Some trial examples to detect pattern in shows and movies duration
-shows |> 
-  ggplot(
-    mapping = aes(
-      x = as.numeric(runtime_duration, "hours")
-    )
-  ) +
-  geom_boxplot(alpha = 0.2) +
-  scale_x_log10(name = "Runtime (hours)")
-
-shows |> 
-  ggplot(
-    mapping = aes(
-      x = as.numeric(runtime_duration, "hours"),
-      y = hours_viewed
-    )
-  ) +
-  geom_point(
-    alpha = 0.3
-  ) +
-  geom_smooth() +
-  scale_x_log10(name = "Runtime (hours)")
+# shows |> 
+#   ggplot(
+#     mapping = aes(
+#       x = as.numeric(runtime_duration, "hours")
+#     )
+#   ) +
+#   geom_boxplot(alpha = 0.2) +
+#   scale_x_log10(name = "Runtime (hours)")
+# 
+# shows |> 
+#   ggplot(
+#     mapping = aes(
+#       x = as.numeric(runtime_duration, "hours"),
+#       y = hours_viewed
+#     )
+#   ) +
+#   geom_point(
+#     alpha = 0.3
+#   ) +
+#   geom_smooth() +
+#   scale_x_log10(name = "Runtime (hours)")
+#   
+#   
+# shows |> 
+#   ggplot(
+#     mapping = aes(
+#       x = as.numeric(runtime_duration, "hours"),
+#       y = hours_viewed
+#     )
+#   ) +
+#   geom_violin() +
+#   scale_x_log10(name = "Runtime (hours)")
+# 
+# # I took some Ideas from AI: Claude Sonnet 4.0
+# library(ggridges)    # For ridge plots
+# 
+# movies |> 
+#   select(runtime_hours, hours_viewed, views) |> 
+#   filter(runtime_hours > (1/2) & runtime_hours < 3) |> 
+#   ggplot(aes(runtime_hours)) +
+#   geom_boxplot()
   
-  
-shows |> 
-  ggplot(
-    mapping = aes(
-      x = as.numeric(runtime_duration, "hours"),
-      y = hours_viewed
+# Planning a RIDGE PLOT - Shows distribution of views across runtime bins
+
+df1 <- movies |> 
+  select(runtime_hours, hours_viewed, views) |> 
+  mutate(
+    runtime_bin = cut(
+      runtime_hours, 
+      breaks = c(0, 0.5, 0.67, 0.83, 1, 1.17, 1.33, 1.5, 1.67, 1.83, 2, 2.5, 3, Inf),
+      labels = c(
+        "<30min", 
+        "30-40min", 
+        "40-50min", 
+        "50-60min", 
+        "1h-1h10m", 
+        "1h10-1h20m", 
+        "1h20-1h30m", 
+        "1h30-1h40m", 
+        "1h40-1h50m", 
+        "1h50m-2h", 
+        "2h-2h30m", 
+        "2h30m-3h", 
+        ">3 hours"
+      ),
+      include.lowest = TRUE,
+      ordered_result = TRUE
     )
-  ) +
-  geom_violin() +
-  scale_x_log10(name = "Runtime (hours)")
+  ) |> 
+  filter(
+    !is.na(runtime_bin),
+    !is.na(views),
+    is.finite(views),
+    views > 0,  # Remove zero or negative views
+    views < Inf  # Remove infinite values
+  )
 
+# df1$runtime_bin |> levels()
 
-########### Took some Ideas from AI: Claude Sonnet 4.0
-library(tidyverse)
-library(lubridate)
-library(scales)
-library(ggridges)    # For ridge plots
-library(hexbin)      # For hexagonal binning
-library(ggbeeswarm)  # For beeswarm plots
-library(gghalves)    # For half violin plots
-library(patchwork)   # For combining plots
+# pacman::p_load(ggridges, gghalves)
 
-# Convert runtime to hours for better visualization
-movies <- movies |> 
-  mutate(runtime_hours = as.numeric(runtime_duration, "hours"))
+# df1 |> 
+#   count(runtime_bin)
 
-shows <- shows |> 
-  mutate(runtime_hours = as.numeric(runtime_duration, "hours"))
+df2 <- df1 |> 
+  group_by(runtime_bin) |> 
+  summarise(
+    mean_views = mean(views, na.rm = T, trim = 0.1),
+    median_views = median(views, na.rm = T)
+  )
 
-# 3. RIDGE PLOT - Shows distribution of views across runtime bins
-df1 <- bind_rows(
-  movies %>% mutate(type = "Movies"),
-  shows %>% mutate(type = "Shows")
-) |> 
-  select(type, runtime_hours, hours_viewed, views) |> 
-  filter(runtime_hours > (1/6) & runtime_hours < 100) |> 
-  mutate(runtime_bin = cut(runtime_hours, 
-                          breaks = c(0.2, 0.5, 1, 1.5, 2, 3, 5, Inf),
-                          labels = c("10-30min", "30min-1h", "1-1.5h", 
-                                   "1.5-2h", "2-3h", "3-5h", "5-100h"))) |> 
-  filter(!is.na(runtime_bin)) 
-  
-pacman::p_load(ggridges)
-
-df1 |> 
-  ggplot(
-    mapping = aes(
-      x = views, 
-      y = runtime_bin, 
-      fill = type
-    )
-  ) +
-  geom_density_ridges(alpha = 0.4, scale = 2) +
-  scale_x_continuous(
-    labels = label_number(scale = 1e-6, suffix = "M"),
-    limits = c(5e4, 1e8),
-    transform = "log10"
-  ) +
-  # facet_wrap(~type, nrow = 1) +
-  labs(title = "View Distribution Across Runtime Categories",
-       subtitle = "Ridge plots reveal optimal duration ranges",
-       x = "Views (Log Scale)", y = "Runtime Categories") +
-  theme_minimal()
 
 ```
 
@@ -270,10 +292,76 @@ df1 |>
 ```{r}
 #| label: base-plot
 
-
-
-
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = views, 
+      y = runtime_bin
+    )
+  ) +
+  geom_density_ridges(
+    mapping = aes(fill = runtime_bin),
+    alpha = 0.7,
+    scale = 1.2,
+    colour = text_col
+  ) +
+  geom_boxplot(
+    mapping = aes(fill = runtime_bin),
+    outliers = FALSE,
+    staplewidth = 1,
+    linewidth = 0.3,
+    width = 0.25,
+    na.rm = TRUE,
+    colour = text_col,
+    alpha = 0.7
+  ) +
+  geom_point(
+    data = df2,
+    mapping = aes(x = mean_views),
+    size = 6,
+    stroke = 0.6,
+    pch = 21,
+    colour = text_col,
+    fill = "red"
+  ) +
+  geom_label(
+    data = df1 |> count(runtime_bin),
+    aes(x = 2.5e6, label = scales::number(n, big.mark = ",")),
+    size = bts / 3,
+    hjust = 0,
+    nudge_y = 0.4,
+    fill = alpha(bg_col, 0.4),
+    label.size = NA,
+    family = "body_font",
+    label.padding = unit(0.1, "lines")
+  ) +
+  annotate(
+    geom = "label",
+    x = 2.5e6,
+    y = 13.65,
+    label = "Number of movies in\nthe duration category",
+    size = bts / 3,
+    lineheight = 0.3,
+    hjust = 0.5,
+    vjust = 0,
+    fill = alpha(bg_col, 0.4),
+    label.size = NA,
+    family = "body_font",
+    label.padding = unit(0.1, "lines")
+  ) +
+  scale_x_continuous(
+    labels = label_number(scale = 1e-6, suffix = "M"),
+    limits = c(5e4, 5e6),
+    transform = "log10",
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(
+    values = paletteer::paletteer_d("khroma::smoothrainbow")[seq(from = 3, by = 2, length = 13)]
+  ) +
+  coord_cartesian(clip = "off") +
   labs(
+    x = "Viewership, on log scale (millions)", 
+    y = "Duration of the Movies",
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption
@@ -283,6 +371,8 @@ df1 |>
     base_size = bts
   ) +
   theme(
+    
+    legend.position = "none",
     
     # Overall
     text = element_text(
@@ -297,25 +387,63 @@ df1 |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2 * bts,
+      size = 3 * bts,
+      family = "body_font"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,2,10, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.1 * bts,
+      hjust = 0,
       family = "body_font",
-      face = "bold"
+      lineheight = 0.3
       ),
     plot.caption = element_textbox(
-      margin = margin(-5,0,5,0, "mm"),
+      margin = margin(5,0,5,0, "mm"),
       hjust = 0.5,
       halign = 0.5,
       colour = text_hil,
-      size = 0.5 * bts,
-      family = "caption_font",
-      fill = alpha("white", 0.6),
-      box.color = NA,
-      padding = unit(0.3, "lines"),
-      r = unit(5, "mm")
+      size = bts,
+      family = "caption_font"
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
-    plot.margin = margin(0,0,0,0, "mm")
+    plot.margin = margin(0,0,0,0, "mm"),
+    
+    # Axes Lines, Ticks, Text and labels
+    axis.line = element_line(
+      colour = text_hil,
+      linewidth = 0.3,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.ticks = element_line(
+      colour = text_hil,
+      linewidth = 0.3
+    ),
+    axis.ticks.length = unit(2, "mm"),
+    axis.text.x = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil
+    ),
+    axis.text.y = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil,
+      family = "caption_font",
+      size = 0.75 * bts,
+      vjust = 0
+    ),
+    axis.title.y = element_text(
+      colour = text_hil,
+      margin = margin(2,2,2,2, "mm"),
+      size = bts * 1.5
+    ),
+    axis.title.x = element_text(
+      colour = text_hil,
+      margin = margin(2,2,2,2, "mm"),
+      size = bts * 1.5
+    )
+    
   )
 
 ggsave(
