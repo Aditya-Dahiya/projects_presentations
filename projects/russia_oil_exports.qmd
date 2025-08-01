@@ -1,0 +1,210 @@
+---
+title: "russia_oil_exports"
+author: "Aditya Dahiya"
+editor: visual
+subtitle: "...................."
+categories:
+  - "Data Visualization"
+  - "Gecomputation"
+  - "Geopolitics"
+date: "2025-08-01"
+image: "images/russia_oil_exports.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+bibliography: references.bib
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/projects/russia_oil_exports.html"
+  description: "Visualizations"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+---
+
+## About the Data
+
+The trade data presented in this analysis was sourced from the [Observatory of Economic Complexity (OEC)](https://oec.world/), a leading platform for visualizing and analyzing international trade data. The dataset specifically utilizes the [BACI (Base pour l'Analyse du Commerce International)](https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37) database, which is maintained by CEPII (Centre d'Études Prospectives et d'Informations Internationales). The data covers textile woven fabric exports (HS4 code: 52709) from European Union countries to various importing nations from 2010 to 2023. BACI provides harmonized bilateral trade flows at the product level, offering comprehensive coverage of world merchandise trade with high-quality data reconciliation procedures. The data was accessed through the [OEC's Tesseract API](https://docs.oec.world/tesseract/), which provides programmatic access to their extensive trade databases.
+
+### Getting the data
+
+```{r}
+# Load required libraries
+library(httr)
+library(jsonlite)
+library(tibble)
+library(dplyr)
+
+# Define the base URL (without year parameter)
+base_url <- "https://api-v2.oec.world/tesseract/data.jsonrecords?cube=trade_i_baci_a_92&drilldowns=Importer+Country&include=Exporter+Country:eurus;Year:YEAR_PLACEHOLDER;HS4:52709&locale=en&parents=true&measures=Trade+Value"
+
+# Define years to fetch
+years <- 2010:2023
+
+# Initialize empty list to store data from each year
+yearly_data_list <- list()
+
+# Loop through each year
+for (year in years) {
+  cat("Fetching data for year:", year, "\n")
+  
+  # Create URL for current year
+  current_url <- gsub("YEAR_PLACEHOLDER", year, base_url)
+  
+  # Make the API request
+  response <- GET(current_url)
+  
+  # Check if the request was successful
+  if (status_code(response) == 200) {
+    # Parse the JSON content
+    json_content <- content(response, "text", encoding = "UTF-8")
+    
+    # Convert JSON to R data structure
+    data_list <- fromJSON(json_content, flatten = TRUE)
+    
+    # Extract the data records
+    if (is.list(data_list) && "data" %in% names(data_list)) {
+      year_data <- as_tibble(data_list$data)
+    } else if (is.data.frame(data_list)) {
+      year_data <- as_tibble(data_list)
+    } else {
+      # If it's a list of records, convert directly
+      year_data <- as_tibble(data_list)
+    }
+    
+    # Add year column
+    year_data$Year <- year
+    
+    # Store in list
+    yearly_data_list[[as.character(year)]] <- year_data
+    
+    cat("Successfully fetched", nrow(year_data), "records for", year, "\n")
+    
+  } else {
+    cat("Error fetching data for year", year, ": HTTP status code", status_code(response), "\n")
+    cat("Response content:", content(response, "text"), "\n")
+  }
+  
+  # Add a small delay between requests to be respectful to the API
+  Sys.sleep(0.5)
+}
+
+# Combine all yearly data into one tibble
+if (length(yearly_data_list) > 0) {
+  trade_data <- bind_rows(yearly_data_list)
+  
+  # Clean up column names (remove spaces, make lowercase)
+  trade_data <- trade_data %>%
+    rename_with(~ gsub(" ", "_", tolower(.x)))
+  
+  # Move Year column to the front
+  trade_data <- trade_data %>%
+    select(year, everything())
+  
+  # Display summary information
+  cat("\n=== FINAL RESULTS ===\n")
+  cat("Total records:", nrow(trade_data), "\n")
+  cat("Years covered:", paste(sort(unique(trade_data$year)), collapse = ", "), "\n")
+  cat("Columns:", ncol(trade_data), "\n")
+  
+  cat("\nColumn names:\n")
+  print(names(trade_data))
+  
+  cat("\nFirst 6 rows:\n")
+  print(head(trade_data))
+  
+  cat("\nData summary by year:\n")
+  year_summary <- trade_data %>%
+    group_by(year) %>%
+    summarise(
+      records = n(),
+      .groups = 'drop'
+    )
+  print(year_summary)
+  
+} else {
+  cat("No data was successfully fetched.\n")
+}
+
+# Clean workspace - keep only trade_data
+rm(list = setdiff(ls(), "trade_data"))
+```
+
+Loading required packages
+
+```{r}
+#| label: setup
+
+# Data wrangling & visualization
+library(tidyverse)  # Data manipulation & visualization
+
+# Final plot tools
+library(scales)               # Nice Scales for ggplot2
+library(fontawesome)          # Icons display in ggplot2
+library(ggtext)               # Markdown text in ggplot2
+library(showtext)             # Display fonts in ggplot2
+library(patchwork)            # Composing Plots
+
+bts = 40 # Base Text Size
+sysfonts::font_add_google("Saira", "title_font")
+sysfonts::font_add_google("Saira Condensed", "body_font")
+sysfonts::font_add_google("Saira Extra Condensed", "caption_font")
+showtext::showtext_auto()
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data**:  Observatory of Economic Complexity",
+  "  |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+```
+
+## Visualizing Russia's Oil Exports
+
+```{r}
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", 
+                        "nyt_election_data_3.png"),
+  height = 2000 * 5 / 4,
+  width = 2000,
+  units = "px",
+  bg = "grey95"
+)
+```
