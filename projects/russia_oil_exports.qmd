@@ -144,15 +144,15 @@ Loading required packages
 ```{r}
 #| label: setup
 
-# Data wrangling & visualization
-library(tidyverse)  # Data manipulation & visualization
-
-# Final plot tools
-library(scales)               # Nice Scales for ggplot2
-library(fontawesome)          # Icons display in ggplot2
-library(ggtext)               # Markdown text in ggplot2
-library(showtext)             # Display fonts in ggplot2
-library(patchwork)            # Composing Plots
+pacman::p_load(
+  ggalluvial,    # Alluvial diagrams and flow visualizations
+  tidyverse,     # Data manipulation & visualization
+  scales,        # Nice scales for ggplot2
+  fontawesome,   # Icons display in ggplot2
+  ggtext,        # Markdown text in ggplot2
+  showtext,      # Display fonts in ggplot2
+  patchwork      # Composing plots
+)
 
 bts = 40 # Base Text Size
 sysfonts::font_add_google("Saira", "title_font")
@@ -193,6 +193,120 @@ plot_caption <- paste0(
 rm(github, github_username, xtwitter, 
    xtwitter_username, social_caption_1, 
    social_caption_2)
+```
+
+Basic Data Wrangling
+
+```{r}
+
+# Manually load previously saved data
+trade_data <- read_csv("C:/Users/dradi/OneDrive/Desktop/trade_data.csv")
+
+df1 <- trade_data |> 
+  mutate(
+    importer_country = fct(importer_country),
+    importer_country = fct_lump_n(
+      importer_country,
+      n = 15,
+      w = trade_value
+    )
+  ) |> 
+  select(importer_country, year, trade_value) |> 
+  group_by(year, importer_country) |> 
+  summarise(trade_value = sum(trade_value, na.rm = T)) |> 
+  arrange(desc(trade_value)) |> 
+  mutate(rank = row_number()) |> 
+  ungroup() |> 
+  arrange(year, rank)
+  
+g <- df1 |> 
+  ggplot(
+    aes(
+      x = year, 
+      y = trade_value,
+      fill = importer_country
+    )
+  ) +
+  geom_area(
+    colour = "white",
+    alpha = 0.7
+  ) +
+  guides(
+    fill = guide_legend(
+      nrow = 4
+    )
+  ) +
+  # geom_text(
+  #   data = df1 |> filter(year == 2023),
+  #   mapping = aes(label = importer_country),
+  #   size = 12,
+  #   hjust = 0,
+  #   nudge_x = 0.2
+  # ) +
+  paletteer::scale_fill_paletteer_d("ggthemes::Hue_Circle") +
+  scale_y_continuous(
+    labels = label_number(
+      prefix = "$",
+      suffix = " ",
+      scale_cut = cut_short_scale(space = T)
+    ),
+    expand = expansion(c(0, 0.1))
+  ) +
+  scale_x_continuous(
+    breaks = seq(2010, 2023, 2),
+    expand = expansion(c(0, 0.05))
+  )+
+  labs(
+    title = "Russian Oil Importers, as an area chart",
+    fill = NULL,
+    y = "Oil Imports (Billions, USD)",
+    x = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(1, 1),
+    legend.justification = c(1, 1),
+    axis.line = element_line(
+      arrow = arrow(length = unit(5, "mm")),
+      colour = "grey40",
+      linewidth = 0.5
+    ),
+    panel.grid = element_line(
+      colour = "grey50",
+      linewidth = 0.3
+    ),
+    panel.grid.minor = element_line(
+      colour = "grey70",
+      linewidth = 0.1
+    ),
+    legend.text = element_text(margin = margin(0,0,0,1, "mm")),
+    legend.key.spacing.x = unit(0, "mm")
+  )
+  
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", 
+                        "russia_oil_exports_2.png"),
+  height = 2000 * 5 / 4,
+  width = 2000,
+  units = "px",
+  bg = "grey95"
+)
+```
+
+![](images/russia_oil_exports_2.png){width="500"}
+
+Making the Plot - {ggalluvial}
+
+```{r}
+
+pacman::p_load(ggalluvial)
+
+vignette(topic = "ggalluvial", package = "ggalluvial")
 ```
 
 ## Visualizing Russia's Oil Exports
