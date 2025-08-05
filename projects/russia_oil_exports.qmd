@@ -1,13 +1,16 @@
 ---
-title: "russia_oil_exports"
+title: "An alluvial plot for Changing Markets for Russian Oil"
 author: "Aditya Dahiya"
 editor: visual
-subtitle: "...................."
+subtitle: "Post-2014 and 2022: European decline, Asian growth, but lower total exports."
 categories:
   - "Data Visualization"
   - "Gecomputation"
   - "Geopolitics"
-date: "2025-08-01"
+  - "{ggalluvial}"
+  - "Sankey Diagram"
+  - "Alluvial Plot"
+date: "2025-08-05"
 image: "images/russia_oil_exports.png"
 format:
   html:
@@ -21,6 +24,7 @@ execute:
   eval: false
 bibliography: references.bib
 filters:
+  - linkate
   - social-share
 share:
   permalink: "https://aditya-dahiya.github.io/projects_presentations/projects/russia_oil_exports.html"
@@ -35,7 +39,11 @@ share:
 
 The trade data presented in this analysis was sourced from the [Observatory of Economic Complexity (OEC)](https://oec.world/), a leading platform for visualizing and analyzing international trade data. The dataset specifically utilizes the [BACI (Base pour l'Analyse du Commerce International)](https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37) database, which is maintained by CEPII (Centre d'Études Prospectives et d'Informations Internationales). The data covers textile woven fabric exports (HS4 code: 52709) from European Union countries to various importing nations from 2010 to 2023. BACI provides harmonized bilateral trade flows at the product level, offering comprehensive coverage of world merchandise trade with high-quality data reconciliation procedures. The data was accessed through the [OEC's Tesseract API](https://docs.oec.world/tesseract/), which provides programmatic access to their extensive trade databases.
 
-### Getting the data
+![This alluvial diagram displays the flow of Russian oil exports to major importing countries from 2010 to 2023. The horizontal axis represents years, while the vertical axis shows trade values in billions of US dollars. Each colored band (alluvium) represents a specific importing country, with band width proportional to import volume. The flowing streams illustrate how trade relationships evolved over time, with countries maintaining, gaining, or losing market share. Vertical dashed lines mark key geopolitical events in 2014 and 2022 for temporal reference.](images/russia_oil_exports_1.png){#fig-1}
+
+## Data Acquisition from OEC API
+
+The trade data was programmatically retrieved from the Observatory of Economic Complexity's [Tesseract API](https://docs.oec.world/tesseract/) using a loop-based approach developed with assistance from Claude Sonnet 4 and Google Gemini 2.5. The technique employed [`{httr}`](https://httr.r-lib.org/) for making GET requests and [`{jsonlite}`](https://cran.r-project.org/web/packages/jsonlite/index.html) for parsing JSON responses, iterating through years 2010-2023 to fetch textile woven fabric exports (HS4 code: 52709) from EU countries. Each API call was constructed by dynamically replacing a year placeholder in the base URL, with error handling to check HTTP status codes and a respectful 0.5-second delay between requests using [`Sys.sleep()`](https://stat.ethz.ch/R-manual/R-devel/library/base/html/Sys.sleep.html). The yearly datasets were stored in a list and combined using [`bind_rows()`](https://dplyr.tidyverse.org/reference/bind.html) from [`{dplyr}`](https://dplyr.tidyverse.org/), with column names cleaned using [`rename_with()`](https://dplyr.tidyverse.org/reference/rename.html) and regular expressions to ensure consistency across the final consolidated dataset.
 
 ```{r}
 # Load required libraries
@@ -139,7 +147,7 @@ if (length(yearly_data_list) > 0) {
 rm(list = setdiff(ls(), "trade_data"))
 ```
 
-Loading required packages
+## Loading packages & defining Visualization Parameters
 
 ```{r}
 #| label: setup
@@ -151,7 +159,8 @@ pacman::p_load(
   fontawesome,   # Icons display in ggplot2
   ggtext,        # Markdown text in ggplot2
   showtext,      # Display fonts in ggplot2
-  patchwork      # Composing plots
+  patchwork,     # Composing plots
+  ggalluvial     # Alluvial Plots in R with ggplot2
 )
 
 bts = 40 # Base Text Size
@@ -195,7 +204,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 ```
 
-Basic Data Wrangling
+## Creating the Russian Oil Exports Area Chart
+
+This stacked area chart was built using [`{ggplot2}`](https://ggplot2.tidyverse.org/)'s [`geom_area()`](https://ggplot2.tidyverse.org/reference/geom_ribbon.html) function to show cumulative trade values over time. The data preprocessing used [`{dplyr}`](https://dplyr.tidyverse.org/) and [`fct_lump_n()`](https://forcats.tidyverse.org/reference/fct_lump.html) from [`{forcats}`](https://forcats.tidyverse.org/) to identify the top 9 importing countries by trade value, consolidating smaller importers into an "Others" category. The visualization employed white borders between areas for visual separation, alpha transparency for subtle layering, and [`{paletteer}`](https://emilhvitfeldt.github.io/paletteer/)'s "basetheme::royal" palette. Scale formatting was handled by [`{scales}`](https://scales.r-lib.org/) functions like [`label_number()`](https://scales.r-lib.org/reference/label_number.html) with [`cut_short_scale()`](https://scales.r-lib.org/reference/cut_short_scale.html) to display values in billions with dollar prefixes, while the legend was positioned inside the plot area using ggplot2's [`legend.position.inside`](https://ggplot2.tidyverse.org/reference/theme.html) parameter.
 
 ```{r}
 
@@ -207,8 +218,9 @@ df1 <- trade_data |>
     importer_country = fct(importer_country),
     importer_country = fct_lump_n(
       importer_country,
-      n = 15,
-      w = trade_value
+      n = 9,
+      w = trade_value,
+      other_level = "Others"
     )
   ) |> 
   select(importer_country, year, trade_value) |> 
@@ -243,7 +255,7 @@ g <- df1 |>
   #   hjust = 0,
   #   nudge_x = 0.2
   # ) +
-  paletteer::scale_fill_paletteer_d("ggthemes::Hue_Circle") +
+  paletteer::scale_fill_paletteer_d("basetheme::royal", direction = -1) +
   scale_y_continuous(
     labels = label_number(
       prefix = "$",
@@ -298,15 +310,251 @@ ggsave(
 )
 ```
 
-![](images/russia_oil_exports_2.png){width="500"}
+![Stacked area chart showing cumulative Russian oil imports by top importing countries from 2010-2023, with each colored layer representing a different nation's trade volume over time.](images/russia_oil_exports_2.png){#fig-2 width="500"}
 
-Making the Plot - {ggalluvial}
+## Creating the Russian Oil Exports Alluvial Plot
+
+This alluvial diagram was created using R's powerful [`{ggalluvial}`](https://corybrunson.github.io/ggalluvial/) package, which extends [`{ggplot2}`](https://ggplot2.tidyverse.org/) to create flow visualizations that show how categorical data changes over time. The visualization process began with data manipulation using [`{dplyr}`](https://dplyr.tidyverse.org/) functions like [`fct_lump_n()`](https://forcats.tidyverse.org/reference/fct_lump.html) from [`{forcats}`](https://forcats.tidyverse.org/) to identify the top 9 importing countries by trade value, grouping smaller importers into an "Others" category. The core visualization leverages [`geom_alluvium()`](https://corybrunson.github.io/ggalluvial/reference/geom_alluvium.html) to create the flowing bands between years and [`geom_stratum()`](https://corybrunson.github.io/ggalluvial/reference/geom_stratum.html) to define the categorical blocks at each time point. Country labels were strategically positioned using [`stat_stratum()`](https://corybrunson.github.io/ggalluvial/reference/stat_stratum.html) with [`position_nudge()`](https://ggplot2.tidyverse.org/reference/position_nudge.html) to place them at the start (2010) and end (2023) of the timeline, with text sizing based on trade values. Historical context was added through vertical dashed lines created with [`geom_segment()`](https://ggplot2.tidyverse.org/reference/geom_segment.html) and rotated text annotations marking the 2014 Crimean annexation and 2022 Ukraine war. The color palette came from [`{paletteer}`](https://emilhvitfeldt.github.io/paletteer/), while typography was enhanced using [`{showtext}`](https://github.com/yixuan/showtext) to incorporate Google Fonts, and the overall aesthetic was refined with a custom [`theme_minimal()`](https://ggplot2.tidyverse.org/reference/ggtheme.html) configuration that positioned legends, adjusted margins, and styled grid lines to create a clean, publication-ready visualization.
 
 ```{r}
 
-pacman::p_load(ggalluvial)
+# pacman::p_load(ggalluvial)
 
-vignette(topic = "ggalluvial", package = "ggalluvial")
+# Some testing code to learn from vignettes given by {ggalluvial}
+
+# vignette(topic = "ggalluvial", package = "ggalluvial")
+# data(Refugees, package = "alluvial")
+# 
+# Refugees |> 
+#   as_tibble()
+# 
+# ggplot(
+#   data = Refugees,
+#   aes(x = year, y = refugees, alluvium = country)) +
+#   geom_alluvium(aes(fill = country, colour = country),
+#                 alpha = .75, decreasing = FALSE) +
+#   scale_x_continuous(breaks = seq(2003, 2013, 2)) +
+#   theme_bw()
+
+plot_title <- "Changing Markets for Russian Oil"
+
+plot_subtitle <- "Post-2014 and 2022, European demand fell significantly as Asian markets, led by China and India, partially offset declining global volumes." |> str_wrap(72)
+
+str_view(plot_subtitle)
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      alluvium = importer_country,
+      y = trade_value,
+      stratum = importer_country,
+      fill = importer_country
+    )
+  ) +
+  geom_alluvium(
+    alpha = 0.5,
+    decreasing = FALSE
+  ) +
+  geom_stratum(
+    colour = "transparent",
+    alpha = 0.25,
+    width = 0.15,
+    linewidth = 0.2,
+    decreasing = FALSE
+  ) +
+  stat_stratum(
+    geom = "text",
+    data = df1 |> filter(year == 2010),
+    mapping = aes(label = importer_country, size = trade_value),
+    decreasing = FALSE,
+    colour = text_col,
+    hjust = 1,
+    position = position_nudge(x = -0.4),
+    check_overlap = TRUE,
+    family = "caption_font"
+  ) +
+  stat_stratum(
+    geom = "text",
+    data = df1 |> filter(year == 2023),
+    mapping = aes(label = importer_country, size = trade_value),
+    decreasing = FALSE,
+    colour = text_col,
+    hjust = 0,
+    position = position_nudge(x = 0.4),
+    check_overlap = TRUE,
+    family = "caption_font"
+  ) +
+  scale_size_continuous(range = c(3, 12)) +
+  scale_x_continuous(
+    breaks = c(seq(2010, 2020, 3), 2021, 2023),
+    expand = expansion(0.1)
+  ) +
+  scale_y_continuous(
+    expand = expansion(0),
+    labels = scales::label_number(
+      prefix = "$ ",
+      scale_cut = cut_short_scale(space = T)
+    )
+  ) +
+  guides(
+    fill = guide_legend(
+      nrow = 3
+    ),
+    size = "none"
+  ) +
+  geom_segment(
+    x = 2013.9, xend = 2013.9,
+    y = 0, yend = 150e9,
+    colour = text_col,
+    linewidth = 0.3,
+    linetype = 2
+  ) +
+  annotate(
+    geom = "text",
+    label = "Russian Annexation of Crimea (20 February, 2014)",
+    x = 2013.9,
+    y = 150e9,
+    angle = 90,
+    hjust = 1,
+    vjust = -0.3,
+    family = "body_font",
+    size = bts * 0.4
+  ) +
+  geom_segment(
+    x = 2021.9, xend = 2021.9,
+    y = 0, yend = 150e9,
+    colour = text_col,
+    linewidth = 0.3,
+    linetype = 2
+  ) +
+  annotate(
+    geom = "text",
+    label = "Start of Ukraine War (24 February, 2022)",
+    x = 2021.9,
+    y = 150e9,
+    angle = 90,
+    hjust = 1,
+    vjust = -0.3,
+    family = "body_font",
+    size = bts * 0.4
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    fill = NULL,
+    x = NULL,
+    y = "Imports of Russian Oil (in Billions, US $)"
+  ) +
+  paletteer::scale_fill_paletteer_d("basetheme::royal", direction = -1) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts * 1.5
+  ) +
+  theme(
+    
+    legend.position = "inside",
+    legend.position.inside = c(1, 1),
+    legend.justification = c(1, 1),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.key.spacing = unit(1, "mm"),
+    legend.text = element_text(
+      margin = margin(0,4,0,2, "mm"),
+      size = bts * 0.8
+    ),
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(3,0,2,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2.4 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(0,0,2,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.4 * bts,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.7,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(3,3,3,3, "mm"),
+    
+    # Axes Lines, Ticks, Text and labels
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.text.x = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil,
+      size = bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil,
+      family = "caption_font",
+      size = 0.75 * bts,
+      vjust = 0
+    ),
+    axis.title.y = element_text(
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1
+    ),
+    axis.title.x = element_text(
+      colour = text_hil,
+      margin = margin(2,2,2,2, "mm"),
+      size = bts * 1.5
+    ),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_line(
+      colour = alpha(text_col, 0.9),
+      linewidth = 0.2,
+      linetype = 3
+    ),
+    panel.grid.major.x = element_line(
+      colour = alpha(text_col, 0.4),
+      linewidth = 0.2,
+      linetype = 3
+    )
+  )
+
+ggsave(
+  plot = g,
+  filename = here::here("projects", "images", 
+                        "russia_oil_exports_1.png"),
+  height = 2000 * 5 / 4,
+  width = 2000,
+  units = "px",
+  bg = "grey95"
+)
 ```
 
 ## Visualizing Russia's Oil Exports
@@ -315,10 +563,44 @@ vignette(topic = "ggalluvial", package = "ggalluvial")
 ggsave(
   plot = g,
   filename = here::here("projects", "images", 
-                        "nyt_election_data_3.png"),
+                        "russia_oil_exports_1.png"),
   height = 2000 * 5 / 4,
   width = 2000,
   units = "px",
   bg = "grey95"
 )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+pacman::p_load(
+  ggalluvial,    # Alluvial diagrams and flow visualizations
+  tidyverse,     # Data manipulation & visualization
+  scales,        # Nice scales for ggplot2
+  fontawesome,   # Icons display in ggplot2
+  ggtext,        # Markdown text in ggplot2
+  showtext,      # Display fonts in ggplot2
+  patchwork,     # Composing plots
+  ggalluvial     # Alluvial Plots in R with ggplot2
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
 ```
