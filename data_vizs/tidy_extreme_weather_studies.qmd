@@ -1,0 +1,332 @@
+---
+title: "tidy_extreme_weather_studies"
+author: "Aditya Dahiya"
+date: "2025-08-13"
+subtitle: "tidy_extreme_weather_studies"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_extreme_weather_studies.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This dataset explores extreme weather attribution studies, sourced from [Carbon Brief](https://carbonbrief.org/)'s comprehensive article [Mapped: How climate change affects extreme weather around the world](https://interactive.carbonbrief.org/attribution-studies/index.html). Last updated in November 2024, the data includes individual entries for attribution studies that calculate whether and by how much climate change affected the intensity, frequency, or impact of extreme weather events—ranging from wildfires in the US and drought in South Africa to record-breaking rainfall in Pakistan and typhoons in Taiwan. The dataset covers studies published over multiple years, including both traditional attribution studies and rapid attribution studies (analyses completed within days of an event occurring). Each entry contains detailed information about the event studied, geographic location using [ISO country codes](https://www.iso.org/iso-3166-country-codes.html), event classification based on climate change influence, publication details, and whether the study represents a rapid response analysis. For those interested in the evolution of this scientific field, Carbon Brief also provides an [in-depth Q&A article](https://carbonbrief.org/qa-the-evolving-science-of-extreme-weather-attribution/) exploring the development of extreme weather attribution science. The dataset was curated by [Rajo](https://github.com/rajodm) for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) weekly data project, making it an excellent resource for exploring questions about how attribution studies have evolved over time, which types of extreme events are most commonly studied, regional focus patterns, and trends in climate change influence across different weather phenomena.
+
+![tidy_extreme_weather_studies](tidy_extreme_weather_studies.png){#fig-1}
+
+# How the Graphic Was Created
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+# Option 2: Read data directly from GitHub
+
+attribution_studies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-08-12/attribution_studies.csv')
+# attribution_studies_raw <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-08-12/attribution_studies_raw.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Custom Colours for dots
+custom_dot_colours <- paletteer::paletteer_d("nbapalettes::cavaliers_retro")
+
+# Custom size for dots
+size_var <- 14
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** Joe Hasell at Our World in Data", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "tidy_extreme_weather_studies"
+
+plot_subtitle <- "tidy_extreme_weather_studies" |> str_wrap(110)
+
+str_view(plot_subtitle)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# pacman::p_load(summarytools)
+
+# Get data on classification and year by countries to try to make a pie chart
+# for each country on top of a world map
+attribution_studies |> 
+  mutate(
+    event_year = parse_number(event_year)
+  ) |>
+  #filter(event_year > 1900) |> 
+  filter(study_focus == "Event") |> 
+  filter(!is.na(iso_country_code)) |> 
+  select(event_year, iso_country_code, classification, event_name)
+  
+  
+# pacman::p_unload(summarytools)
+
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+
+
+
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    x = "Gini Coefficient (0 = Perfect Equality, 1 = Maximum Inequality)",
+    y = NULL,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    # Legend: Not needed as colour does not convey any additional information
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,5,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size =  bts,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(8,0,5,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.8,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = alpha(text_hil, 0.7),
+      linewidth = 0.3,
+      linetype = 3
+    ),
+    
+    # Axes Lines, Ticks, Text and labels
+    axis.line.x = element_line(
+      colour = text_hil,
+      linewidth = 0.3,
+      arrow = arrow(length = unit(5, "mm"))
+    ),
+    axis.line.y = element_blank(),
+    axis.ticks.x = element_line(
+      colour = text_hil,
+      linewidth = 0.3,
+    ),
+    axis.ticks.length = unit(5, "mm"),
+    axis.ticks.length.y = unit(0, "mm"),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil
+    ),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(
+      colour = text_hil,
+      margin = margin(2,0,0,0, "mm"),
+      size = bts
+    )
+    
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_extreme_weather_studies.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_extreme_weather_studies.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_extreme_weather_studies.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork             # Composing Plots
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
