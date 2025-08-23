@@ -1,10 +1,13 @@
 ---
-title: "tidy_extreme_weather_studies"
+title: "Mapping Global Climate Attribution Studies"
 author: "Aditya Dahiya"
-date: "2025-08-13"
-subtitle: "tidy_extreme_weather_studies"
+date: "2025-08-23"
+subtitle: "Using scatterpie and sf to visualize global extreme weather attribution studies"
 categories:
   - "#TidyTuesday"
+  - "Maps"
+  - "{scatterpie}"
+  - "Pie Chart"
 image: "thumbnails/tidy_extreme_weather_studies.png"
 format:
   html:
@@ -35,9 +38,11 @@ comments:
 
 This dataset explores extreme weather attribution studies, sourced from [Carbon Brief](https://carbonbrief.org/)'s comprehensive article [Mapped: How climate change affects extreme weather around the world](https://interactive.carbonbrief.org/attribution-studies/index.html). Last updated in November 2024, the data includes individual entries for attribution studies that calculate whether and by how much climate change affected the intensity, frequency, or impact of extreme weather events—ranging from wildfires in the US and drought in South Africa to record-breaking rainfall in Pakistan and typhoons in Taiwan. The dataset covers studies published over multiple years, including both traditional attribution studies and rapid attribution studies (analyses completed within days of an event occurring). Each entry contains detailed information about the event studied, geographic location using [ISO country codes](https://www.iso.org/iso-3166-country-codes.html), event classification based on climate change influence, publication details, and whether the study represents a rapid response analysis. For those interested in the evolution of this scientific field, Carbon Brief also provides an [in-depth Q&A article](https://carbonbrief.org/qa-the-evolving-science-of-extreme-weather-attribution/) exploring the development of extreme weather attribution science. The dataset was curated by [Rajo](https://github.com/rajodm) for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) weekly data project, making it an excellent resource for exploring questions about how attribution studies have evolved over time, which types of extreme events are most commonly studied, regional focus patterns, and trends in climate change influence across different weather phenomena.
 
-![tidy_extreme_weather_studies](tidy_extreme_weather_studies.png){#fig-1}
+![This world map visualizes extreme weather attribution studies by country using proportional pie charts from Carbon Brief's database. Each pie chart is positioned at a country's geographic center, with slice sizes representing the proportion of studies finding climate change made events more severe/likely, had no discernible human influence, provided insufficient data, or made events less severe/likely. Pie chart sizes correspond to the total number of attribution studies conducted per country. The visualization reveals the global scientific consensus that climate change is predominantly making extreme weather events more dangerous worldwide.](tidy_extreme_weather_studies.png){#fig-1}
 
-# How the Graphic Was Created
+## How I Made This Graphic
+
+This world map visualization was created using R's powerful geospatial and data visualization ecosystem. The foundation began with data wrangling using the [`tidyverse`](https://www.tidyverse.org/) suite, where I filtered the attribution studies data to focus on event-specific studies and parsed country codes using [`separate_longer_delim()`](https://tidyr.tidyverse.org/reference/separate_longer_delim.html) to handle multi-country studies. The base world map was generated using [`rnaturalearth::ne_countries()`](https://docs.ropensci.org/rnaturalearth/reference/ne_countries.html) and processed with the [`sf`](https://r-spatial.github.io/sf/) package for spatial operations, including coordinate transformation and centroid calculation to position pie charts at each country's geographic center. The key visualization technique employed the [`scatterpie`](https://github.com/GuangchuangYu/scatterpie) package, specifically [`geom_scatterpie()`](https://guangchuangyu.github.io/scatterpie/reference/geom_scatterpie.html), which creates proportional pie charts where each slice represents the classification of extreme weather events (more severe/likely, no discernible influence, insufficient data, or less severe/likely). Typography was enhanced using [`showtext`](https://github.com/yixuan/showtext) with Google Fonts integration via [`font_add_google()`](https://cran.r-project.org/web/packages/showtext/showtext.pdf), while [`ggtext`](https://wilkelab.org/ggtext/) enabled markdown formatting in plot elements. The spatial coordinate system was managed through [`coord_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html) with EPSG:4326 projection, and custom legends were positioned using [`geom_scatterpie_legend()`](https://guangchuangyu.github.io/scatterpie/reference/geom_scatterpie_legend.html). Color palettes were sourced from [`paletteer`](https://emilhvitfeldt.github.io/paletteer/), and the final composition used [`ggthemes::theme_map()`](https://jrnold.github.io/ggthemes/reference/theme_map.html) for a clean cartographic aesthetic. The resulting visualization effectively demonstrates that across most countries with recorded extreme weather attribution studies, the majority of events are classified as "more severe or more likely to occur" due to climate change, represented by the dominant color in most pie charts globally.
 
 ### Loading required libraries
 
@@ -53,7 +58,8 @@ pacman::p_load(
   showtext,             # Display fonts in ggplot2
   colorspace,           # Lighten and Darken colours
 
-  patchwork             # Composing Plots
+  patchwork,            # Composing Plots
+  sf                    # Spatial Operations
 )
 
 # Option 2: Read data directly from GitHub
@@ -119,7 +125,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** Joe Hasell at Our World in Data", 
+  "**Data:** Carbon Brief", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -130,9 +136,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_extreme_weather_studies"
+plot_title <- "The Attribution Map: Climate Change and Weather Extremes"
 
-plot_subtitle <- "tidy_extreme_weather_studies" |> str_wrap(110)
+plot_subtitle <- "This world map displays pie charts for each country showing the classification of extreme weather attribution studies from<br>Carbon Brief's database. Each pie represents the proportion of studies finding climate change made events <span style='color:#BD5630FF'>**more severe/likely**</span>, had<br><span style='color:#6D8325FF'>**no discernible influence**</span>, provided <span style='color:grey'>**insufficient data**</span>, or made events <span style='color:#6D8325FF'>**less severe/likely**</span>. The size of each pie reflects<br>the total number of attribution studies conducted. Globally, the dominant <span style='color:#BD5630FF'>**red segments**</span> reveal that most extreme weather<br>events are becoming more severe due to climate change."
 
 str_view(plot_subtitle)
 ```
@@ -144,21 +150,59 @@ str_view(plot_subtitle)
 
 # pacman::p_load(summarytools)
 
+# A base world map to plot
+world_map <- rnaturalearth::ne_countries(scale = "large") |> 
+  select(iso_a3, geometry) |> 
+  rename(iso3c = iso_a3)
+
 # Get data on classification and year by countries to try to make a pie chart
 # for each country on top of a world map
-attribution_studies |> 
+df1 <- attribution_studies |> 
   mutate(
     event_year = parse_number(event_year)
   ) |>
   #filter(event_year > 1900) |> 
   filter(study_focus == "Event") |> 
   filter(!is.na(iso_country_code)) |> 
-  select(event_year, iso_country_code, classification, event_name)
+  select(event_year, iso_country_code, classification) |> 
+  rename(iso3c = iso_country_code) |> 
+  separate_longer_delim(cols = iso3c, ",") |> 
+  count(iso3c, classification)
   
-  
-# pacman::p_unload(summarytools)
+# Make data in format that {scatterpie} understands
+df_scatterpie <- df1 |>
+  pivot_wider(
+    id_cols = iso3c,
+    names_from = classification,
+    values_from = n
+  ) |> 
+  mutate(across(everything(), ~ replace_na(.x, 0))) |> 
+  left_join(
+    df1 |> 
+      group_by(iso3c) |> 
+      summarise(radius_var = sum(n))
+  ) |> 
+  # add centroids of each country
+  left_join(
+    world_map |> 
+      st_transform(crs = "EPSG:3857") |> 
+      sf::st_centroid() |> 
+      st_transform(crs = "EPSG:4326") |> 
+      st_coordinates() |> 
+      as_tibble() |>
+      bind_cols(world_map |> st_drop_geometry() |> select(iso3c)) |> 
+      rename(longitude = X, latitude = Y)
+  ) |> 
+  mutate(
+    iso3c_label = countrycode::countrycode(
+      iso3c, 
+      origin = "iso3c", 
+      destination = "country.name.en"
+    )
+  ) |> 
+  arrange(desc(radius_var))
 
-
+pacman::p_load(scatterpie)
 ```
 
 ### The Plot
@@ -166,24 +210,122 @@ attribution_studies |>
 ```{r}
 #| label: base-plot
 
+scale_factor <- 2
 
-
-
+g <- ggplot() +
+  geom_sf(
+    data = world_map |> filter(iso3c != "ATA"),
+    fill = "grey90",
+    colour = bg_col,
+    linewidth = 0.3,
+    linetype = 3
+  ) +
+  
+  scatterpie::geom_scatterpie(
+    data = df_scatterpie,
+    mapping = aes(
+      x = longitude, y = latitude, 
+      group = iso3c, r = log(radius_var + 1) * scale_factor
+    ),
+    cols = colnames(df_scatterpie)[2:5], 
+    color = bg_col, 
+    alpha = 0.9,
+    linewidth = 0.1
+  ) +
+  
+  # Add country labels (iso3c)
+  geom_text(
+    data = df_scatterpie,
+    mapping = aes(
+      x = longitude, 
+      y = latitude, 
+      label = str_wrap(iso3c_label, 15),
+      size = log(radius_var + 1) * scale_factor
+    ),
+    colour = text_col,
+    family = "caption_font",
+    vjust = -1.4,  # Position above pie chart
+    hjust = 0.5,
+    check_overlap = TRUE,
+    lineheight = 0.3
+  ) +
+  
+  # Add numeric value labels
+  geom_text(
+    data = df_scatterpie,
+    mapping = aes(
+      x = longitude, 
+      y = latitude, 
+      label = radius_var,
+      size = log(radius_var + 1) * scale_factor
+    ),
+    colour = text_hil,
+    family = "body_font", 
+    hjust = 0.5,
+    vjust = 0.5,
+    check_overlap = TRUE
+  ) +
+  scale_size_continuous(range = c(bts/20, bts/2)) +
+  
+  coord_sf(
+    crs = "EPSG:4326",
+    default_crs = "EPSG:4326"
+  ) +
+  
+  # Custom legend with specific breaks
+  geom_scatterpie_legend(
+    log(c(5, 10, 50, 90) + 1) * scale_factor,  # Transform the desired break points
+    x = -160, 
+    y = -55,
+    n = 4,  # Four legend circles for our breaks
+    labeller = function(x) c("5", "10", "50", "90"),
+    size = bts / 5,
+    family = "body_font",
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "text",
+    x = -160, 
+    y = -40,
+    label = "Number of studies",
+    size = bts / 3,
+    family = "body_font",
+    colour = text_hil,
+    hjust = 0.5
+  ) +
+  scale_fill_manual(
+    values = c("#6D8325FF", "#7FC7AFFF", "grey", "#BD5630FF" )
+  ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
-    x = "Gini Coefficient (0 = Perfect Equality, 1 = Maximum Inequality)",
+    x = NULL,
     y = NULL,
     caption = plot_caption
   ) +
-  theme_minimal(
+  guides(
+    size = "none",
+    fill = guide_legend(
+      title = NULL,
+      override.aes = list(
+        size = 15,
+        shape = 1
+      )
+    )
+  ) +
+  ggthemes::theme_map(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
     
-    # Legend: Not needed as colour does not convey any additional information
-    legend.position = "none",
+    legend.position = "bottom",
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm")
+    ),
+    legend.title = element_blank(),
     
     # Overall
     text = element_text(
@@ -198,16 +340,18 @@ attribution_studies |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2 * bts,
+      size = 2.5 * bts,
       family = "body_font",
       face = "bold"
       ),
-    plot.subtitle = element_text(
+    plot.subtitle = element_textbox(
       margin = margin(2,0,5,0, "mm"),
       vjust = 0.5,
       colour = text_hil,
       size =  bts,
+      halign = 0.5,
       hjust = 0.5,
+      valign = 0.5,
       family = "body_font",
       lineheight = 0.3
       ),
@@ -221,42 +365,7 @@ attribution_studies |>
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
-    plot.margin = margin(5,5,5,5, "mm"),
-    panel.grid.minor.y = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    panel.grid.major.x = element_line(
-      colour = alpha(text_hil, 0.7),
-      linewidth = 0.3,
-      linetype = 3
-    ),
-    
-    # Axes Lines, Ticks, Text and labels
-    axis.line.x = element_line(
-      colour = text_hil,
-      linewidth = 0.3,
-      arrow = arrow(length = unit(5, "mm"))
-    ),
-    axis.line.y = element_blank(),
-    axis.ticks.x = element_line(
-      colour = text_hil,
-      linewidth = 0.3,
-    ),
-    axis.ticks.length = unit(5, "mm"),
-    axis.ticks.length.y = unit(0, "mm"),
-    axis.ticks.y = element_blank(),
-    axis.text.x = element_text(
-      margin = margin(1,1,1,1, "mm"),
-      colour = text_hil
-    ),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(
-      colour = text_hil,
-      margin = margin(2,0,0,0, "mm"),
-      size = bts
-    )
-    
+    plot.margin = margin(5,5,5,5, "mm")
   )
 
 ggsave(
@@ -265,8 +374,8 @@ ggsave(
     "tidy_extreme_weather_studies.png"
   ),
   plot = g,
-  width = 400,
-  height = 500,
+  width = 500,
+  height = 400,
   units = "mm",
   bg = bg_col
 )
@@ -301,7 +410,6 @@ image_read(here::here("data_vizs",
 #| label: tbl-session-info
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
-
 
 pacman::p_load(
   tidyverse,            # All things tidy
