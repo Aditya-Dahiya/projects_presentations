@@ -1,10 +1,13 @@
 ---
-title: "tidy_scottish_munros"
+title: "Mapping the Evolution of Scottish Munros"
 author: "Aditya Dahiya"
-date: "2025-08-22"
-subtitle: "tidy_scottish_munros"
+date: "2025-08-23"
+subtitle: "Spatial analysis with {sf}, visualization with {ggplot2}, and enhanced text styling with {ggtext}"
 categories:
   - "#TidyTuesday"
+  - "Maps"
+  - "{ggtext}"
+  - "Data Wrangling"
 image: "thumbnails/tidy_scottish_munros.png"
 format:
   html:
@@ -35,9 +38,11 @@ comments:
 
 This dataset contains information about Scottish Munros, mountains with elevations exceeding 3,000 feet (914 meters), sourced from [The Database of British and Irish Hills](https://www.hills-database.co.uk/) v18.2 and made available under a [Creative Commons Attribution 4.0 International Licence](https://creativecommons.org/licenses/by/4.0/). Originally catalogued by Sir Hugh Munro in 1891, these peaks differ from other Scottish mountain classifications by lacking rigid prominence requirements, making the list subject to periodic revisions as new surveys are conducted. The dataset tracks the classification status of each peak across multiple revisions from 1891 to 2021, documenting whether summits were designated as full Munros, subsidiary Munro Tops, or excluded entirely during different time periods. Each entry includes precise coordinates using the British National Grid projection system, enabling geographic analysis of these iconic Scottish highlands. This data was curated by [Nicola Rennie](https://github.com/nrennie) as part of the [TidyTuesday](https://github.com/rfordatascience/tidytuesday) weekly data project, providing researchers and enthusiasts with a comprehensive historical record of how Scotland's most celebrated peaks have been classified over more than a century.
 
-![.............................](tidy_scottish_munros.png){#fig-1}
+![This map displays changes to Scotland's official Munro list—mountains exceeding 3,000 feet in elevation—across nine survey revisions from 1921 to 1997. Each dot represents a Munro peak: green dots indicate mountains newly added to the list in that survey year, red dots show peaks that will be dropped in the next revision, and gray dots represent mountains that remained unchanged between consecutive surveys. The shifting classifications reflect improvements in surveying techniques and measurement accuracy over more than a century of Scottish mountaineering history.](tidy_scottish_munros.png){#fig-1}
 
 # How the Graphic Was Created
+
+This visualization was created using R's powerful mapping and data visualization ecosystem. I started by loading the Scottish Munros dataset and transforming it using the [`tidyverse`](https://www.tidyverse.org/) suite of packages, particularly [`dplyr`](https://dplyr.tidyverse.org/) for data manipulation and [`tidyr`](https://tidyr.tidyverse.org/) for reshaping the data from wide to long format with [`pivot_longer()`](https://tidyr.tidyverse.org/reference/pivot_longer.html). The coordinate data was converted into spatial objects using the [`sf`](https://r-spatial.github.io/sf/) package's [`st_as_sf()`](https://r-spatial.github.io/sf/reference/st_as_sf.html) function, specifying the British National Grid (OSGB36) projection (CRS 27700). To categorize each Munro's status across survey years, I developed custom helper functions to identify previous and next years in the chronological sequence, then used [`purrr`](https://purrr.tidyverse.org/)'s [`map2_lgl()`](https://purrr.tidyverse.org/reference/map2.html) function to determine whether each peak was newly added, unchanged, or dropped in subsequent surveys. The Scotland boundary data was obtained using [`geodata::gadm()`](https://github.com/rspatial/geodata) and transformed to match the coordinate system. The final visualization was built with [`ggplot2`](https://ggplot2.tidyverse.org/), using [`geom_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html) to plot both the country boundary and Munro locations, [`facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html) to create separate panels for each survey year, and [`ggtext::geom_richtext()`](https://wilkelab.org/ggtext/reference/geom_richtext.html) to add formatted summary statistics. Custom fonts were integrated using [`showtext`](https://github.com/yixuan/showtext), while the color palette and styling were enhanced with [`paletteer`](https://emilhvitfeldt.github.io/paletteer/) and extensive [`theme()`](https://ggplot2.tidyverse.org/reference/theme.html) customizations to create a clean, professional cartographic presentation.
 
 ### Loading required libraries
 
@@ -119,7 +124,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** Joe Hasell at Our World in Data", 
+  "**Data:** The Database of British and Irish Hills", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -130,9 +135,9 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_scottish_munros"
+plot_title <- "Scottish Munros: A Century of Reclassification"
 
-plot_subtitle <- "tidy_scottish_munros" |> str_wrap(110)
+plot_subtitle <- "Mountains over 3,000 feet have been <span style='color:#088158FF'>**added**</span> and <span style='color:#BA2F2AFF'>**dropped**</span> from Scotland's official Munro<br>list across multiple surveys. Gray peaks remained unchanged between consecutive revisions."
 
 str_view(plot_subtitle)
 ```
@@ -143,33 +148,33 @@ str_view(plot_subtitle)
 #| label: eda
 
 # How many distinct munors are there
-scottish_munros |> 
-  distinct(do_bih_number)
+# scottish_munros |> 
+#   distinct(do_bih_number)
 
-scottish_munros |> 
-  distinct(name)
+# scottish_munros |> 
+#   distinct(name)
 
 # Convert into sf object for British National Grid (OSGB36) projection
-df1 <- scottish_munros |> 
-  distinct(do_bih_number, name, xcoord, ycoord, height_m) |> 
-  drop_na() |> 
-  st_as_sf(coords = c("xcoord", "ycoord"), crs = 27700)
-
-scottish_munros |> 
-  select(height_m) |> 
-  ggplot(aes(height_m)) +
-  geom_boxplot()
-
-df1 |> 
-  ggplot() +
-  geom_sf(
-    aes(colour = height_m),
-    size = 0.8
-  ) +
-  paletteer::scale_colour_paletteer_c(
-    "grDevices::Purple-Yellow",
-    direction = -1
-  )
+# df1 <- scottish_munros |> 
+#   distinct(do_bih_number, name, xcoord, ycoord, height_m) |> 
+#   drop_na() |> 
+#   st_as_sf(coords = c("xcoord", "ycoord"), crs = 27700)
+# 
+# scottish_munros |> 
+#   select(height_m) |> 
+#   ggplot(aes(height_m)) +
+#   geom_boxplot()
+# 
+# df1 |> 
+#   ggplot() +
+#   geom_sf(
+#     aes(colour = height_m),
+#     size = 0.8
+#   ) +
+#   paletteer::scale_colour_paletteer_c(
+#     "grDevices::Purple-Yellow",
+#     direction = -1
+#   )
 
 df2 <- scottish_munros |> 
   filter(!is.na(xcoord) & !is.na(ycoord)) |> 
@@ -198,7 +203,7 @@ get_prev_year <- function(year) {
 }
 
 get_next_year <- function(year) {
-  idx <- which(year_order == year) |> 
+  idx <- which(year_order == year)
   if (idx == length(year_order)) return(NA) else return(year_order[idx + 1])
 }
 
@@ -246,7 +251,8 @@ plotdf1 <- plotdf |>
       filter(!is.na(xcoord) & !is.na(ycoord)) |> 
       st_as_sf(coords = c("xcoord", "ycoord"), crs = 27700)
   ) |> 
-  st_as_sf()
+  st_as_sf() |> 
+  filter(!(year %in% c(1891, 2021)))
 
 # A summary table for labels in the facet
 plotdf2 <- plotdf |>
@@ -254,6 +260,10 @@ plotdf2 <- plotdf |>
   pivot_wider(names_from = label_var, values_from = n, values_fill = 0) |>
   arrange(year) |> 
   filter(year != 1891)
+label_vector <- colnames(plotdf2)
+plotdf2 <- plotdf2 |> 
+  janitor::clean_names() |>
+  filter(year != 2021)
 
 scotland <- geodata::gadm(
   country = "United Kingdom",
@@ -266,7 +276,9 @@ scotland <- geodata::gadm(
   filter(name_1 == "Scotland") |> 
   st_transform(crs = 27700)
   
-
+scotland
+plotdf1
+plotdf2
 ```
 
 ### The Plot
@@ -278,17 +290,88 @@ g <- plotdf1 |>
   ggplot() +
   geom_sf(
     data = scotland,
-    fill = "lightgrey"
+    fill = "grey80",
+    linewidth = 0.3,
+    colour = "grey60"
   ) +
   geom_sf(
-    data = 
-  )
-
-
+    data = plotdf1,
+    mapping = aes(colour = label_var),
+    size = 0.75,
+    alpha = 0.8
+  ) +
+  geom_sf(
+    data = plotdf1 |> filter(label_var != "Unchanged"),
+    mapping = aes(colour = label_var),
+    size = 2.5,
+    pch = 21,
+    fill = "transparent",
+    stroke = 2
+  ) +
+  geom_text(
+    data = plotdf2,
+    mapping = aes(
+      x = -8,
+      y = 59.5,
+      label = year
+    ),
+    size = bts / 2,
+    colour = text_hil,
+    family = "body_font",
+    hjust = 0,
+    vjust = 1,
+    fontface = "bold"
+  ) +
+  geom_richtext(
+    data = plotdf2,
+    mapping = aes(
+      x = -8,
+      y = 59,
+      label = paste0(
+        "<span style='color:#088158FF'>Newly added in this survey = ",
+        newly_added_in_this_survey,
+        "</span><br><span style='color:#BA2F2AFF'>Dropped in next survey = ",
+        dropped_in_the_next_survey,
+        "</span>"
+      )
+    ),
+    size = bts / 4.5,
+    family = "caption_font",
+    fill = "transparent",
+    hjust = 0,
+    vjust = 1,
+    lineheight = 0.4,
+    label.size = NA,
+    label.padding = unit(0, "mm")
+  ) +
+  facet_wrap(
+    ~year, ncol = 3, nrow = 3
+  ) +
+  scale_colour_manual(
+    values = c("#BA2F2AFF", "#088158FF", "grey30"),
+    labels = str_wrap(label_vector[c(3,2,4)], 14)
+  ) +
+  guides(
+    colour = guide_legend(
+      override.aes = list(
+        size = 20,
+        pch = 21,
+        fill = "transparent",
+        stroke = 4
+      )
+    )
+  ) +
+  coord_sf(
+    crs = 27700,
+    ylim = c(54.5, 59.9),
+    default_crs = "EPSG:4326",
+    clip = "off",
+    expand = FALSE
+  ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
-    x = "Gini Coefficient (0 = Perfect Equality, 1 = Maximum Inequality)",
+    x = NULL,
     y = NULL,
     caption = plot_caption
   ) +
@@ -298,8 +381,21 @@ g <- plotdf1 |>
   ) +
   theme(
     
-    # Legend: Not needed as colour does not convey any additional information
-    legend.position = "none",
+    # Legend
+    legend.position = "bottom",
+    legend.margin = margin(-20,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm"),
+      lineheight = 0.3,
+      size = 1.2 * bts
+    ),
+    legend.title = element_blank(),
+    panel.grid = element_line(
+      colour = alpha(text_col, 0.3),
+      linewidth = 0.3,
+      linetype = 3
+    ),
     
     # Overall
     text = element_text(
@@ -314,15 +410,18 @@ g <- plotdf1 |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2 * bts,
+      size = 2.2 * bts,
       family = "body_font",
       face = "bold"
       ),
-    plot.subtitle = element_text(
-      margin = margin(2,0,5,0, "mm"),
+    plot.subtitle = element_textbox(
+      margin = margin(2,0,2,0, "mm"),
+      fill = bg_col,
       vjust = 0.5,
+      valign = 0.5,
+      halign = 0.5,
       colour = text_hil,
-      size =  bts,
+      size =  bts * 1.2,
       hjust = 0.5,
       family = "body_font",
       lineheight = 0.3
@@ -332,47 +431,39 @@ g <- plotdf1 |>
       hjust = 0.5,
       halign = 0.5,
       colour = text_hil,
-      size = bts * 0.8,
+      size = bts * 1.2,
       family = "caption_font"
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
-    plot.margin = margin(5,5,5,5, "mm"),
-    panel.grid.minor.y = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    panel.grid.major.x = element_line(
-      colour = alpha(text_hil, 0.7),
-      linewidth = 0.3,
-      linetype = 3
-    ),
+    plot.margin = margin(5,0,5,5, "mm"),
     
     # Axes Lines, Ticks, Text and labels
-    axis.line.x = element_line(
-      colour = text_hil,
-      linewidth = 0.3,
-      arrow = arrow(length = unit(5, "mm"))
-    ),
-    axis.line.y = element_blank(),
-    axis.ticks.x = element_line(
-      colour = text_hil,
-      linewidth = 0.3,
-    ),
-    axis.ticks.length = unit(5, "mm"),
-    axis.ticks.length.y = unit(0, "mm"),
-    axis.ticks.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
     axis.text.x = element_text(
       margin = margin(1,1,1,1, "mm"),
-      colour = text_hil
-    ),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(
       colour = text_hil,
-      margin = margin(2,0,0,0, "mm"),
-      size = bts
-    )
+      size = 0.5 * bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(1,1,1,1, "mm"),
+      colour = text_hil,
+      size = 0.5 * bts
+    ),
     
+    # Panels
+    panel.spacing.y = unit(0.5, "mm"),
+    panel.spacing.x = unit(5, "mm"),
+    strip.text = element_blank(),
+    panel.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    ),
+    plot.background = element_rect(
+      fill = "transparent",
+      colour = "transparent"
+    )
   )
 
 ggsave(
@@ -382,7 +473,7 @@ ggsave(
   ),
   plot = g,
   width = 400,
-  height = 500,
+  height = 550,
   units = "mm",
   bg = bg_col
 )
@@ -399,7 +490,7 @@ library(magick)
 
 # Saving a thumbnail for the webpage
 image_read(here::here("data_vizs", 
-                      "tidy_scottish_munross.png")) |> 
+                      "tidy_scottish_munros.png")) |> 
   image_resize(geometry = "x400") |> 
   image_write(
     here::here(
@@ -408,7 +499,6 @@ image_read(here::here("data_vizs",
       "tidy_scottish_munros.png"
     )
   )
-
 ```
 
 ### Session Info
