@@ -1,0 +1,652 @@
+---
+title: "Europe's Energy Pivot: Mapping the Gas Import Revolution"
+author: "Aditya Dahiya"
+date: "2025-08-25"
+subtitle: "Visualizing the dramatic shift in Russian natural gas dependency across European countries from 2021 to 2023"
+categories:
+  - "Chloropleth"
+  - "Maps"
+  - "{scatterpie}"
+  - "Pie Chart"
+image: "thumbnails/viz_euro_energy_imports.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This analysis uses natural gas import data from [**Eurostat**](https://ec.europa.eu/eurostat), the official statistical office of the European Union. The dataset (`nrg_ti_gas`) contains information on natural gas trade imports measured in millions of cubic meters, broken down by importing country and partner country. The visualization compares two critical time periods: **2021**, representing the pre-Ukraine War baseline when European energy relationships were still largely intact, and **2023**, reflecting the post-invasion reality after Russia's full-scale attack on Ukraine in February 2022. This temporal comparison reveals the dramatic shift in European energy dependency, showing how individual EU member states reduced their reliance on Russian gas imports following the conflict. The data specifically tracks the percentage share of Russian gas imports relative to total gas imports for each country, illustrating the varying degrees of energy transition and diversification efforts across Europe. Countries like Germany, which historically had high Russian gas dependency through pipelines like Nord Stream, show particularly striking changes between these two periods, while others maintained different import patterns based on their geographic location, existing infrastructure, and policy responses to the crisis.
+
+The Eurostat energy statistics provide comprehensive coverage of EU member states and are considered the authoritative source for European energy trade data, making this analysis particularly valuable for understanding the geopolitical and economic impacts of the Ukraine conflict on European energy security.
+
+![This map visualizes the dramatic shift in European natural gas imports from Russia between 2021 (pre-war) and 2023 (post-invasion). Darker purple shades indicate higher percentages of Russian gas dependency, while lighter shades show lower reliance. The comparison reveals how the 2022 Ukraine conflict fundamentally reshaped Europe's energy landscape, with many countries significantly reducing their Russian gas imports. Percentages displayed on each country show the exact share of total gas imports sourced from Russia.](viz_euro_energy_imports.png){#fig-1 width="400"}
+
+## How I Made This Graphic (1)
+
+The first visualization was created using **R** and leverages several powerful packages for data manipulation, mapping, and visualization. The foundation begins with [**{tidyverse}**](https://www.tidyverse.org/) for data wrangling and [**{eurostat}**](https://ropengov.github.io/eurostat/) for directly accessing European statistical data through the `get_eurostat()` function. The mapping capabilities come from [**{sf}**](https://r-spatial.github.io/sf/) for spatial operations and [**{rnaturalearth}**](https://docs.ropensci.org/rnaturalearth/) for obtaining world map geometries. Geographic data processing involved transforming coordinate reference systems (from WGS84 to EPSG:3035 for proper European projection) and using spatial operations like `st_intersection()` to crop the world map to European boundaries. The visualization itself was built with [**{ggplot2}**](https://ggplot2.tidyverse.org/) using `geom_sf()` for mapping polygons and `geom_sf_text()` for country labels showing percentage values. Typography was enhanced using [**{showtext}**](https://github.com/yixuan/showtext) to load custom Google Fonts (Saira family), while [**{ggtext}**](https://wilkelab.org/ggtext/) enabled markdown formatting in plot elements. Colour palettes were applied using [**{paletteer}**](https://emilhvitfeldt.github.io/paletteer/) with the "grDevices::Purples" scale, and the final layout used `facet_wrap()` to create side-by-side comparison panels for 2021 and 2023. The coordinate system was set using `coord_sf()` with EPSG:3035 projection, optimized for European cartographic display, and the plot was exported using `ggsave()` with precise dimensions for high-quality output.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  eurostat,             # Package for EUROSTAT data
+  rvest,                # Package for harvesting web data
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf,                   # Spatial Operations
+  scatterpie            # To make pie charts on top of maps
+)
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey30"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey40"
+
+# Custom Colours for dots
+custom_dot_colours <- paletteer::paletteer_d("nbapalettes::cavaliers_retro")
+
+# Custom size for dots
+size_var <- 14
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:** {eurostat}", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Europe's Energy Pivot"
+
+plot_subtitle <- "Russian natural gas imports as percentage of total gas imports across European countries, comparing pre-war era (2021) with post-war reality (2023)" |> str_wrap(90)
+
+str_view(plot_subtitle)
+```
+
+### Getting the data and Wrangling
+
+```{r}
+#| label: eda
+
+
+# Example: fetch natural gas import volumes by country and partner
+# For brevity, this example uses get_eurostat (requires eurostat package) 
+gas_raw <- get_eurostat("nrg_ti_gas", time_format = "num") |> 
+  janitor::clean_names()
+
+# gas_raw |> 
+#   distinct(geo)
+# 
+# gas_raw |> 
+#   distinct(time_period) |> 
+#   arrange(desc(time_period))
+
+# Compute total and Russian share by country and year
+gas_by_country <- gas_raw  |> 
+  filter(
+    unit == "MIO_M3",
+    #   (geo %in% c("AT","DE","FR","IT","PL","ES","SE",
+    #               "BG","HU","SK","CZ","RO","SI","RS")
+    #    ),
+    time_period %in% c(2021, 2023)
+  ) |> 
+  group_by(geo, time_period)  |> 
+  summarise(
+    total_import = sum(values, na.rm=TRUE),
+    russia_import = sum(values[partner == "RU"], na.rm=TRUE)
+  )  |> 
+  ungroup()  |> 
+  mutate(share_russia = russia_import / total_import) |> 
+  left_join(
+    # Convert geo (iso2) to ISO3
+    tibble(
+      geo = countrycode::codelist$iso2c, 
+      iso3 = countrycode::codelist$iso3c) |>  filter(!is.na(geo), !is.na(iso3)
+    )
+  )
+
+library(rnaturalearth)
+# Get world map in WGS84 first
+world_map <- rnaturalearth::ne_countries(returnclass = "sf", scale = "large") |> 
+  select(iso_a3, name, geometry) |> 
+  rename(iso3 = iso_a3) |> 
+  mutate(
+    iso3 = if_else(
+      name == "France",
+      "FRA",
+      iso3
+    )
+  ) |> 
+  st_transform("EPSG:3857")
+
+# Create bounding box in WGS84 (same CRS as world_map)
+bbox_polygon <- st_bbox(c(xmin = -25, ymin = 33, xmax = 40, ymax = 70)) |>
+  st_as_sfc() |> 
+  st_set_crs("EPSG:4326") |> 
+  st_transform("EPSG:3857")
+
+# Testing to see Europe and World Map
+# world_map |> 
+#   ggplot() +
+#   geom_sf() +
+#   geom_sf(
+#     data = bbox_polygon,
+#     fill = "red"
+#   ) +
+#   coord_sf(
+#     ylim = c(-80, 80),
+#     default_crs = "EPSG:4326"
+#   )
+
+# Crop to Europe first, then transform
+europe_map <- world_map |> 
+  st_intersection(bbox_polygon) |>
+  # Transform after cropping
+  st_transform("EPSG:3035")  |> 
+  
+  # Remove margins non-Europe countries
+  filter(
+    !(iso3 %in% c("RUS", "GRL", "TUR", "SYR",
+                  "JOR", "IRQ", "LBN", "CYP",
+                  "-99", "ISR", "GEO", "DZA",
+                  "TUN", "LBY", "MAR"))
+  )
+
+# europe_map |> 
+#   ggplot() +
+#   geom_sf() +
+#   geom_sf_text(aes(label = iso3))
+
+plotdf <- gas_by_country |> 
+  left_join(europe_map) |> 
+  st_as_sf() |> 
+  filter(!is.nan(share_russia))
+
+rm(gas_raw, world_map, bbox_polygon)
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- plotdf |> 
+  ggplot() +
+  geom_sf(
+    data = europe_map,
+    linewidth = 0.2,
+    fill = bg_col,
+    colour = text_col
+  ) +
+  geom_sf(
+    mapping = aes(
+      fill = share_russia
+    )
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = paste0(round(share_russia * 100, 1), " %"),
+      colour = share_russia > 0.35
+    ),
+    size = bts / 4,
+    family = "caption_font",
+    check_overlap = TRUE
+  ) +
+  scale_colour_manual(
+    values = c(text_col, "white")
+  ) +
+  geom_text(
+    data = tibble(time_period = c(2021, 2023)),
+    mapping = aes(x = -28, y = 55, label = time_period),
+    size = bts,
+    colour = text_hil,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  facet_wrap(
+    ~time_period, 
+    ncol = 1
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::BuPu",
+    direction = -1,
+    labels = scales::label_percent()
+  ) +
+  guides(colour = "none") +
+  coord_sf(
+    crs = "EPSG:3035",
+    default_crs = "EPSG:4326",
+    clip = "off",
+    expand = FALSE
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    fill = "Russian Gas\nShare of\nTotal Imports\n(%)"
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    legend.position = "right",
+    legend.justification = c(0, 0.4),
+    legend.margin = margin(0,0,0,-5, "mm"),
+    legend.box.margin = margin(0,0,0,-5, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm"),
+      size = 1.2 * bts
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,10,0, "mm"),
+      lineheight = 0.3,
+      size = 1.25 * bts
+    ),
+    legend.title.position = "top",
+    legend.key.width = unit(7.5, "mm"),
+    legend.key.height = unit(50, "mm"),
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    strip.text = element_blank(),
+    strip.background = element_blank(),
+    panel.spacing.y = unit(-10, "mm"),
+    plot.title = element_text(
+      margin = margin(2,0,2,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 4 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size =  bts * 1.2,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(-10,0,5,0, "mm"),
+      hjust = -0.1,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.8,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "viz_euro_energy_imports.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### A scatterpie plot of the same Chloropleth (to represent volumes)
+
+This enhanced visualization combines choropleth mapping with scatter pie charts to show both the proportion and absolute volume of European natural gas imports. The technical foundation remained similar to the first version, using R with {tidyverse}, {eurostat}, and {sf} for data manipulation and spatial operations. However, this iteration introduced the {scatterpie} package as the key innovation, allowing pie charts to be overlaid on the map at each country's centroid. The process involved several critical steps: first, extracting country centroids using `st_centroid()` and `st_coordinates()` to position the pie charts accurately; second, calculating a scaling factor to make pie chart sizes proportional to total import volumes using `sqrt(total_import) * scale_factor`; and third, restructuring the data to separate Russian imports from other sources for the pie chart segments. The {ggnewscale} package enabled multiple fill scales—one for the choropleth background showing Russian gas share percentages, and another for the pie chart colors distinguishing Russian imports (red) from other sources (grey). Custom legend positioning was achieved using `geom_scatterpie_legend()` with precise coordinate placement, while strip labels for the years were manually positioned using a separate data frame. The dual encoding approach—choropleth for proportions and scatter pies for volumes—creates a rich, layered visualization that reveals both the dependency patterns and the scale of energy trade across European countries before and after the Ukraine conflict.
+
+```{r}
+#| label: base-plot2
+
+scale_factor <- 500
+
+plotdf2 <- plotdf |> 
+  st_drop_geometry() |> 
+  mutate(rest_import = total_import - russia_import) |> 
+  select(iso3, time_period, russia_import, rest_import, total_import) |> 
+  bind_cols(
+    plotdf |> 
+      st_centroid() |> 
+      # st_transform("EPSG:4326") |> 
+      st_coordinates() |> 
+      janitor::clean_names()
+  ) |> 
+  
+  # Scale the radius for better visualization
+  # Adjust scaling factor as needed
+  mutate(radius = sqrt(total_import) * scale_factor) |> 
+  select(-total_import)
+
+# Create a simple data frame: for Strip Labels i.e. years
+strip_labels_df <- data.frame(
+  time_period = c(2021, 2023),
+  lon = c(-36, -36),
+  lat = c(50, 50)
+) |> 
+  st_as_sf(
+  coords = c("lon", "lat"),
+  crs = "EPSG:4326"
+) |> 
+  st_transform("EPSG:3035")
+
+g <- plotdf |> 
+  ggplot() +
+  geom_sf(
+    data = europe_map,
+    linewidth = 0.2,
+    fill = bg_col,
+    colour = text_col
+  ) +
+  geom_sf(
+    mapping = aes(
+      fill = share_russia
+    )
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::BuPu",
+    direction = -1,
+    labels = scales::label_percent(),
+    name = "Russian Gas\nShare of\nTotal Imports\n(%)"
+  ) +
+  ggnewscale::new_scale_fill() +
+  
+  geom_scatterpie(
+    data = plotdf2,
+    mapping = aes(
+      x = x, y = y,
+      # Use scaled radius
+      r = radius,
+      group = time_period
+    ),
+    cols = c("russia_import", "rest_import"),  
+    colour = text_hil,
+    linewidth = 0.1,
+    alpha = 0.75
+  ) +
+  geom_scatterpie_legend(
+    # Convert your desired breaks (in billions m³) to the scaled radius values
+    # Convert B to M, then apply your scaling
+    sqrt(c(0, 50, 250, 500) * 1000) * scale_factor,  
+    x = 1672194,
+    y = 3072552,
+    
+    n = 4,  
+    
+    labeller = function(x) {
+      # Convert back from scaled radius to billions m³
+      original_value <- (x / scale_factor)^2 / 1000
+      paste0(original_value, " B m³")
+    },
+    
+    size = bts / 4,  
+    family = "caption_font",
+    colour = text_hil
+  ) +
+  geom_sf_text(
+    data = strip_labels_df,
+    mapping = aes(label = time_period),
+    size = bts,
+    colour = text_hil,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  facet_wrap(
+    ~time_period, 
+    ncol = 1
+  ) +
+  scale_fill_manual(
+    values = c("#BB5566FF", "grey80"),
+    labels = c("Imports from\nRussia", "Other\nImports"),
+    name = NULL
+  ) +
+  guides(colour = "none") +
+  coord_sf(
+    crs = "EPSG:3035",
+    default_crs = "EPSG:3035",
+    clip = "off",
+    expand = FALSE
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    legend.position = "right",
+    legend.justification = c(0, 0.4),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm"),
+      size = 1.2 * bts
+    ),
+    legend.box.spacing = unit(5, "mm"),
+    legend.title = element_text(
+      margin = margin(0,0,10,0, "mm"),
+      lineheight = 0.3,
+      size = 1.25 * bts
+    ),
+    legend.title.position = "top",
+    legend.key.width = unit(10, "mm"),
+    legend.key.height = unit(30, "mm"),
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    strip.text = element_blank(),
+    strip.background = element_blank(),
+    panel.spacing.y = unit(-10, "mm"),
+    plot.title = element_text(
+      margin = margin(2,0,2,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 4 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size =  bts * 1.2,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(-10,0,2,0, "mm"),
+      hjust = 0,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.8,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "viz_euro_energy_imports_2.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+![This map reveals Europe's dramatic energy transition between 2021 and 2023, combining two visual layers to tell the complete story. The choropleth (background colors) shows Russian gas dependency as a percentage of total imports, with darker purple indicating higher reliance. The overlaid pie charts represent absolute import volumes—larger circles mean more total gas imports, with red segments showing Russian sources and grey representing other suppliers. This dual visualization reveals both the scale of energy trade and the proportion of Russian dependency, illustrating how countries like Germany dramatically reduced both their reliance on and absolute volumes of Russian gas following the Ukraine invasion.](viz_euro_energy_imports_2.png)
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "viz_euro_energy_imports_2.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_euro_energy_imports.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  eurostat,             # Package for EUROSTAT data
+  rvest,                # Package for harvesting web data
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf                    # Spatial Operations
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
