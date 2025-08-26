@@ -1,0 +1,453 @@
+---
+title: "AI Adoption Across Europe"
+author: "Aditya Dahiya"
+date: "2025-08-26"
+subtitle: "Share of businesses adopting AI technologies including text mining, machine learning, and natural language processing across European nations, with Denmark, Sweden, and Belgium leading adoption rates."
+categories:
+  - "Chloropleth"
+  - "Maps"
+image: "thumbnails/viz_euro_ai_adoption.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+The data presented in this visualization comes from [Eurostat's 2024 EU survey on 'ICT usage and e-commerce in enterprises'](https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Use_of_artificial_intelligence_in_enterprises), conducted by National Statistical Authorities in the first months of 2024. The survey reveals that 13.5% of enterprises in the EU with 10 or more employees used artificial intelligence (AI) technologies to conduct their business in 2024, representing a significant 5.5 percentage point growth from 8.0% in 2023. The comprehensive survey covered approximately [157,000 of the 1.54 million enterprises](https://ec.europa.eu/eurostat/databrowser/view/isoc_eb_ai/default/table?lang=en) across the EU, with data collection focusing on enterprises with at least 10 employees and self-employed persons across multiple economic sectors including manufacturing, information and communication, professional services, and retail trade. AI technologies measured in the survey include text mining, speech recognition, natural language generation, image recognition, machine learning, robotic process automation, and autonomous decision-making systems. The original data and detailed methodology are available through [Eurostat's database](https://ec.europa.eu/eurostat/databrowser/view/isoc_eb_ai/default/table?lang=en), with the specific Excel file containing the visualization data accessible at the [European Commission's statistics portal](https://ec.europa.eu/eurostat/statistics-explained/images/2/2b/2024_Enterprises_using_AI_data_tables_and_graphs.xlsx).
+
+![This map visualizes the percentage of enterprises with 10 or more employees using artificial intelligence technologies across European countries in 2023 and 2024. The fill colors represent AI adoption rates, ranging from light (low adoption) to dark (high adoption), with values displayed on each country. Denmark leads with 27.6% adoption in 2024, followed by Sweden (25.1%) and Belgium (24.7%), while Romania shows the lowest rate at 3.1%. All countries demonstrate growth between the two years, reflecting Europe's accelerating digital transformation. Data source: Eurostat's ICT usage survey.](viz_euro_ai_adoption.png){#fig-1}
+
+## How I Made This Graphic
+
+This visualization was created using R and several key packages for data processing, spatial analysis, and plotting. The data was harvested directly from [Eurostat's Excel file](https://ec.europa.eu/eurostat/statistics-explained/images/2/2b/2024_Enterprises_using_AI_data_tables_and_graphs.xlsx) using R's built-in `download.file()` function and processed with the [readxl](https://readxl.tidyverse.org/) package to extract specific sheet ranges. Data wrangling was performed using the [tidyverse](https://www.tidyverse.org/) ecosystem, particularly [dplyr](https://dplyr.tidyverse.org/) for data manipulation and [tidyr](https://tidyr.tidyverse.org/) for reshaping the data from wide to long format. Country names were standardized and converted to ISO3 codes using the [countrycode](https://github.com/vincentarelbundock/countrycode) package. The spatial component utilized the [rnaturalearth](https://docs.ropensci.org/rnaturalearth/) package to obtain country geometries and the [sf](https://r-spatial.github.io/sf/) package for spatial operations, including coordinate system transformations to EPSG:3035 for optimal European mapping. The final visualization was created using [ggplot2](https://ggplot2.tidyverse.org/) with `geom_sf()` for mapping, [paletteer](https://emilhvitfeldt.github.io/paletteer/) for color palettes, and enhanced typography through [showtext](https://github.com/yixuan/showtext) with Google Fonts integration, while [ggtext](https://wilkelab.org/ggtext/) enabled rich text formatting in plot annotations.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  eurostat,             # Package for EUROSTAT data
+  rvest,                # Package for harvesting web data
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf,                   # Spatial Operations
+  scatterpie            # To make pie charts on top of maps
+)
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "grey97"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey40"
+
+# Custom Colours for dots
+custom_dot_colours <- paletteer::paletteer_d("nbapalettes::cavaliers_retro")
+
+# Custom size for dots
+size_var <- 14
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  2024 ICT Usage survey, EuroStat", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "A.I. Adoption Across Europe"
+
+plot_subtitle <- "Percentage of enterprises with 10+ employees using artificial intelligence technologies in EU Member States and associated countries, showing significant growth from 2023 to 2024." |> str_wrap(90)
+
+str_view(plot_subtitle)
+```
+
+### Getting the data and Wrangling
+
+```{r}
+#| label: eda
+
+library(readxl)
+# Source: Eurostat, Use of artificial intelligence in enterprises
+# 1. Define the URL and download the Excel file
+xlsx_url <- "https://ec.europa.eu/eurostat/statistics-explained/images/2/2b/2024_Enterprises_using_AI_data_tables_and_graphs.xlsx"
+destfile <- file.path(tempdir(), basename(xlsx_url))
+download.file(xlsx_url, destfile, mode = "wb", quiet = TRUE)
+
+readxl::excel_sheets(destfile)
+
+df_raw <- read_excel(
+  destfile,
+  sheet = "Figure 2",
+  range = "B6:D42"   # header in row 6, data from row 9 onwards
+) |>
+  clean_names() |>
+  # remove any empty rows if present
+  filter(!if_all(everything(), is.na)) |> 
+  rename(country_name = x1) |> 
+  slice(-1) |> 
+  mutate(
+    country_name = str_replace(
+      country_name, "\\s*\\(.*\\)", ""
+    ) |> str_squish()
+  )
+
+
+world_map <- rnaturalearth::ne_countries(returnclass = "sf", scale = "large") |> 
+  select(iso_a3, name, geometry) |> 
+  rename(iso3 = iso_a3) |> 
+  mutate(
+    iso3 = if_else(
+      name == "France",
+      "FRA",
+      iso3
+    )
+  ) |> 
+  st_transform("EPSG:3857")
+
+# Create bounding box in WGS84 (same CRS as world_map)
+bbox_polygon <- st_bbox(c(xmin = -25, ymin = 33, xmax = 40, ymax = 70)) |>
+  st_as_sfc() |> 
+  st_set_crs("EPSG:4326") |> 
+  st_transform("EPSG:3857")
+
+# Crop to Europe first, then transform
+europe_map <- world_map |> 
+  st_intersection(bbox_polygon) |>
+  # Transform after cropping
+  st_transform("EPSG:3035")  |> 
+  
+  # Remove margins non-Europe countries
+  filter(
+    !(iso3 %in% c("RUS", "GRL", "TUR", "SYR",
+                  "JOR", "IRQ", "LBN", "CYP",
+                  "-99", "ISR", "GEO", "DZA",
+                  "TUN", "LBY", "MAR"))
+  )
+
+
+plotdf <- df_raw |> 
+  pivot_longer(
+    cols = c(x2023, x2024),
+    names_to = "time_period",
+    values_to = "value_var"
+  ) |> 
+  mutate(
+    time_period = parse_number(time_period),
+    iso3 = countrycode(
+      country_name,
+      origin = "country.name.en",
+      destination = "iso3c"
+    )
+  ) |> 
+  left_join(europe_map) |> 
+  st_as_sf()
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- plotdf |> 
+  ggplot() +
+  geom_sf(
+    data = europe_map,
+    linewidth = 0.15,
+    fill = "white",
+    colour = "grey30"
+  ) +
+  geom_sf(
+    mapping = aes(
+      fill = value_var
+    ),
+    colour = "grey30",
+    linewidth = 0.15
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = paste0(round(value_var, 1)),
+      colour = value_var > 15
+    ),
+    size = bts / 4,
+    family = "caption_font",
+    check_overlap = TRUE,
+    vjust = 1.2
+  ) +
+  geom_sf_text(
+    mapping = aes(
+      label = str_wrap(country_name, 10),
+      colour = value_var > 15
+    ),
+    size = bts / 7,
+    family = "caption_font",
+    check_overlap = TRUE,
+    vjust = -0.2,
+    lineheight = 0.25
+  ) +
+  scale_colour_manual(
+    values = c(text_col, "white")
+  ) +
+  geom_text(
+    data = tibble(time_period = c(2023, 2024)),
+    mapping = aes(x = -28, y = 55, label = time_period),
+    size = bts,
+    colour = text_hil,
+    hjust = 0,
+    vjust = 1,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  facet_wrap(
+    ~time_period, 
+    ncol = 1
+  ) +
+  paletteer::scale_fill_paletteer_c(
+    # "grDevices::Purples 3",
+    # "grDevices::Oslo",
+    # "grDevices::Purple-Yellow",
+    # "grDevices::RdPu",
+    "pals::ocean.tempo",
+    # "pals::kovesi.linear_kryw_5_100_c67",
+    direction = 1,
+    labels = label_number(suffix = "%"),
+    breaks = seq(0, 30, 5)
+  ) +
+  guides(colour = "none") +
+  coord_sf(
+    crs = "EPSG:3035",
+    default_crs = "EPSG:4326",
+    clip = "off",
+    expand = FALSE
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    fill = "Adoption\nof AI in\nenterprises\n(%)"
+  ) +
+  ggthemes::theme_map(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    legend.position = "right",
+    legend.justification = c(0, 0.4),
+    legend.margin = margin(0,0,0,-5, "mm"),
+    legend.box.margin = margin(0,0,0,-5, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm"),
+      size = 1.2 * bts
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,10,0, "mm"),
+      lineheight = 0.3,
+      size = 1.25 * bts
+    ),
+    legend.title.position = "top",
+    legend.key.width = unit(12.5, "mm"),
+    legend.key.height = unit(50, "mm"),
+    legend.ticks = element_line(
+      linewidth = 0.5,
+      colour = bg_col
+    ),
+    legend.ticks.length = unit(3, "mm"),
+    legend.background = element_rect(
+      fill = bg_col,
+      colour = "transparent"
+    ),
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Labels and Strip Text
+    strip.text = element_blank(),
+    strip.background = element_blank(),
+    panel.spacing.y = unit(-10, "mm"),
+    plot.title = element_text(
+      margin = margin(2,0,2,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 4 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size =  bts * 1.2,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(-10,0,5,0, "mm"),
+      hjust = -0.1,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.8,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,2,5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "viz_euro_ai_adoption.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "viz_euro_ai_adoption.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "viz_euro_ai_adoption.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  eurostat,             # Package for EUROSTAT data
+  rvest,                # Package for harvesting web data
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf                    # Spatial Operations
+)
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
