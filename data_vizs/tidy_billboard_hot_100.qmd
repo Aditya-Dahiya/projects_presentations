@@ -1,8 +1,8 @@
 ---
-title: "tidy_billboard_hot_100"
+title: "From Long to Short: Hit Song Evolution"
 author: "Aditya Dahiya"
 date: "2025-08-28"
-subtitle: "tidy_billboard_hot_100"
+subtitle: "Chart-toppers peaked in duration during the 1990s after decades of growth, while the once-popular fade-out technique largely disappeared after 2010."
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_billboard_hot_100"
@@ -35,7 +35,7 @@ comments:
 
 The Billboard Hot 100 Number Ones Database represents a comprehensive collection of data about every song to reach number one on the [Billboard Hot 100](https://www.billboard.com/charts/hot-100/) between August 4, 1958 and January 11, 2025. This extensive dataset was meticulously compiled by [Chris Dalla Riva](https://bio.site/uncharted_territory) over seven years as part of his research for the book [*Uncharted Territory: What Numbers Tell Us about the Biggest Hit Songs and Ourselves*](https://bio.site/uncharted_territory), and continues to power his music analytics newsletter [*Can't Get Much Higher*](https://www.cantgetmuchhigher.com/). The database contains detailed information across 87 variables for each chart-topper, including musical characteristics sourced from [Spotify](https://open.spotify.com/), genre classifications from both Dalla Riva's team and [Discogs](https://www.discogs.com/), songwriter and producer credits from [BMI/ASCAP databases](https://www.bmi.com/), demographic information about artists, lyrical content analysis, and technical details like song structure, instrumentation, and recording characteristics. This rich dataset enables researchers to explore trends in popular music across nearly seven decades, from the evolution of song length and musical keys to changing patterns in artist demographics and lyrical themes, providing unprecedented insights into the cultural and musical landscape of American popular music.
 
-![tidy_billboard_hot_100](tidy_billboard_hot_100.png){#fig-1}
+![This visualization maps the evolution of Billboard Hot 100 #1 hits from 1958 to 2025, with each horizontal line segment representing a chart-topping song. The x-axis shows song duration in seconds, centered at zero and extending symmetrically to show each song's length. The y-axis displays the release year. Line segment width indicates weeks spent at #1, while colors distinguish between songs that fade out (orange) versus those with definitive endings (blue). Two curved trend lines trace the average duration boundaries over time, revealing how hit songs lengthened from the 1960s through 1990s before shortening again in recent decades, while the predominance of fade-outs has declined since 2010.](tidy_billboard_hot_100.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -118,7 +118,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:** ......................", 
+  "**Data:**  Chris Dalla Riva", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -129,9 +129,10 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_billboard_hot_100"
+plot_title <- "Shorter Songs, Cleaner Endings"
 
-plot_subtitle <- "tidy_billboard_hot_100"
+plot_subtitle <- "Billboard #1 hits grew longer from 1960-1990s then shortened again, traced by curved trend lines showing duration boundaries. Fade-outs dominated until 2010 when definitive endings took over." |> 
+  str_wrap(100)
 
 str_view(plot_subtitle)
 ```
@@ -141,25 +142,25 @@ str_view(plot_subtitle)
 ```{r}
 #| label: eda
 
-billboard |> 
-  ggplot(
-    mapping = aes(
-      x = length_sec
-    )
-  ) +
-  geom_histogram(
-    fill = "white",
-    colour = "grey20",
-    bins = 100
-  )
-
-billboard |> 
-  distinct(cdr_genre)
-
-pacman::p_load(summarytools)
-billboard |> 
-  dfSummary() |> 
-  view()
+# billboard |> 
+#   ggplot(
+#     mapping = aes(
+#       x = length_sec
+#     )
+#   ) +
+#   geom_histogram(
+#     fill = "white",
+#     colour = "grey20",
+#     bins = 100
+#   )
+# 
+# billboard |> 
+#   distinct(cdr_genre)
+# 
+# pacman::p_load(summarytools)
+# billboard |> 
+#   dfSummary() |> 
+#   view()
 
 plotdf <- billboard |> 
   mutate(
@@ -170,7 +171,8 @@ plotdf <- billboard |>
       artist_male == 1 ~ "Male",
       artist_male == 2 ~ "Both Male and Female",
       artist_male == 3 ~ "Both Male and Female"
-    )
+    ),
+    date = as_date(date)
   )
 ```
 
@@ -181,57 +183,98 @@ plotdf <- billboard |>
 
 
 g <- plotdf |> 
-  ggplot(
-    aes(
+  ggplot() +
+  geom_segment(
+    mapping = aes(
       y = date,
       yend = date,
       x = length_x_min,
       xend = length_x_max,
       linewidth = weeks_at_number_one,
-      colour = as_factor(fade_out),
-      # colour = as_factor(colour_var)
-    )
-  ) +
-  geom_segment(
+      colour = as_factor(fade_out)
+    ),
     alpha = 0.5
-  ) + 
+  ) +
+  geom_vline(
+    xintercept = 0,
+    linewidth = 3,
+    alpha = 0.2,
+    colour = "black"
+  ) +
+  geom_smooth(
+    mapping = aes(x = length_x_min, y = date, group = 1),
+    orientation = "y",
+    formula = y ~ poly(x, 3),
+    linewidth = 1.5,
+    colour = alpha("black", 0.2),
+    se = FALSE
+  ) +
+  geom_smooth(
+    mapping = aes(x = length_x_max, y = date, group = 1),
+    orientation = "y",
+    linewidth = 1.5,
+    formula = y ~ poly(x, 3),
+    colour = alpha("black", 0.2),
+    se = FALSE
+  ) +
   scale_linewidth_continuous(
-    range = c(0.1, 6)
+    range = c(0.1, 6),
+    breaks = seq(3, 18, 3)
   ) +
   scale_x_continuous(
     limits = c(-200, 200),
     oob = scales::squish,
     breaks = seq(-200, 200, 40),
-    labels = abs(seq(-200, 200, 40))
+    labels = abs(seq(-200, 200, 40)),
+    expand = expansion(0)
+  ) +
+  scale_y_date(
+    expand = expansion(0),
+    breaks = seq(as.Date("1960-01-01"), as.Date("2020-01-01"), by = "10 years"),
+    date_labels = "%Y"
   ) +
   scale_colour_manual(
-    values = c("red", "blue"),
-    labels = c("The Song\ndoes not\nfade out", "The Song\nfades out")
+    values = paletteer::paletteer_d("nbapalettes::knicks")[1:2],
+    labels = c("The Song does\nnot fade out", "The Song\nfades out")
+  ) +
+  guides(
+    linewidth = guide_legend(
+      nrow = 1
+    ),
+    colour = guide_legend(
+      override.aes = list(
+        size = 5, shape = 20,
+        linewidth = 10
+      )
+    )
   ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
-    x = "Year",
-    y = "Duration of the song (in seconds)",
+    y = "Year",
+    x = "Duration of the song (in seconds)",
     caption = plot_caption,
-    linewidth = "Total Weeks spent as No. 1 song on Billboard",
+    linewidth = "Total Weeks spent as No. 1",
     colour = "Does the song fade out?"
   ) +
-  ggthemes::theme_map(
+  coord_cartesian(clip = "off") +
+  theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
     
     legend.position = "bottom",
-    legend.margin = margin(0,0,0,0, "mm"),
-    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.margin = margin(-15,0,0,0, "mm"),
+    legend.box.margin = margin(-10,0,0,0, "mm"),
     legend.text = element_text(
       margin = margin(0,0,0,2, "mm")
     ),
     legend.title = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,3,0, "mm"),
+      hjust = 0.5
     ),
+    legend.title.position = "top",
     
     # Overall
     text = element_text(
@@ -240,29 +283,63 @@ g <- plotdf |>
       lineheight = 0.3
     ),
     
+    # Axes
+    axis.line.x = element_line(
+      arrow = arrow(ends = "both", length = unit(5, "mm")),
+      colour = line_col,
+      linewidth = 0.5
+    ),
+    axis.line.y = element_line(
+      arrow = arrow(length = unit(5, "mm")),
+      colour = line_col,
+      linewidth = 0.5
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      colour = "grey",
+      linewidth = 0.3
+    ),
+    axis.text.x = element_text(
+      margin = margin(4,2,2,2, "mm"),
+      face = "bold",
+      hjust = 0.5
+    ),
+    axis.text.y = element_text(
+      margin = margin(2,2,2,2, "mm"),
+      face = "bold"
+    ),
+    axis.title.y = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.5
+    ),
+    axis.title.x = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      size = bts * 1.5
+    ),
     # Labels and Strip Text
     plot.title = element_text(
       margin = margin(5,0,5,0, "mm"),
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2.5 * bts,
+      size = 3 * bts,
       family = "body_font",
       face = "bold"
       ),
-    plot.subtitle = element_textbox(
+    plot.subtitle = element_text(
       margin = margin(2,0,5,0, "mm"),
       vjust = 0.5,
       colour = text_hil,
       size =  bts,
-      halign = 0.5,
       hjust = 0.5,
-      valign = 0.5,
       family = "body_font",
       lineheight = 0.3
       ),
     plot.caption = element_textbox(
-      margin = margin(8,0,5,0, "mm"),
+      margin = margin(5,0,2,0, "mm"),
       hjust = 0.5,
       halign = 0.5,
       colour = text_hil,
