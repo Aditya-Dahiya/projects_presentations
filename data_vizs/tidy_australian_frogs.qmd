@@ -1,0 +1,428 @@
+---
+title: "tidy_australian_frogs"
+author: "Aditya Dahiya"
+date: "2025-08-29"
+subtitle: "tidy_australian_frogs"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_australian_frogs.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This week's dataset explores Australian frog biodiversity through the 2023 release of [FrogID data](https://www.frogid.net.au/explore), representing the sixth annual publication from this groundbreaking citizen science initiative. [FrogID](https://www.frogid.net.au/) is an innovative mobile app that enables citizen scientists across Australia to record and submit frog calls, which are then expertly identified by museum professionals. Since its launch in 2017, this collaborative effort has generated data that has contributed to over 30 scientific papers examining frog ecology, taxonomy, and conservation. The dataset is particularly significant given that Australia hosts 257 unique native frog species—most found nowhere else on Earth—with nearly one in five species currently threatened with extinction due to climate change, urbanization, disease, and invasive species. The data includes occurrence records with precise geographic coordinates, temporal information, and species identifications validated by experts, offering researchers and data enthusiasts a comprehensive view of Australian frog distributions and calling patterns. This rich dataset, formally documented in [ZooKeys](https://zookeys.pensoft.net/) by Rowley & Callaghan (2020), provides an invaluable resource for understanding the current state of Australia's imperiled amphibian fauna and supports ongoing conservation efforts through community-driven scientific discovery.
+
+![tidy_australian_frogs](tidy_australian_frogs.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(ggforce)
+# To plot geom_convex_hull()
+pacman::p_load(MASS, fields)
+
+pacman::p_load(
+  tidyverse,            # All things tidy
+  
+  scales,               # Nice Scales for ggplot2
+  fontawesome,          # Icons display in ggplot2
+  ggtext,               # Markdown text support for ggplot2
+  showtext,             # Display fonts in ggplot2
+  colorspace,           # Lighten and Darken colours
+
+  patchwork,            # Composing Plots
+  sf                    # Spatial Operations
+)
+
+# Using R
+frogID_data <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-02/frogID_data.csv')
+
+frog_names <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-02/frog_names.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey20"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  ...........", 
+  " |  **Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "tidy_australian_frogs"
+
+plot_subtitle <- "tidy_australian_frogs" |> 
+  str_wrap(100)
+
+str_view(plot_subtitle)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+
+# pacman::p_load(summarytools)
+# frogID_data |> 
+#   dfSummary() |> 
+#   view()
+# 
+# frog_names |> 
+#   dfSummary() |> 
+#   view()
+# 
+# pacman::p_unload(summarytools)
+
+# Get the data to plot as an SF object
+plotdf_points <- frogID_data |>
+  
+  # drop uncertain measurements
+  filter(coordinateUncertaintyInMeters < 100) |> 
+  
+  # drop out of mainland measurements
+  filter(
+    decimalLatitude > -44 &
+      decimalLatitude < -8 &
+      decimalLongitude > 112 &
+      decimalLongitude < 154
+  ) |> 
+  left_join(
+    frog_names |> 
+      dplyr::select(scientificName, subfamily, tribe),
+    relationship = "many-to-many"
+  ) |> 
+  janitor::clean_names() |> 
+  dplyr::select(
+    event_id, decimal_latitude, decimal_longitude,
+    subfamily, tribe
+  ) |> 
+  filter(!is.na(subfamily) & !is.na(tribe))
+  
+
+# Create bounding box for latitude restriction
+clip_polygon <- st_as_sfc(
+  st_bbox(
+    c(xmin = 110, ymin = -44, xmax = 155, ymax = -8), 
+    crs = st_crs(4326)
+  )
+)
+
+# Get Australia map and apply latitude restriction
+aus_map <- rnaturalearth::ne_countries(
+  country = "Australia",
+  scale = "large",
+  returnclass = "sf"
+) |> 
+  dplyr::select(geometry) |> 
+  # Clip to latitude bounds before transforming
+  st_intersection(clip_polygon) |> 
+  # Transform to Australian coordinate system
+  st_transform(crs = 7845)
+
+
+# Function to calculate density-based core points for each subfamily
+get_core_points <- function(data, prop = 0.5) {
+  data |>
+    group_by(subfamily) |>
+    group_modify(~ {
+      if (nrow(.x) < 3) return(.x)  # Keep all points if too few for hull
+      
+      # Calculate 2D kernel density
+      coords <- cbind(.x$decimal_longitude, .x$decimal_latitude)
+      kde <- MASS::kde2d(coords[,1], coords[,2], n = 50)
+      
+      # Get density at each point location
+      density_at_points <- fields::interp.surface(
+        obj = list(x = kde$x, y = kde$y, z = kde$z),
+        loc = coords
+      )
+      
+      # Select top proportion of points by density
+      n_keep <- ceiling(nrow(.x) * prop)
+      density_rank <- rank(-density_at_points, ties.method = "random")
+      core_mask <- density_rank <= n_keep
+      
+      .x[core_mask, ]
+    }) |>
+    ungroup()
+}
+
+# Create core points dataset (most concentrated 50%)
+plotdf_core <- get_core_points(
+  plotdf_points |> 
+    filter(decimal_longitude > 120), 
+  prop = 0.7
+)
+
+plotdf_core2 <- get_core_points(
+  plotdf_points |> 
+    filter(decimal_longitude < 120), 
+  prop = 0.7
+)
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- ggplot() +
+  geom_sf(
+    data = aus_map,
+    linewidth = 0.2,
+    fill = NA,
+    colour = text_col
+  ) +
+ geom_point(
+    data = plotdf_points,
+    mapping = aes(
+      x = decimal_longitude, 
+      y = decimal_latitude,
+      colour = subfamily
+    ),
+    alpha = 0.5,
+    size = 0.3,
+    position = position_jitter(
+      width = 0.5,
+      height = 0.5
+    )
+  ) +
+  
+  # Hull only around core points
+  ggforce::geom_mark_hull(
+    data = plotdf_core,
+    mapping = aes(
+      x = decimal_longitude,
+      y = decimal_latitude,
+      colour = subfamily,
+      fill = subfamily,
+      label = subfamily,
+      label.colour = subfamily,
+      label.fill = subfamily
+    ),
+    concavity = 20,
+    label.margin = margin(1,1,1,1, "mm"),
+    label.family = "body_font",
+    label.fontsize = bts / 2
+    
+  ) +
+  ggforce::geom_mark_hull(
+    data = plotdf_core2,
+    mapping = aes(
+      x = decimal_longitude,
+      y = decimal_latitude,
+      colour = subfamily,
+      fill = subfamily
+    ),
+    concavity = 20
+  ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = NULL,
+    y = NULL
+  ) +
+  coord_sf(
+    crs = 7845,
+    default_crs = "EPSG:4326"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    
+    legend.position = "bottom",
+    legend.margin = margin(-15,0,0,0, "mm"),
+    legend.box.margin = margin(-10,0,0,0, "mm"),
+    legend.text = element_text(
+      margin = margin(0,0,0,2, "mm")
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,3,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.title.position = "top",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 3 * bts,
+      family = "body_font",
+      face = "bold"
+      ),
+    plot.subtitle = element_text(
+      margin = margin(2,0,5,0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size =  bts,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+      ),
+    plot.caption = element_textbox(
+      margin = margin(5,0,2,0, "mm"),
+      hjust = 0.5,
+      halign = 0.5,
+      colour = text_hil,
+      size = bts * 0.8,
+      family = "caption_font"
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5,5,5,5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_australian_frogs.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", 
+                      "tidy_australian_frogs.png")) |> 
+  image_resize(geometry = "x400") |> 
+  image_write(
+    here::here(
+      "data_vizs", 
+      "thumbnails", 
+      "tidy_australian_frogs.png"
+    )
+  )
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+sessioninfo::session_info()$packages |> 
+  as_tibble() |> 
+  dplyr::select(package, 
+         version = loadedversion, 
+         date, source) |> 
+  dplyr::arrange(package) |> 
+  janitor::clean_names(
+    case = "title"
+  ) |> 
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
