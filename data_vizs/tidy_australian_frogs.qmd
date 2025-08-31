@@ -1,10 +1,13 @@
 ---
-title: "tidy_australian_frogs"
+title: "A map of Australia's Frog Families"
 author: "Aditya Dahiya"
-date: "2025-08-29"
-subtitle: "tidy_australian_frogs"
+date: "2025-08-31"
+subtitle: "Five subfamilies, two patterns: mapping Australia's climate-constrained frog diversity through citizen science."
 categories:
   - "#TidyTuesday"
+  - "Maps"
+  - "{ggforce}"
+  - "Convex Mark Hull"
 image: "thumbnails/tidy_australian_frogs.png"
 format:
   html:
@@ -35,9 +38,11 @@ comments:
 
 This week's dataset explores Australian frog biodiversity through the 2023 release of [FrogID data](https://www.frogid.net.au/explore), representing the sixth annual publication from this groundbreaking citizen science initiative. [FrogID](https://www.frogid.net.au/) is an innovative mobile app that enables citizen scientists across Australia to record and submit frog calls, which are then expertly identified by museum professionals. Since its launch in 2017, this collaborative effort has generated data that has contributed to over 30 scientific papers examining frog ecology, taxonomy, and conservation. The dataset is particularly significant given that Australia hosts 257 unique native frog species—most found nowhere else on Earth—with nearly one in five species currently threatened with extinction due to climate change, urbanization, disease, and invasive species. The data includes occurrence records with precise geographic coordinates, temporal information, and species identifications validated by experts, offering researchers and data enthusiasts a comprehensive view of Australian frog distributions and calling patterns. This rich dataset, formally documented in [ZooKeys](https://zookeys.pensoft.net/) by Rowley & Callaghan (2020), provides an invaluable resource for understanding the current state of Australia's imperiled amphibian fauna and supports ongoing conservation efforts through community-driven scientific discovery.
 
-![tidy_australian_frogs](tidy_australian_frogs.png){#fig-1}
+![Distribution map based on citizen-contributed frog call recordings shows marked geographic segregation among Australia's five major amphibian subfamilies. Each dot represents a validated frog call recording from the FrogID citizen science database, with colors indicating the five major Australian frog subfamilies. Shaded regions highlight core distribution areas where each subfamily's populations are most concentrated. The map demonstrates the stark biogeographic divide between widespread generalist subfamilies (Hylidae and Myobatrachidae) that occur across Australia's diverse environments, and tropical specialists (Ranidae, Bufonidae, and Microhylidae) restricted to the humid northeastern coastal regions.](tidy_australian_frogs.png){#fig-1}
 
 ## How I Made This Graphic
+
+This visualization was created using R with several specialized packages for spatial analysis and advanced plotting techniques. The core data manipulation relied on the [tidyverse](https://www.tidyverse.org/) ecosystem, particularly [dplyr](https://dplyr.tidyverse.org/) for data wrangling and [ggplot2](https://ggplot2.tidyverse.org/) for the base mapping framework. Spatial operations were handled using [sf](https://r-spatial.github.io/sf/) for coordinate transformations and map clipping, while the Australian map boundaries came from [rnaturalearth](https://docs.ropensci.org/rnaturalearth/). The key analytical challenge—identifying the 70% most concentrated points for each subfamily—was solved using kernel density estimation through [MASS::kde2d()](https://www.rdocumentation.org/packages/MASS/versions/7.3-61/topics/kde2d) and [fields::interp.surface()](https://www.rdocumentation.org/packages/fields/versions/16.3/topics/interp.surface) to calculate density at each point location, then ranking and selecting the highest-density observations. The striking convex hulls that define each subfamily's core distribution were created using [ggforce::geom_mark_hull()](https://ggforce.data-imaginist.com/reference/geom_mark_hull.html), which automatically generates smooth, labeled boundary polygons around point clusters. Additional aesthetic enhancements included the [fishualize](https://nschiett.github.io/fishualize/) color palette for subfamily differentiation, [ggtext](https://wilkelab.org/ggtext/) for HTML-formatted text elements with coloured subfamily names, and [showtext](https://github.com/yixuan/showtext) for custom Google Fonts integration, creating a publication-ready visualization that clearly communicates Australia's distinct amphibian bio-geographic patterns.
 
 ### Loading required libraries
 
@@ -95,11 +100,11 @@ bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
-text_hil <- "grey20"
+text_hil <- "grey40"
 seecolor::print_color(text_hil)
 
 # Colour for the text
-text_col <- "grey20"
+text_col <- "grey30"
 seecolor::print_color(text_col)
 
 line_col <- "grey30"
@@ -119,7 +124,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**  ...........", 
+  "**Data:**  FrogID App; Rowley & Callaghan (2020)", 
   " |  **Code:** ", 
   social_caption_1, 
   " |  **Graphics:** ", 
@@ -130,12 +135,51 @@ rm(github, github_username, xtwitter,
    social_caption_2)
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_australian_frogs"
+plot_title <- "Endemic Boundaries:\nAustralia's Frog Geography"
 
-plot_subtitle <- "tidy_australian_frogs" |> 
-  str_wrap(100)
+# Adding Subtitle:
+# First, get the color palette to match your plot
+mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
+
+# Create color mapping for subfamilies
+subfamily_colors <- setNames(
+  mypal, c("Hylid", "Myobatrachid", "Microhylidae", "Toad", "Ranid"))
+
+# Formatted subtitle with ggtext color coding and line breaks
+plot_subtitle <- paste0(
+  "Australia's five frog subfamilies reveal a striking biogeographic pattern. While <span style='color:",
+  subfamily_colors["Hylid"], "'>**Hylid**</span> and <span style='color:",
+  subfamily_colors["Myobatrachid"], "'>**Myobatrachid**</span><br>",
+  "frogs colonize diverse habitats across the continent, <span style='color:",
+  subfamily_colors["Ranid"], "'>**Ranid**</span>, <span style='color:",
+  subfamily_colors["Toad"], "'>**Toad**</span>, and <span style='color:",
+  subfamily_colors["Microhylidae"], "'>**Microhylidae**</span> species are confined<br>",
+  "to Australia's tropical northeastern coast, highlighting how climate zones have shaped evolution."
+)
 
 str_view(plot_subtitle)
+
+# Get a map of Australia to plot
+
+# Create bounding box for latitude restriction
+clip_polygon <- st_as_sfc(
+  st_bbox(
+    c(xmin = 110, ymin = -44, xmax = 155, ymax = -8), 
+    crs = st_crs(4326)
+  )
+)
+
+# Get Australia map and apply latitude restriction
+aus_map <- rnaturalearth::ne_countries(
+  country = "Australia",
+  scale = "large",
+  returnclass = "sf"
+) |> 
+  dplyr::select(geometry) |> 
+  # Clip to latitude bounds before transforming
+  st_intersection(clip_polygon) |> 
+  # Transform to Australian coordinate system
+  st_transform(crs = 7845)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -143,7 +187,7 @@ str_view(plot_subtitle)
 ```{r}
 #| label: eda
 
-
+# Exploring the data to understand it
 # pacman::p_load(summarytools)
 # frogID_data |> 
 #   dfSummary() |> 
@@ -178,29 +222,23 @@ plotdf_points <- frogID_data |>
     event_id, decimal_latitude, decimal_longitude,
     subfamily, tribe
   ) |> 
-  filter(!is.na(subfamily) & !is.na(tribe))
-  
-
-# Create bounding box for latitude restriction
-clip_polygon <- st_as_sfc(
-  st_bbox(
-    c(xmin = 110, ymin = -44, xmax = 155, ymax = -8), 
-    crs = st_crs(4326)
+  filter(!is.na(subfamily) & !is.na(tribe)) |> 
+  mutate(
+    subfamily = fct(
+      subfamily,
+      levels = c(
+        "Hylid",        
+        "Myobatrachid", 
+        "Microhylidae", 
+        "Toad",
+        "Ranid"
+      )
+    )
   )
-)
 
-# Get Australia map and apply latitude restriction
-aus_map <- rnaturalearth::ne_countries(
-  country = "Australia",
-  scale = "large",
-  returnclass = "sf"
-) |> 
-  dplyr::select(geometry) |> 
-  # Clip to latitude bounds before transforming
-  st_intersection(clip_polygon) |> 
-  # Transform to Australian coordinate system
-  st_transform(crs = 7845)
-
+# plotdf_points |> 
+#   count(subfamily) |> 
+#   pull(subfamily)
 
 # Function to calculate density-based core points for each subfamily
 get_core_points <- function(data, prop = 0.5) {
@@ -229,16 +267,47 @@ get_core_points <- function(data, prop = 0.5) {
     ungroup()
 }
 
+# plotdf_points |> 
+#   distinct(subfamily)
+
+filter_fams <- c("Hylid", "Myobatrachid")
+
 # Create core points dataset (most concentrated 50%)
-plotdf_core <- get_core_points(
+plotdf_core1 <- get_core_points(
   plotdf_points |> 
-    filter(decimal_longitude > 120), 
+    filter(decimal_longitude > 140) |> 
+    filter(
+      !(subfamily %in% filter_fams & decimal_latitude > -25)
+    ), 
   prop = 0.7
 )
 
 plotdf_core2 <- get_core_points(
   plotdf_points |> 
-    filter(decimal_longitude < 120), 
+    filter(
+      decimal_longitude < 140 &
+        decimal_longitude > 120 &
+        decimal_latitude > -25 &
+        !(subfamily %in% filter_fams)
+    ), 
+  prop = 0.7
+)
+
+plotdf_core3 <- get_core_points(
+  plotdf_points |> 
+    filter(
+      decimal_longitude < 140 &
+        decimal_longitude > 130 &
+        decimal_latitude < -25
+    ), 
+  prop = 0.7
+)
+
+plotdf_core4 <- get_core_points(
+  plotdf_points |> 
+    filter(
+      decimal_longitude < 120
+    ), 
   prop = 0.7
 )
 ```
@@ -248,84 +317,122 @@ plotdf_core2 <- get_core_points(
 ```{r}
 #| label: base-plot
 
-g <- ggplot() +
-  geom_sf(
-    data = aus_map,
-    linewidth = 0.2,
-    fill = NA,
-    colour = text_col
-  ) +
- geom_point(
-    data = plotdf_points,
-    mapping = aes(
-      x = decimal_longitude, 
-      y = decimal_latitude,
-      colour = subfamily
-    ),
-    alpha = 0.5,
-    size = 0.3,
-    position = position_jitter(
-      width = 0.5,
-      height = 0.5
-    )
-  ) +
-  
-  # Hull only around core points
+mypal <- paletteer::paletteer_d("fishualize::Balistapus_undulatus")
+
+# Define a custom geom_mark_hull function
+geom_frog_hull <- function(dataframe = plotdf_core1, ...) {
   ggforce::geom_mark_hull(
-    data = plotdf_core,
+    data = dataframe,
     mapping = aes(
       x = decimal_longitude,
       y = decimal_latitude,
       colour = subfamily,
       fill = subfamily,
-      label = subfamily,
-      label.colour = subfamily,
-      label.fill = subfamily
+      label = subfamily
     ),
-    concavity = 20,
-    label.margin = margin(1,1,1,1, "mm"),
+    expand = unit(10, "mm"),
+    radius = unit(10, "mm"),
+    concavity = 5,
+    label.margin = margin(3,1,-3,1, "mm"),
     label.family = "body_font",
-    label.fontsize = bts / 2
-    
-  ) +
-  ggforce::geom_mark_hull(
-    data = plotdf_core2,
+    label.fontsize = bts,
+    label.fontface = "plain",
+    label.fill = alpha("white", 0.3),
+    label.colour = text_hil,
+    label.buffer = unit(2, "mm"),
+    con.size = 0.4,
+    con.cap = unit(1, "mm"),
+    ...
+  )
+}
+
+g <- ggplot() +
+  
+  # Map of Australia
+  geom_sf(
+    data = aus_map,
+    linewidth = 0.5,
+    fill = "grey90",
+    colour = text_col,
+    alpha = 0.8
+  ) +  
+  
+  geom_point(
+    data = plotdf_points,
     mapping = aes(
       x = decimal_longitude,
       y = decimal_latitude,
-      colour = subfamily,
       fill = subfamily
     ),
-    concavity = 20
+    alpha = 0.4,
+    size = 1,
+    position = ggforce::position_jitternormal(
+      sd_x = 0.2,
+      sd_y = 0.2
+    ),
+    pch = 21,
+    colour = "transparent"
+  ) +
+  
+  # Drawing the Convex Hulls
+  geom_frog_hull(plotdf_core1) +
+  geom_frog_hull(plotdf_core2) +
+  geom_frog_hull(plotdf_core3) +
+  geom_frog_hull(plotdf_core4) +
+  
+  
+  # Scales and Coordinates
+  scale_colour_manual(
+    values = mypal
+  ) +
+  scale_fill_manual(
+    values = mypal
   ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
     x = NULL,
-    y = NULL
+    y = NULL,
+    colour = NULL, 
+    fill = NULL
   ) +
   coord_sf(
     crs = 7845,
-    default_crs = "EPSG:4326"
+    default_crs = "EPSG:4326",
+    clip = "off",
+    expand = TRUE
   ) +
-  theme_minimal(
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        size = 15,
+        pch = 1
+      )
+    )
+  ) +
+  ggthemes::theme_map(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
     
-    legend.position = "bottom",
-    legend.margin = margin(-15,0,0,0, "mm"),
-    legend.box.margin = margin(-10,0,0,0, "mm"),
+    legend.position = "inside",
+    legend.position.inside = c(0.05, 0.05),
+    legend.justification = c(0, 0),
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.direction = "horizontal",
     legend.text = element_text(
-      margin = margin(0,0,0,2, "mm")
+      margin = margin(0,0,0,2, "mm"),
+      face = "bold"
     ),
     legend.title = element_text(
       margin = margin(0,0,3,0, "mm"),
       hjust = 0.5
     ),
     legend.title.position = "top",
+    legend.key.spacing.x = unit(7, "mm"),
     
     # Overall
     text = element_text(
@@ -341,18 +448,20 @@ g <- ggplot() +
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 3 * bts,
+      size = 4 * bts,
       family = "body_font",
       face = "bold"
       ),
-    plot.subtitle = element_text(
-      margin = margin(2,0,5,0, "mm"),
+    plot.subtitle = element_textbox(
+      margin = margin(5,0,-5,0, "mm"),
       vjust = 0.5,
       colour = text_hil,
-      size =  bts,
+      size =  bts * 1.3,
       hjust = 0.5,
-      family = "body_font",
-      lineheight = 0.3
+      halign = 0.5,
+      valign = 0.5,
+      family = "caption_font",
+      lineheight = 0.4
       ),
     plot.caption = element_textbox(
       margin = margin(5,0,2,0, "mm"),
