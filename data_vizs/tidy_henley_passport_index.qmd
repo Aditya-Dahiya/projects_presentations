@@ -146,6 +146,31 @@ plot_title <- "Passport Power Shifts (2006-2025)"
 plot_subtitle <- "Based on visa-free destinations accessible to passport holders, the Henley Index reveals dramatic shifts in global mobility. UAE's spectacular 39-position climb and declines by poorer, war-torn economies highlight how economic growth and diplomatic expansion are redefining travel freedom worldwide." |> str_wrap(105)
 
 str_view(plot_subtitle)
+
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption_2 <- paste0(
+  "**Data:**  Henley Passport Index by Henley & Partners",
+  "<br>**Code:** ",
+  social_caption_1,
+  "<br>**Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -271,6 +296,98 @@ top_movers <- ranking_changes %>%
       TRUE ~ 0.5
     )
   )
+
+country_lists |> 
+  select(code, country, visa_free_access)
+
+# Get country codes for Visa Free Access
+# Inspiration: Claude AI Sonnet 4.0
+
+library(tidyverse)
+library(jsonlite)
+
+# Extract visa-free access data to long format
+visa_free_long <- country_lists %>%
+  select(code, country, visa_free_access) %>%
+  # Filter out rows with empty or null visa_free_access
+  filter(!is.na(visa_free_access) & visa_free_access != "[]" & visa_free_access != "") %>%
+  # Parse JSON and extract country codes
+  mutate(
+    # Parse the JSON string to extract the nested array
+    parsed_json = map(visa_free_access, ~{
+      tryCatch({
+        # Parse the JSON - it appears to be a nested array format
+        parsed <- fromJSON(.x, flatten = TRUE)
+        # Extract the first level of the nested structure
+        if(is.list(parsed) && length(parsed) > 0) {
+          parsed[[1]]
+        } else {
+          NULL
+        }
+      }, error = function(e) {
+        # Return NULL if parsing fails
+        NULL
+      })
+    })
+  ) %>%
+  # Filter out rows where JSON parsing failed
+  filter(!map_lgl(parsed_json, is.null)) %>%
+  # Unnest the parsed JSON data with name separation
+  unnest(parsed_json, names_sep = "_") %>%
+  # Clean and select relevant columns
+  select(
+    origin_code = code,
+    origin_country = country,
+    destination_code = parsed_json_code,  # This will be the "code" field from JSON
+    destination_country = parsed_json_name  # This will be the "name" field from JSON
+  ) %>%
+  # Remove any rows with missing destination codes
+  filter(!is.na(destination_code) & destination_code != "")
+
+
+# Show summary by origin country
+visa_free_summary <- visa_free_long %>%
+  group_by(origin_code, origin_country) %>%
+  summarise(
+    visa_free_destinations = n(),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(visa_free_destinations))
+
+library(tidyverse)
+
+# Prepare the data for plotting
+visa_free_plot_data <- visa_free_long %>% 
+  select(origin_country, origin_code, destination_code) %>% 
+  mutate(
+    across(
+      .cols = c(origin_code, destination_code),
+      .fns = str_to_lower
+    )
+  ) %>% 
+  # Count visa-free destinations per origin country
+  group_by(origin_code, origin_country) %>% 
+  mutate(total_destinations = n()) %>% 
+  ungroup() %>% 
+  # Order origin countries by total destinations (most at top)
+  mutate(
+    origin_country_ordered = fct_reorder(origin_country, total_destinations, .desc = TRUE),
+    origin_country_ordered = fct_rev(origin_country_ordered)
+  ) %>% 
+  # For each origin country, arrange destinations and create symmetric x positions
+  group_by(origin_code) %>% 
+  arrange(destination_code) %>% 
+  mutate(
+    rank_num = row_number(),
+    n_destinations = n(),
+    # Create symmetric positions around 0
+    x_position = if (n_destinations[1] == 1) {
+      0
+    } else {
+      seq(-((n_destinations[1] - 1) / 2), ((n_destinations[1] - 1) / 2), length.out = n_destinations[1])
+    }
+  ) %>% 
+  ungroup()
 ```
 
 ### The Plot
@@ -470,6 +587,152 @@ ggsave(
   plot = g,
   width = 400,
   height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### The Plot 2
+
+```{r}
+# Create the plot
+
+g <- visa_free_plot_data |> 
+  filter(destination_code %in% ggflags::lflags)
+  ggplot(
+    mapping = aes(
+      x = x_position,
+      y = origin_country_ordered,
+      label = destination_code,
+      country = destination_code
+    )
+  ) +
+  geom_point(alpha = 0.1) +
+  geom_flag(aes(country = destination_code), size = 3) +
+  
+  # Add origin country flags at the left end
+  geom_flag(
+    aes(country = origin_code, y = origin_country_ordered), 
+    x = -Inf, 
+    size = 3,
+    inherit.aes = FALSE,
+    data = visa_free_plot_data %>% 
+      count(origin_code, origin_country_ordered)
+  ) +
+  geom_text(
+    aes(
+      label = paste0("(",  n, ")"),
+      y = origin_country_ordered
+    ), 
+    x = -Inf, 
+    size = bts / 9,
+    hjust = 1.5,
+    family = "caption_font",
+    colour = text_col,
+    inherit.aes = FALSE,
+    data = visa_free_plot_data %>% 
+      count(origin_code, origin_country_ordered)
+  ) +
+  
+  # Add title annotation at bottom left
+  annotate(
+    geom = "text",
+    x = Inf, y = -Inf,
+    label = "Global\nVisa-Free\nAccess\nPatterns",
+    hjust = 1.02, vjust = -1.7,
+    colour = text_hil,
+    size = 3.5 * bts * 0.35,  # Convert to geom_text size
+    family = "body_font",
+    fontface = "bold",
+    lineheight = 0.25
+  ) +
+  
+  # Add subtitle annotation below title
+  annotate(
+    geom = "text",
+    x = Inf, y = -Inf,
+    label = "Each dot represents a destination country with visa-free access for the Country's passport holders" |> str_wrap(20) |> str_view(),
+    hjust = 1.02, vjust = -0.6,
+    colour = text_hil,
+    size = 1.7 * bts * 0.35,  # Convert to geom_text size
+    family = "caption_font",
+    lineheight = 0.3
+  ) +
+  
+  # Add caption annotation at bottom right
+  annotate(
+    geom = "richtext",
+    x = Inf, y = -Inf,
+    label = plot_caption_2,  # Replace with your actual caption
+    hjust = 1.02, vjust = -0.5,
+    colour = text_hil,
+    size = bts * 0.8 * 0.35,  # Convert to geom_richtext size
+    family = "caption_font",
+    fill = NA,
+    label.color = NA,
+    lineheight = 0.35
+  ) +
+  
+  scale_x_continuous(
+    breaks = NULL,
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = NULL,     # Remove plot title
+    subtitle = NULL,  # Remove plot subtitle
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Axes
+    axis.text.y = element_text(
+      hjust = 1, 
+      margin = margin(0,7.5,0,0, "mm"),
+      size = bts / 3,
+      family = "caption_font"
+    ),
+    axis.ticks.y = element_blank(),
+    axis.ticks.length.y = unit(0, "mm"),
+    
+    axis.text.x = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.x = element_blank(),
+    axis.line.x = element_blank(),
+    axis.title.x = element_blank(),
+    panel.grid = element_blank(),
+    
+    # Remove plot title and subtitle themes since they're now annotations
+    plot.title = element_blank(),
+    plot.subtitle = element_blank(),
+    plot.caption = element_blank(),  # Remove since using annotation instead
+    
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_henley_passport_index_2.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 550,
   units = "mm",
   bg = bg_col
 )
