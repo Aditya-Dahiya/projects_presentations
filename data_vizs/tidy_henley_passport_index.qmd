@@ -300,11 +300,15 @@ top_movers <- ranking_changes %>%
 country_lists |> 
   select(code, country, visa_free_access)
 
+############################# Plot 2 #######################################
 # Get country codes for Visa Free Access
 # Inspiration: Claude AI Sonnet 4.0
 
 library(tidyverse)
 library(jsonlite)
+
+codes_filter <- ggflags::lflags |> 
+  names()
 
 # Extract visa-free access data to long format
 visa_free_long <- country_lists %>%
@@ -342,7 +346,13 @@ visa_free_long <- country_lists %>%
     destination_country = parsed_json_name  # This will be the "name" field from JSON
   ) %>%
   # Remove any rows with missing destination codes
-  filter(!is.na(destination_code) & destination_code != "")
+  filter(!is.na(destination_code) & destination_code != "") |> 
+  mutate(
+    across(
+      .cols = c(origin_code, destination_code),
+      .fns = str_to_lower
+    )
+  )
 
 
 # Show summary by origin country
@@ -359,12 +369,7 @@ library(tidyverse)
 # Prepare the data for plotting
 visa_free_plot_data <- visa_free_long %>% 
   select(origin_country, origin_code, destination_code) %>% 
-  mutate(
-    across(
-      .cols = c(origin_code, destination_code),
-      .fns = str_to_lower
-    )
-  ) %>% 
+  filter(destination_code %in% codes_filter) |> 
   # Count visa-free destinations per origin country
   group_by(origin_code, origin_country) %>% 
   mutate(total_destinations = n()) %>% 
@@ -594,11 +599,12 @@ ggsave(
 
 ### The Plot 2
 
+This visualization was created using R to transform complex passport data into an intuitive flag-based display. The foundation relied on the [tidyverse](https://www.tidyverse.org/) ecosystem for data manipulation, particularly using `jsonlite` to parse the nested JSON structure containing visa-free access information from the [Henley Passport Index API](http://api.henleypassportindex.com/api/v3/countries). The core challenge involved unnesting the complex JSON data structure and creating symmetric positioning for destination flags around a central axis using conditional logic within grouped `mutate()` operations. The visual appeal comes from the [ggflags package](https://github.com/jimjam-slam/ggflags), which renders actual country flags instead of text labels, making patterns immediately recognizable. I used `geom_flag()` twice: once for visa-free destinations positioned symmetrically along each row, and again for origin country flags anchored to the left edge using `x = -Inf` positioning. Typography and styling leverage [showtext](https://github.com/yixuan/showtext) for Google Fonts integration ([Saira font family](https://fonts.google.com/specimen/Saira)), while [ggtext](https://wilkelab.org/ggtext/) enables rich text formatting for the caption with embedded social media icons using Font Awesome. The annotations system replaces traditional plot titles with precisely positioned text elements using `annotate(geom = "text")` and `annotate(geom = "richtext")`, providing complete control over placement and styling.
+
 ```{r}
 # Create the plot
 
 g <- visa_free_plot_data |> 
-  filter(destination_code %in% ggflags::lflags)
   ggplot(
     mapping = aes(
       x = x_position,
@@ -608,7 +614,7 @@ g <- visa_free_plot_data |>
     )
   ) +
   geom_point(alpha = 0.1) +
-  geom_flag(aes(country = destination_code), size = 3) +
+  geom_flag(aes(country = destination_code), size = 2.7) +
   
   # Add origin country flags at the left end
   geom_flag(
@@ -621,7 +627,7 @@ g <- visa_free_plot_data |>
   ) +
   geom_text(
     aes(
-      label = paste0("(",  n, ")"),
+      label = paste0("(",  visa_free_destinations, ")"),
       y = origin_country_ordered
     ), 
     x = -Inf, 
@@ -630,8 +636,8 @@ g <- visa_free_plot_data |>
     family = "caption_font",
     colour = text_col,
     inherit.aes = FALSE,
-    data = visa_free_plot_data %>% 
-      count(origin_code, origin_country_ordered)
+    data = visa_free_plot_data |> 
+      left_join(visa_free_summary)
   ) +
   
   # Add title annotation at bottom left
@@ -750,7 +756,7 @@ library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here(
   "data_vizs",
-  "tidy_henley_passport_index.png"
+  "tidy_henley_passport_index_2.png"
 )) |>
   image_resize(geometry = "x400") |>
   image_write(
