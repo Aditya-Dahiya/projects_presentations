@@ -125,9 +125,9 @@ rm(
 )
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_allrecipes"
+plot_title <- "Nutritional Composition by Cuisine"
 
-plot_subtitle <- "tidy_allrecipes" |> str_wrap(105)
+plot_subtitle <- "Countries ordered by carbohydrate proportion (highest to lowest)\nPie size reflects average calories per recipe." |> str_wrap(60)
 
 str_view(plot_subtitle)
 ```
@@ -185,7 +185,16 @@ df1 <- cuisines |>
       calories, to = c(0.1, 0.4), 
       from = range(calories, na.rm = TRUE)
       )
-  ) 
+  ) |> 
+  mutate(country_code = c("au", "no", "us", "nl", "at", "br", "dk", "fi", "za", "se", 
+                         "il", "pr", "ca", "il", "tr", "lb", "ir", "pe", "jp", "ru", 
+                         "cl", "se", "vn", "us", "pl", "ar", "th", "es", "co", "de", 
+                         "cn", "kr", "jm", "pk", "pt", "cu", "mx", "in", "ph", "id", 
+                         "bd", "it", "fr", "us", "gr", "my", "us"))
+
+df1 |> 
+  pull(country) |> 
+  paste0(collapse = ", ")
 
 plot_data <-  df1 |> 
   pivot_longer(
@@ -198,30 +207,45 @@ plot_data <-  df1 |>
     country = factor(country, levels = unique(df1$country))
   )
 
-# Create the plot
-plot_data |> 
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+library(ggplot2)
+library(ggpattern)
+
+g <- plot_data |> 
   ggplot(
     mapping = aes(
       x = 1,
       y = value,
-      fill = nutrient
+      fill = nutrient,
+      pattern = nutrient,
+      pattern_filename = nutrient
     )
   ) +
   geom_col(
     mapping = aes(width = calories),
-    position = position_fill()
+    position = position_fill(),
+    colour = "white",
+    size = 0.5
   ) +
   facet_wrap(
     ~country
   ) +
   coord_radial(
     theta = "y",
-    inner.radius = 0,  # Smaller inner radius for better visibility
+    inner.radius = 0.1,  # Small inner radius for better visibility
     expand = FALSE
   ) +
-  scale_fill_viridis_d(
+  scale_fill_manual(
     name = "Nutrient",
-    labels = c("Carbohydrates", "Fat", "Protein")
+    labels = c("Carbohydrates", "Fat", "Protein"),
+    values = c("carbs" = "#FFA726", "fat" = "#FF7043", "protein" = "#42A5F5")
   ) +
   theme_minimal() +
   theme(
@@ -232,20 +256,9 @@ plot_data |>
     strip.text = element_text(size = 8, face = "bold"),
     legend.position = "bottom",
     plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5, size = 10)
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    legend.key.size = unit(1, "cm")  # Make legend keys larger to show patterns
   ) +
-  labs(
-    title = "Nutritional Composition by Cuisine",
-    subtitle = "Countries ordered by carbohydrate proportion (highest to lowest)\nPie size reflects average calories per recipe"
-  )
-
-```
-
-### The Plot
-
-```{r}
-#| label: base-plot
-
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
