@@ -1,8 +1,8 @@
 ---
-title: "tidy_allrecipes"
+title: "Global Cuisine Nutrition Profiles"
 author: "Aditya Dahiya"
-date: "2025-09-14"
-subtitle: "tidy_allrecipes"
+date: "2025-09-23"
+subtitle: "Created with ggplot2 + coord_polar() for pie charts, ggflags for country indicators, showtext for custom fonts, and scales for proportional sizing based on average calories per recipe"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_allrecipes.png"
@@ -35,9 +35,11 @@ comments:
 
 This week's dataset explores a comprehensive collection of recipes from [Allrecipes.com](https://www.allrecipes.com/), curated through the [tastyR package](https://cran.r-project.org/package=tastyR) and prepared for analysis. The collection includes two complementary datasets: `all_recipes` containing 14,426 general recipes, and `cuisines` featuring 2,218 recipes categorized by country of origin. Both datasets provide rich recipe information including ingredients, comprehensive nutritional data (calories, fat, carbohydrates, protein), cooking logistics (preparation and cooking times), user engagement metrics (ratings and reviews), and serving sizes. All data has been systematically cleaned and standardized to facilitate straightforward comparisons and visual exploration. The datasets open up numerous analytical opportunities, from identifying the most successful recipe authors and exploring relationships between cooking time and ratings, to discovering which cuisines achieve the highest user satisfaction and finding the most "actionable" recipes that balance high ratings with minimal time investment. This curated collection was assembled by [Brian Mubia](https://github.com/owlzyseyes) and represents a valuable resource for exploring culinary trends, user preferences, and recipe performance patterns across diverse cooking traditions and styles.
 
-![..............](tidy_allrecipes.png){#fig-1}
+![This visualization explores the nutritional profiles of 42 global cuisines from the Allrecipes dataset, with each pie chart representing a different culinary tradition. The size of each pie is proportional to the average calories per recipe, ranging from Malaysian cuisine at 247 calories to Italian at 488 calories. Within each pie, colored segments reveal the macronutrient balance: red for carbohydrates, yellow for fats, and green for proteins, with percentages displayed for each segment. Country flags at the center help identify each cuisine's origin. The data reveals fascinating patterns—Italian and German cuisines tend to be more calorie-dense, while Asian cuisines like Vietnamese and Thai generally show lower calorie averages. Some cuisines like Brazilian and Turkish show relatively balanced macronutrient distributions, while others like certain European cuisines lean more heavily toward carbohydrates, reflecting their traditional grain and pasta-based dishes.](tidy_allrecipes.png){#fig-1}
 
 ## How I Made This Graphic
+
+I created this comprehensive visualization using [R](https://www.r-project.org/) and the [tidyverse](https://www.tidyverse.org/) ecosystem, leveraging several specialized packages for enhanced functionality. The foundation was built with [ggplot2](https://ggplot2.tidyverse.org/) for the core plotting framework, enhanced by [ggtext](https://wilkelab.org/ggtext/) for markdown text support in titles and subtitles. I used [showtext](https://github.com/yixuan/showtext) and [Google Fonts](https://fonts.google.com/) to incorporate custom typography (Saira family fonts) for a polished aesthetic. The polar coordinate system transformed rectangular bar charts into pie charts using `coord_polar()`, while [ggflags](https://github.com/jimjam-slam/ggflags) added country flags at each pie center. Data manipulation relied heavily on [dplyr](https://dplyr.tidyverse.org/) for grouping and summarizing nutritional data, with [tidyr](https://tidyr.tidyverse.org/) for reshaping data into the long format required for visualization. The [scales](https://scales.r-lib.org/) package normalized calorie values to create proportional pie sizes, and [patchwork](https://patchwork.data-imaginist.com/) enabled the multi-panel layout through `facet_wrap()`. Color choices used a custom palette to distinguish carbohydrates, fats, and proteins across the 42 featured cuisines.
 
 ### Loading required libraries
 
@@ -59,6 +61,67 @@ pacman::p_load(
 
 all_recipes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-16/all_recipes.csv')
 cuisines <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-16/cuisines.csv')
+
+# Source: Claude Sonnet 4.0
+# Create a tibble mapping cuisines to their primary country ISO-2 codes
+library(tibble)
+
+cuisine_country_mapping <- tibble(
+  country = c(
+    "Southern Recipes", "Italian", "Cajun and Creole", "Malaysian", "Indonesian", 
+    "Vietnamese", "Spanish", "Tex-Mex", "Portuguese", "Soul Food", "Thai", 
+    "Pakistani", "Peruvian", "Cuban", "Puerto Rican", "Canadian", "French", 
+    "Korean", "Polish", "Chinese", "Austrian", "German", "Persian", "Filipino", 
+    "Turkish", "Greek", "Jamaican", "Brazilian", "Russian", "Japanese", 
+    "Indian", "Jewish", "Argentinian", "Chilean", "Scandinavian", 
+    "Amish and Mennonite", "Swedish", "Australian and New Zealander", 
+    "Lebanese", "Danish", "Israeli", "Norwegian"
+  ),
+  country_code = c(
+    "us",  # Southern Recipes - United States (Southern US cuisine)
+    "it",  # Italian - Italy
+    "us",  # Cajun and Creole - United States (Louisiana)
+    "my",  # Malaysian - Malaysia
+    "id",  # Indonesian - Indonesia
+    "vn",  # Vietnamese - Vietnam
+    "es",  # Spanish - Spain
+    "us",  # Tex-Mex - United States (Texas-Mexico border cuisine)
+    "pt",  # Portuguese - Portugal
+    "us",  # Soul Food - United States (African-American cuisine)
+    "th",  # Thai - Thailand
+    "pk",  # Pakistani - Pakistan
+    "pe",  # Peruvian - Peru
+    "cu",  # Cuban - Cuba
+    "pr",  # Puerto Rican - Puerto Rico
+    "ca",  # Canadian - Canada
+    "fr",  # French - France
+    "kr",  # Korean - South Korea
+    "pl",  # Polish - Poland
+    "cn",  # Chinese - China
+    "at",  # Austrian - Austria
+    "de",  # German - Germany
+    "ir",  # Persian - Iran
+    "ph",  # Filipino - Philippines
+    "tr",  # Turkish - Turkey
+    "gr",  # Greek - Greece
+    "jm",  # Jamaican - Jamaica
+    "br",  # Brazilian - Brazil
+    "ru",  # Russian - Russia
+    "jp",  # Japanese - Japan
+    "in",  # Indian - India
+    "il",  # Jewish - Israel (modern Jewish cuisine center)
+    "ar",  # Argentinian - Argentina
+    "cl",  # Chilean - Chile
+    "se",  # Scandinavian - Sweden (largest Scandinavian country)
+    "us",  # Amish and Mennonite - United States (primarily Pennsylvania)
+    "se",  # Swedish - Sweden
+    "au",  # Australian and New Zealander - Australia (larger population)
+    "lb",  # Lebanese - Lebanon
+    "dk",  # Danish - Denmark
+    "il",  # Israeli - Israel
+    "no"   # Norwegian - Norway
+  )
+)
 ```
 
 ### Visualization Parameters
@@ -112,7 +175,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**  Brian Mubia, www.allrecipes.com",
+  "**Data:**  Brian Mubia",
   " |  **Code:** ",
   social_caption_1,
   " |  **Graphics:** ",
@@ -125,9 +188,9 @@ rm(
 )
 
 # Add text to plot-------------------------------------------------
-plot_title <- "Nutritional Composition by Cuisine"
+plot_title <- "Global Cuisine Nutrition Profiles"
 
-plot_subtitle <- "Countries ordered by carbohydrate proportion (highest to lowest)\nPie size reflects average calories per recipe." |> str_wrap(60)
+plot_subtitle <- "Pie chart size reflects average calories per recipe (value in brackets), while segments<br>show the balance of <b style='color:#FF7676'>**Carbohydrates**</b>, <b style='color:#F9D662'>**Fats**</b>, and <b style='color:#7CAB7D'>**Proteins**</b> across the cuisines."
 
 str_view(plot_subtitle)
 ```
@@ -137,21 +200,21 @@ str_view(plot_subtitle)
 ```{r}
 #| label: eda
 
-all_recipes
-
-cuisines |> 
-  count(country, sort = T) |> 
-  print(n = 30)
-
-pacman::p_load(summarytools)
-cuisines |> 
-  dfSummary() |> 
-  view()
-
-all_recipes |> 
-  dfSummary() |> 
-  view()
-pacman::p_unload(summarytools)
+# all_recipes
+# 
+# cuisines |> 
+#   count(country, sort = T) |> 
+#   print(n = 30)
+# 
+# pacman::p_load(summarytools)
+# cuisines |> 
+#   dfSummary() |> 
+#   view()
+# 
+# all_recipes |> 
+#   dfSummary() |> 
+#   view()
+# pacman::p_unload(summarytools)
 
 # Clause Sonnet 4.0
 
@@ -169,32 +232,31 @@ df1 <- cuisines |>
   ) |> 
   
   # Calculate carbs proportion for sorting
-  mutate(
-    total_macros = fat + carbs + protein,
-    carbs_prop = carbs / total_macros
+  # mutate(
+  #   total_macros = fat + carbs + protein,
+  #   carbs_prop = carbs / total_macros
+  # ) |> 
+  slice_max(
+    order_by = n,
+    n = 42,
+    with_ties = FALSE
   ) |> 
-  arrange(desc(n)) |> 
-  filter(n > 10) |> 
-  
+
   # Sort by carbs proportion (descending)
-  arrange(desc(carbs_prop)) |> 
+  arrange(desc(calories)) |> 
   
   # Create radius scale based on calories (normalize between 0.1 and 0.4)
   mutate(
     radius = scales::rescale(
-      calories, to = c(0.1, 0.4), 
+      calories, to = c(247/488, 1), 
       from = range(calories, na.rm = TRUE)
       )
   ) |> 
-  mutate(country_code = c("au", "no", "us", "nl", "at", "br", "dk", "fi", "za", "se", 
-                         "il", "pr", "ca", "il", "tr", "lb", "ir", "pe", "jp", "ru", 
-                         "cl", "se", "vn", "us", "pl", "ar", "th", "es", "co", "de", 
-                         "cn", "kr", "jm", "pk", "pt", "cu", "mx", "in", "ph", "id", 
-                         "bd", "it", "fr", "us", "gr", "my", "us"))
-
-df1 |> 
-  pull(country) |> 
-  paste0(collapse = ", ")
+  # pull(country) |> 
+  # paste0(collapse = ", ")
+  left_join(
+    cuisine_country_mapping
+  )
 
 plot_data <-  df1 |> 
   pivot_longer(
@@ -204,10 +266,31 @@ plot_data <-  df1 |>
   ) |> 
   # Reorder country factor to maintain the carbs proportion order
   mutate(
-    country = factor(country, levels = unique(df1$country))
+    country = factor(country, levels = df1$country)
+  ) |> 
+  group_by(
+    country
+  ) |> 
+  mutate(value = value / sum(value)) |>
+  group_by(country) |>
+  mutate(
+    ymax = cumsum(value),
+    ymin = lag(ymax, default = 0),
+    ymid = (ymax + ymin) / 2,
+    xmin = 0,
+    xmax = radius
   )
 
-
+# Create custom labels for the facets
+strip_labels <- plot_data |> 
+  distinct(
+    country, calories
+  ) |> 
+  mutate(
+    label = str_wrap(paste0(country, " (", round(calories, 0), ")"), 18)
+  ) |> 
+  pull(label)
+names(strip_labels) <- levels(plot_data$country)
 ```
 
 ### The Plot
@@ -215,55 +298,77 @@ plot_data <-  df1 |>
 ```{r}
 #| label: base-plot
 
-library(ggplot2)
-library(ggpattern)
-
+# Create the plot
 g <- plot_data |> 
-  ggplot(
+  ggplot() +
+  geom_rect(
     mapping = aes(
-      x = 1,
-      y = value,
-      fill = nutrient,
-      pattern = nutrient,
-      pattern_filename = nutrient
-    )
+    xmin = xmin, 
+    xmax = xmax, 
+    ymin = ymin, 
+    ymax = ymax, 
+    fill = nutrient
+    ),
+    colour = bg_col
   ) +
-  geom_col(
-    mapping = aes(width = calories),
-    position = position_fill(),
-    colour = "white",
-    size = 0.5
+  geom_rect(
+    data = tibble(
+      xmin = rep(0, nrow(plot_data)),
+      xmax = rep(0.22, nrow(plot_data)),
+      ymin = rep(0, nrow(plot_data)),
+      ymax = rep(1, nrow(plot_data))
+    ),
+    mapping = aes(
+      xmin = xmin, 
+      xmax = xmax, 
+      ymin = ymin, 
+      ymax = ymax
+    ),
+    fill = bg_col,
+    colour = bg_col
+  ) +
+  geom_text(
+    mapping = aes(
+      x = xmax * 0.75,  # Position at ~3/4 way to edge
+      y = ymid,
+      label = paste0(round(value*100, 0), "%"),
+      size = radius * bts / 5
+    ),
+    family = "body_font",
+    colour = "black"
+  ) +
+  scale_size_identity() +
+  ggflags::geom_flag(
+    mapping = aes(
+      x = 0,  # Center position
+      y = 0,  # Center position
+      country = country_code
+    ),
+    size = 10
   ) +
   facet_wrap(
-    ~country
+    ~country,
+    ncol = 6,
+    labeller = labeller(
+      country = strip_labels
+    )
   ) +
-  coord_radial(
+  coord_polar(
     theta = "y",
-    inner.radius = 0.1,  # Small inner radius for better visibility
-    expand = FALSE
+    start = 90 * pi / 180,
+    direction = 1,
+    clip = "off"
   ) +
   scale_fill_manual(
     name = "Nutrient",
     labels = c("Carbohydrates", "Fat", "Protein"),
-    values = c("carbs" = "#FFA726", "fat" = "#FF7043", "protein" = "#42A5F5")
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text = element_blank(),
-    axis.title = element_blank(),
-    axis.ticks = element_blank(),
-    panel.grid = element_blank(),
-    strip.text = element_text(size = 8, face = "bold"),
-    legend.position = "bottom",
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5, size = 10),
-    legend.key.size = unit(1, "cm")  # Make legend keys larger to show patterns
+    values = c("#FF7676FF", "#F9D662FF", "#7CAB7DFF")
   ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
-    x = "Change in Rankings (2025 rank - 2006 rank)",
+    x = NULL,
     y = NULL,
     colour = NULL,
     fill = NULL
@@ -283,39 +388,27 @@ g <- plot_data |>
     ),
     
     # Axes
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(),
-    axis.ticks.length.y = unit(0, "mm"),
-    
-    axis.text.x = element_text(
-      margin = margin(2,2,2,2, "mm")
-    ),
-    axis.ticks.length.x = unit(5, "mm"),
-    axis.ticks.x = element_line(
-      colour = text_hil,
-      linewidth = 0.4
-    ),
-    axis.line.x = element_line(
-      arrow = arrow(
-        ends = "both"
-      ),
-      colour = text_hil,
-      linewidth = 0.4
-    ),
-    axis.title.x = element_text(
-      margin = margin(2,2,2,2, "mm")
-    ),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.line = element_blank(),
     panel.grid = element_blank(),
-    panel.grid.major.x = element_line(
-      linewidth = 0.3,
-      linetype = 3,
-      colour = alpha(text_col, 0.7)
+ 
+    # Panels
+    strip.text = element_text(
+      size = 0.75 * bts,
+      margin = margin(0,0,-3,0, "mm"),
+      lineheight = 0.3,
+      vjust = 0,
+      hjust = 0.5,
+      colour = text_hil
     ),
-
-
+    panel.spacing.x = unit(2, "mm"),
+    panel.spacing.y = unit(-5, "mm"),
+    
     # Labels and Strip Text
     plot.title = element_text(
-      margin = margin(5, 0, 5, 0, "mm"),
+      margin = margin(5, 0, 2, 0, "mm"),
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
@@ -323,22 +416,21 @@ g <- plot_data |>
       family = "body_font",
       face = "bold"
     ),
-    plot.subtitle = element_text(
-      margin = margin(5, 0, 0, 0, "mm"),
+    plot.subtitle = element_textbox(
+      margin = margin(2, 0, 5, 0, "mm"),
       vjust = 0.5,
       colour = text_hil,
       size = 1.3 * bts,
       hjust = 0.5,
-      family = "caption_font",
+      halign = 0.5,
+      family = "body_font",
       lineheight = 0.3
     ),
-    plot.caption = element_textbox(
-      margin = margin(5, 0, 2, 0, "mm"),
+    plot.caption = element_markdown(
+      family = "caption_font",
       hjust = 0.5,
-      halign = 0.5,
-      colour = text_hil,
-      size = bts * 0.8,
-      family = "caption_font"
+      margin = margin(-5,0,0,0, "mm"),
+      colour = text_hil
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
