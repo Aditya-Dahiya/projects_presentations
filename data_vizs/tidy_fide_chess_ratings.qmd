@@ -1,8 +1,8 @@
 ---
-title: "FIDE Chess Player Ratings"
+title: "The Age Gap: Female vs Male Chess Players Worldwide"
 author: "Aditya Dahiya"
 date: "2025-09-23"
-subtitle: "tidy_fide_chess_ratings"
+subtitle: "The global chess landscape shows women competing at younger ages than men universally, while India stands out as having the youngest average age among all major chess federations."
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_allrecipes.png"
@@ -35,7 +35,7 @@ comments:
 
 This dataset features chess player ratings from the [FIDE (International Chess Federation)](https://www.fide.com/) for August and September 2025, sourced from FIDE's monthly rating publications available on their [official website](https://www.fide.com/fide-september-2025-rating-list-vincent-keymer-debuts-in-top-10-open/). Chess ratings, based on the [Elo rating system](https://en.wikipedia.org/wiki/Elo_rating_system), provide a numerical estimate of a player's strength relative to other competitors, with ratings increasing or decreasing based on performance against expected outcomes. The September 2025 rating list reflects results from major tournaments including the [Sinquefield Cup](https://saintlouischessclub.org/tournaments/sinquefield-cup), Quantbox Chennai Grand Masters, 61st International Akiba Rubinstein Chess Festival, and the Spanish League Honor Division 2025 held in Linares. Each player record includes their unique FIDE identification number, federation code (similar to [IOC country codes](https://www.mark-weeks.com/aboutcom/mw15b16.htm)), various titles ranging from [Grandmaster (GM)](https://en.wikipedia.org/wiki/Grandmaster_(chess)) to Candidate Master (CM), current Elo rating, number of games played, and birth year. The dataset was curated by [Jessica Moore](https://github.com/jessjep) as part of the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) weekly data project, providing researchers and chess enthusiasts with comprehensive rating data to analyze player improvements, federation distributions, ranking changes, and youth player performance trends.
 
-![..................](tidy_fide_chess_ratings.png){#fig-1}
+![This population pyramid visualization displays the average age and player count distribution across the top 20 chess federations by total registered players from FIDE's August 2025 ratings. Each horizontal bar represents a federation, with blue bars extending rightward showing male players and pink bars extending leftward representing female players. The length of each bar corresponds to the average age of players in that gender group, while the numbers displayed indicate the total count of registered players. Country flags appear at the center dividing line between male and female demographics. The x-axis represents average age in years, with the scale showing absolute values for both directions. The data illustrates a consistent pattern where female players maintain younger average ages than their male counterparts across all federations.](tidy_fide_chess_ratings.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -61,7 +61,7 @@ pacman::p_load(
 
 
 fide_ratings_august <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_august.csv')
-fide_ratings_september <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_september.csv')
+# fide_ratings_september <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_september.csv')
 
 ```
 
@@ -129,9 +129,9 @@ rm(
 )
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_fide_chess_ratings"
+plot_title <- "Gender and Age Patterns in Chess players"
 
-plot_subtitle <- "tidy_fide_chess_ratings"
+plot_subtitle <- "International chess reveals a striking pattern where <span style='color:#9E0C5BFF'>**female**</span> players are consistently younger than <span style='color:#003DA5FF'>**males**</span><br>across all federations, with India demonstrating the most youthful chess community globally."
 
 str_view(plot_subtitle)
 ```
@@ -141,17 +141,18 @@ str_view(plot_subtitle)
 ```{r}
 #| label: eda
 
-pacman::p_load(summarytools)
+# pacman::p_load(summarytools)
+# 
+# fide_ratings_august |> 
+#   dfSummary() |> 
+#   view()
+# 
+# fide_ratings_september |> 
+#   dfSummary() |> 
+#   view()
+# 
+# pacman::p_unload(summarytools)
 
-fide_ratings_august |> 
-  dfSummary() |> 
-  view()
-
-fide_ratings_september |> 
-  dfSummary() |> 
-  view()
-
-pacman::p_unload(summarytools)
 
 df1 <- fide_ratings_august |> 
   mutate(age = 2025 - bday) |> 
@@ -162,20 +163,46 @@ df1 <- fide_ratings_august |>
     age = mean(age, na.rm = TRUE),
     rating = mean(rating, na.rm = TRUE),
     games = mean(games, na.rm = TRUE)
+  ) |>  
+  group_by(fed) |> 
+  mutate(total_player = sum(nos)) |> 
+  ungroup() |> 
+  slice_max(
+    order_by = total_player,
+    n = 40,
+    with_ties = TRUE
+  ) |> 
+  mutate(
+    age = if_else(sex == "F", -age, age),
+    rating = if_else(sex == "F", -rating, rating)
   )
 
-df1 |> 
-  group_by(fed, sex) |> 
-  mutate(total_player = sum(nos))
-  slice_max(nos, n = 20)
-  
-  
-  pivot_wider(
-    id_cols
-  )
+country_levels <- df1 |> 
+  arrange(total_player) |> 
+  pull(fed) |> 
+  unique()
+
+countrycode::guess_field(df1$fed)
+
+df2 <- df1 |> 
+  mutate(fed = fct(fed, levels = country_levels)) |> 
   mutate(
-    size_var = 
+    country_code = str_to_lower(
+      countrycode::countrycode(
+        fed,
+        "ioc",
+        "iso2c"
+      )
+    ),
+    country_name = countrycode::countrycode(
+      country_code,
+      "iso2c",
+      "country.name.en"
+    )
   )
+
+cpicks <-  c("#003DA5FF", "#9E0C5BFF")
+
 ```
 
 ### The Plot
@@ -183,17 +210,124 @@ df1 |>
 ```{r}
 #| label: base-plot
 
-
-
-
-
+g <- df2 |> 
+  ggplot(
+    mapping = aes(
+      x = fed,
+      y = age
+    )
+  ) +
+  
+  # Plotting the data for males
+  ggchicklet::geom_chicklet(
+    data = df2 |> filter(sex == "M"),
+    fill = cpicks[1],
+    alpha = 0.5
+  ) +
+  geom_text(
+    data = df2 |> filter(sex == "M"),
+    mapping = aes(label = paste0(round(age, 0), " yrs")),
+    family = "caption_font",
+    hjust = -0.1,
+    colour = cpicks[1],
+    size = bts / 3
+  ) +
+  geom_text(
+    data = df2 |> filter(sex == "M"),
+    mapping = aes(
+      label = number(nos, big.mark = ","),
+      y = 5
+    ),
+    family = "body_font",
+    hjust = 0,
+    colour = cpicks[1],
+    size = bts / 3
+  ) +
+  
+  # Plotting the data for Females
+  ggchicklet::geom_chicklet(
+    data = df2 |> filter(sex == "F"),
+    fill = cpicks[2],
+    alpha = 0.5
+  ) +
+  geom_text(
+    data = df2 |> filter(sex == "F"),
+    mapping = aes(label = paste0(round(-age, 0), " yrs")),
+    family = "caption_font",
+    hjust = 1.1,
+    colour = cpicks[2],
+    size = bts / 3
+  ) +
+  geom_text(
+    data = df2 |> filter(sex == "F"),
+    mapping = aes(
+      label = number(nos, big.mark = ","),
+      y = -5
+    ),
+    family = "body_font",
+    hjust = 1,
+    colour = cpicks[2],
+    size = bts / 3
+  ) +
+  
+  # Add Country Names
+  geom_text(
+    data = df2 |> filter(sex == "F"),
+    mapping = aes(label = country_name, y = -55),
+    family = "body_font",
+    hjust = 0,
+    colour = text_hil,
+    size = bts / 3
+  ) +
+  
+  # Add flags in the center
+  ggflags::geom_flag(
+    data = df2 |> filter(sex == "M"),
+    mapping = aes(country = country_code),
+    y = 0,
+    size = 20
+  ) +
+  
+  # Add text annotations for "Number of Players"
+  geom_text(
+    data = data.frame(x = 21, y = 5),
+    mapping = aes(x = x, y = y),
+    label = "Number of Male Players",
+    family = "body_font",
+    color = cpicks[1],
+    size = bts / 3.5,
+    hjust = 0,
+    inherit.aes = FALSE,
+    lineheight = 0.3
+  ) +
+  geom_text(
+    data = data.frame(x = 21, y = -5),
+    mapping = aes(x = x, y = y),
+    label = "Number of Female Players",
+    family = "body_font",
+    color = cpicks[2],
+    size = bts / 3.5,
+    hjust = 1,
+    inherit.aes = FALSE,
+    lineheight = 0.3
+  ) +
+  
+  scale_y_continuous(
+    labels = function(x) abs(x), # Remove minus signs
+    limits = c(-55, 55),
+    breaks = seq(-60, 60, 10),
+    expand = expansion(0)
+  ) +
+  coord_flip(
+    clip = "off"
+  ) +
 
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
+    y = "Average Age for FIDE players for the country",
     x = NULL,
-    y = NULL,
     colour = NULL,
     fill = NULL
   ) +
@@ -212,23 +346,34 @@ df1 |>
     ),
     
     # Axes
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    axis.ticks.length = unit(0, "mm"),
-    axis.line = element_blank(),
-    panel.grid = element_blank(),
- 
-    # Panels
-    strip.text = element_text(
-      size = 0.75 * bts,
-      margin = margin(0,0,-3,0, "mm"),
-      lineheight = 0.3,
-      vjust = 0,
-      hjust = 0.5,
+    axis.text.y = element_blank(),
+    axis.text.x = element_text(
+      margin = margin(3,0,0,0, "mm")
+    ),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_line(
+      colour = text_hil,
+      linewidth = 0.3
+    ),
+    axis.ticks.length = unit(7, "mm"),
+    axis.line.y = element_blank(),
+    axis.line.x = element_line(
+      arrow = arrow(length = unit(5, "mm"), ends = "both"),
+      linewidth = 0.3,
       colour = text_hil
     ),
-    panel.spacing.x = unit(2, "mm"),
-    panel.spacing.y = unit(-5, "mm"),
+    axis.title.x = element_text(
+      margin = margin(1,0,5,0, "mm"),
+      colour = text_hil,
+      size = bts,
+      face = "bold"
+    ),
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = text_hil
+    ),
     
     # Labels and Strip Text
     plot.title = element_text(
@@ -236,7 +381,7 @@ df1 |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 3.2 * bts,
+      size = 2.6 * bts,
       family = "body_font",
       face = "bold"
     ),
@@ -247,13 +392,13 @@ df1 |>
       size = 1.3 * bts,
       hjust = 0.5,
       halign = 0.5,
-      family = "body_font",
+      family = "caption_font",
       lineheight = 0.3
     ),
     plot.caption = element_markdown(
       family = "caption_font",
       hjust = 0.5,
-      margin = margin(-5,0,0,0, "mm"),
+      margin = margin(5,0,0,0, "mm"),
       colour = text_hil
     ),
     plot.caption.position = "plot",
