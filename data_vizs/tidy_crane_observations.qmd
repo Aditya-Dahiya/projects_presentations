@@ -150,7 +150,7 @@ df1 <- cranes |>
     year = year(date),
     decade = (year(date) %/% 10) * 10,
     decade_label = paste0(decade, "s"),       # Decade with 's' suffix (1990s, 2000s, etc.)
-    month = month(date, label = TRUE),
+    month = month(date, label = TRUE, abbr = FALSE),
     day_of_week = wday(date, label = TRUE),
     day = day(date),
     day_of_year = yday(date)
@@ -219,22 +219,48 @@ g <- df1 |>
   ) |> 
   ggplot(
     aes(
-      x = day_of_week, 
-      y = observations,
+      y = day_of_week, 
+      x = observations,
       fill = day_of_week
     )
   ) +
-  geom_col() +
-  facet_grid(month~decade_label) +
+  geom_col(
+    alpha = 0.75
+  ) +
+  geom_text(
+    mapping = aes(
+      label = number(
+        observations, 
+        scale_cut = cut_short_scale(),
+        accuracy = 0.1
+      ),
+      colour = day_of_week
+    ),
+    hjust = -0.2,
+    size = bts / 4,
+    family = "caption_font"
+  ) +
+  facet_grid(decade_label ~ month) +
   scale_fill_manual(
-    values = paletteer::paletteer_d("feathers::bee_eater")
+    values = paletteer::paletteer_d("ghibli::PonyoDark")
+  ) +
+  scale_colour_manual(
+    values = paletteer::paletteer_d("ghibli::PonyoDark")
+  ) +
+  scale_x_continuous(
+    labels = scales::label_number(scale_cut = cut_short_scale()),
+    expand = expansion(0),
+    breaks = seq(3, 12, 3) * 1e3
+  ) +
+  scale_y_discrete(
+    expand = expansion(0)
   ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
-    y = "Average Age for FIDE players for the country",
-    x = NULL,
+    y = NULL,
+    x = "Number of observations on each day on the week (average for the month)",
     colour = NULL,
     fill = NULL
   ) +
@@ -253,27 +279,25 @@ g <- df1 |>
     ),
     
     # Axes
-    axis.text.y = element_blank(),
-    axis.text.x = element_text(
-      margin = margin(3,0,0,0, "mm")
+    axis.text = element_text(
+      margin = margin(2,2,2,2, "mm")
     ),
     axis.ticks.y = element_blank(),
-    axis.ticks.x = element_line(
-      colour = text_hil,
-      linewidth = 0.3
+    axis.ticks.x = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    axis.line.y = element_line(
+      linewidth = 0.3,
+      colour = line_col
     ),
-    axis.ticks.length = unit(7, "mm"),
-    axis.line.y = element_blank(),
     axis.line.x = element_line(
-      arrow = arrow(length = unit(5, "mm"), ends = "both"),
+      arrow = arrow(length = unit(3, "mm")),
       linewidth = 0.3,
       colour = text_hil
     ),
-    axis.title.x = element_text(
-      margin = margin(1,0,5,0, "mm"),
+    axis.title.y = element_text(
+      margin = margin(0,3,0,0, "mm"),
       colour = text_hil,
-      size = bts,
-      face = "bold"
+      size = bts
     ),
     panel.grid = element_blank(),
     panel.grid.major.x = element_line(
@@ -281,6 +305,26 @@ g <- df1 |>
       linewidth = 0.3,
       colour = text_hil
     ),
+    panel.background = element_rect(
+      fill = NA,
+      colour = text_hil,
+      linewidth = 0.3
+    ),
+    
+    # Strip Labels
+    strip.text.x = element_text(
+      colour = text_hil, 
+      size = bts * 1.2,
+      margin = margin(0,0,3,0, "mm")
+    ),
+    strip.text.y = element_text(
+      colour = text_hil, 
+      size = bts * 1.2,
+      margin = margin(0,0,0,3, "mm"),
+      angle = 0
+    ),
+    panel.spacing.x = unit(3, "mm"),
+    panel.spacing.y = unit(3, "mm"),
     
     # Labels and Strip Text
     plot.title = element_text(
