@@ -1,8 +1,8 @@
 ---
-title: "tidy_crane_observations"
+title: "Tracking Cranes at Lake Hornborgasjön"
 author: "Aditya Dahiya"
-date: "2025-09-26"
-subtitle: "tidy_crane_observations"
+date: "2025-10-05"
+subtitle: "How observation patterns reveal seasonal stopover behavior (1994-2024)"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_crane_observations.png"
@@ -35,7 +35,7 @@ comments:
 
 This dataset documents crane observations at Lake Hornborgasjön in Västergötland, Sweden, spanning over 30 years of migration patterns. The data comes from dedicated crane counters at the [Hornborgasjön field station](https://www.hornborga.com/naturen/tranor/), who have systematically recorded crane populations during spring and fall migrations. The timing of peak crane presence varies depending on weather conditions—particularly the arrival of spring and favorable southerly winds that support crane flight. The dataset includes daily observation counts, dates, and important contextual notes from counting officials, such as records of bad weather, canceled counts, seasonal milestones (first and last counts), record observations, severe interference, and uncertain counts. Weather disruptions are specifically flagged when original comments mention conditions like fog, rain, snow, thunder, or other adverse weather. This rich historical record enables analysis of population trends, seasonal patterns, and the relationship between crane migration and weather conditions. More information about crane statistics can be found on the [Hornborgasjön website](https://www.hornborga.com/naturen/transtatistik/).
 
-![...................](tidy_crane_observations.png){#fig-1}
+![Visualization shows mean crane observations by weekday (y-axis), faceted by month (columns) and decade (rows). Bar length represents average observation count for each day-month-decade combination, with numeric labels showing exact values. Spring months (March-April) display comprehensive daily monitoring across all seven weekdays, while autumn months (August-October) show strategic sampling on selected days only. Growing bar lengths across decades indicate increasing observation frequencies. Colors distinguish weekdays using the Ghibli PonyoDark palette. Data: Hornborgasjön field station crane counts (1994-2024). Missing bars indicate no observations recorded for that weekday-month combination.](tidy_crane_observations.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -100,6 +100,10 @@ line_col <- "grey30"
 # Define Base Text Size
 bts <- 80
 
+# Get the actual colors from chosen palette
+day_colors <- paletteer::paletteer_d("ghibli::PonyoDark", n = 7)
+names(day_colors) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
 # Caption stuff for the plot
 sysfonts::font_add(
   family = "Font Awesome 6 Brands",
@@ -125,9 +129,14 @@ rm(
 )
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_crane_observations"
+plot_title <- "Crane Observation Patterns\nLake Hornborgasjön (1994–2024)"
 
-plot_subtitle <- "tidy_crane_observations"
+plot_subtitle <- glue::glue(
+  "Systematic crane monitoring occurs daily (<span style='color:{day_colors['Mon']}'>Mon</span>-<span style='color:{day_colors['Sun']}'>Sun</span>) during the intense <b>March-April</b> spring migration<br>",
+  "when thousands gather at this critical stopover. Starting in the 2000s, <b>autumn counts</b> expanded to track southward<br>",
+  "migration, but occur selectively—only on <span style='color:{day_colors['Mon']}'>Mon</span>, <span style='color:{day_colors['Tue']}'>Tue</span>, and <span style='color:{day_colors['Thu']}'>Thu</span> in the 2010s, and <span style='color:{day_colors['Mon']}'>Mon</span> and <span style='color:{day_colors['Thu']}'>Thu</span> in the 2020s—<br>",
+  "reflecting the more dispersed nature of fall passage. Three decades reveal steadily rising observations."
+)
 
 str_view(plot_subtitle)
 ```
@@ -242,10 +251,10 @@ g <- df1 |>
   ) +
   facet_grid(decade_label ~ month) +
   scale_fill_manual(
-    values = paletteer::paletteer_d("ghibli::PonyoDark")
+    values = day_colors
   ) +
   scale_colour_manual(
-    values = paletteer::paletteer_d("ghibli::PonyoDark")
+    values = day_colors
   ) +
   scale_x_continuous(
     labels = scales::label_number(scale_cut = cut_short_scale()),
@@ -328,19 +337,20 @@ g <- df1 |>
     
     # Labels and Strip Text
     plot.title = element_text(
-      margin = margin(5, 0, 2, 0, "mm"),
+      margin = margin(5, 0, 5, 0, "mm"),
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2.6 * bts,
+      size = 2.3 * bts,
       family = "body_font",
-      face = "bold"
+      face = "bold",
+      lineheight = 0.25
     ),
     plot.subtitle = element_textbox(
       margin = margin(2, 0, 5, 0, "mm"),
       vjust = 0.5,
       colour = text_hil,
-      size = 1.3 * bts,
+      size = 1.1 * bts,
       hjust = 0.5,
       halign = 0.5,
       family = "caption_font",
