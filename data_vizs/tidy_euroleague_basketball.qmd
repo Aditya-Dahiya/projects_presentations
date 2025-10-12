@@ -1,10 +1,15 @@
 ---
-title: "tidy_euroleague_basketball"
+title: "Mapping Europe's Elite Basketball Arenas"
 author: "Aditya Dahiya"
-date: "2025-10-07"
-subtitle: "tidy_euroleague_basketball"
+date: "2025-10-12"
+subtitle: "The Geography of European Basketball Excellence"
 categories:
   - "#TidyTuesday"
+  - "Maps"
+  - "Images"
+  - "{ggimage}"
+  - "{ggrepel}"
+  - "{ggtext}"
 image: "thumbnails/tidy_euroleague_basketball.png"
 format:
   html:
@@ -37,7 +42,7 @@ comments:
 
 This dataset explores **EuroLeague Basketball**, the top-tier European professional basketball club competition widely regarded as the most prestigious in European basketball. The data includes information on EuroLeague teams such as their country, home city, arena, seating capacity, and historical performance metrics including Final Four appearances and championship titles won. The dataset was curated from publicly available sources including [Wikipedia](https://en.wikipedia.org/wiki/EuroLeague) and [official EuroLeague records](https://www.euroleaguebasketball.net/), and is available through the [EuroleagueBasketball R package](https://github.com/natanast/EuroleagueBasketball) created by [Natasa Anastasiadou](https://github.com/natanast), with full documentation at [natanast.github.io/EuroleagueBasketball](https://natanast.github.io/EuroleagueBasketball/). This rich dataset enables exploration of geographic representation across European basketball, comparisons of arena capacities, and analysis of the most historically successful clubs in European basketball competition. The data is part of the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) project, a weekly data visualization challenge in the R and Python communities.
 
-![tidy_euroleague_basketball](tidy_euroleague_basketball.png){#fig-1}
+![This map visualizes EuroLeague Basketball teams across Europe and beyond, showing arena locations, capacities, and team logos. Created using {ggplot2} with {sf} for spatial data, {ggimage} for team logos, and {ggrepel} for label placement. Map data from {rnaturalearth}, team information from the {EuroleagueBasketball} package. Logos were sourced via Google Custom Search API and processed with {magick}.](tidy_euroleague_basketball.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -132,9 +137,10 @@ rm(
 )
 
 # Add text to plot-------------------------------------------------
-plot_title <- "tidy_euroleague_basketball"
+plot_title <- "Europe's Elite Basketball Arenas"
 
-plot_subtitle <- "tidy_euroleague_basketball"
+plot_subtitle <- "From Barcelona to Tel Aviv, 23 iconic arenas across 11 countries host Europe's top-tier basketball competition. Arena capacities range from intimate 3,000-seat venues to massive 20,000+ stadiums, reflecting the continent's diverse basketball culture and passionate fanbases." |> 
+  str_wrap(100)
 
 str_view(plot_subtitle)
 ```
@@ -246,7 +252,7 @@ for (i in 3:nrow(euroleague_basketball)) {
 
 # Get logos of each team
 
-
+# Source: Claude Sonnet 4.0
 # Get the coordinates of each team  city to show on the map
 # euroleague_basketball$arena |> paste0(collapse = ", ")
 euroleague_arenas <- tibble(
@@ -373,7 +379,7 @@ df1 <- euroleague_arenas |>
   separate_longer_delim(capacity, delim = ", ") %>%
   # Parse as numbers (remove commas and convert to numeric)
   mutate(capacity = parse_number(capacity)) |> 
-  group_by(arena) |> 
+  group_by(team) |> 
   slice_head(n = 1) |> 
   ungroup() |> 
   st_as_sf()
@@ -392,12 +398,15 @@ country_map <- df1 |>
       returnclass = "sf",
       scale = "large"
     ) |> 
-      select(iso_a2, geometry) |> 
-  mutate(iso_a2 = if_else(iso_a2 == "-99", "FR", iso_a2))
+      select(name, iso_a2, geometry) |> 
+  mutate(
+    iso_a2 = if_else(
+      iso_a2 == "-99" & name == "France", 
+      "FR", 
+      iso_a2)
+    )
   ) |> 
   st_as_sf()
-
-
 ```
 
 ### The Plot
@@ -408,55 +417,83 @@ country_map <- df1 |>
 g <- ggplot() +
   geom_sf(
     data = world_map,
-    fill = NA,
+    fill = "grey90",
     colour = text_hil,
-    linewidth = 0.2
+    linewidth = 0.2,
+    alpha = 0.5
   ) +
   geom_sf(
     data = country_map,
-    fill = "grey90",
+    fill = "grey50",
     colour = text_col,
     linewidth = 0.3
   ) +
-  geom_point(
-    data = df1,
-    mapping = aes(x = longitude, y = latitude, size = capacity),
-    alpha = 0.4
-  ) +
-  ggrepel::geom_text_repel(
-    data = df1,
-    mapping = aes(
-      label = paste0(
-        team, "\n",
-        "(", home_city, ", ", country, ")"
+
+  # Replace the geom_label_repel with:
+  ggrepel::geom_label_repel(
+      data = df1,
+      mapping = aes(
+        label = paste0(
+          team, " (", home_city, ") \n",
+          arena, ", ", "\n",
+          number(capacity, accuracy = 100)
+        ),
+        geometry = geometry
       ),
-      geometry = geometry
-    ),
-    stat = "sf_coordinates",
-    hjust = 0,
-    vjust = 0,
-    lineheight = 0.2,
-    family = "caption_font"
+      stat = "sf_coordinates",
+      hjust = 0.5,
+      vjust = 0,
+      lineheight = 0.3,
+      family = "body_font",
+      fill = alpha("white", 0.1),
+      label.size = NA,
+      label.r = unit(0.2, "lines"),
+      label.padding = unit(0.25, "lines"),
+      force_pull = 0.01,
+      force = 200,
+      seed = 21,
+      size = bts / 4,
+      colour = text_hil,
+      fontface = "bold",
+      min.segment.length = unit(1, "mm")
+    ) +
+     ggimage::geom_image(
+      data = df1,
+      mapping = aes(
+          x = longitude, 
+          y = latitude, 
+          image = paste0("data_vizs/temp_euroleague_basketball_", image_id, ".png")
+        ),
+        size = 0.05
+      ) +
+    # Add legend annotation
+    annotate(
+      geom = "label",
+      x = 45, 
+      y = 65,
+      label = paste0(
+          "Team Name", " (Home City) \n",
+          "Name of the Arena, ", "\n",
+          "Capacity of the Stadium"
+        ),
+      family = "body_font",
+      fill = alpha("white", 0.3),
+      label.size = NA,
+      label.r = unit(0.2, "lines"),
+      label.padding = unit(0.5, "lines"),
+      hjust = 0,
+      vjust = 0.5,
+      lineheight = 0.3,
+      size = bts / 4,
+      colour = text_hil,
+      fontface = "bold"
   ) +
-  # ggrepel::geom_text_repel(
-  #   data = df1,
-  #   mapping = aes(
-  #     label = paste0(
-  #       arena, " Capacity: ",
-  #       number(capacity, accuracy = 0.1 , scale_cut = cut_short_scale())
-  #     ),
-  #     geometry = geometry
-  #   ),
-  #   stat = "sf_coordinates",
-  #   hjust = 0,
-  #   vjust = 1,
-  #   lineheight = 0.2,
-  #   family = "caption_font"
-  # ) +
+
   coord_sf(
+    crs = "EPSG:3857",
     default_crs = "EPSG:4326",
     xlim = c(-10, 60),
-    ylim = c(20, 56)
+    ylim = c(20, 66)
   ) +
   
   labs(
@@ -464,7 +501,8 @@ g <- ggplot() +
     subtitle = plot_subtitle,
     caption = plot_caption,
     colour = NULL,
-    fill = NULL
+    fill = NULL,
+    x = NULL, y = NULL
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -480,24 +518,34 @@ g <- ggplot() +
       lineheight = 0.3
     ),
     
+    # Grid Lines and Axes Text
+    panel.grid = element_line(
+      linewidth = 0.3,
+      linetype = 3,
+      colour = text_hil
+    ),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    
     # Labels and Strip Text
     plot.title = element_text(
       margin = margin(5, 0, 5, 0, "mm"),
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2.3 * bts,
+      size = 3.2 * bts,
       family = "body_font",
       face = "bold",
       lineheight = 0.25
     ),
-    plot.subtitle = element_textbox(
+    plot.subtitle = element_text(
       margin = margin(2, 0, 5, 0, "mm"),
       vjust = 0.5,
       colour = text_hil,
-      size = 1.1 * bts,
+      size = 1.4 * bts,
       hjust = 0.5,
-      halign = 0.5,
       family = "caption_font",
       lineheight = 0.3
     ),
