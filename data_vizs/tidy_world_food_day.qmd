@@ -1,0 +1,293 @@
+---
+title: "tidy_world_food_day"
+author: "Aditya Dahiya"
+date: "2025-10-16"
+subtitle: "tidy_world_food_day"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_world_food_day.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This week's dataset celebrates [World Food Day](https://en.wikipedia.org/wiki/World_Food_Day) and the 80th anniversary of the [Food and Agriculture Organization of the United Nations (FAO)](https://en.wikipedia.org/wiki/Food_and_Agriculture_Organization). The data comes from the FAO's [Suite of Food Security Indicators](https://www.fao.org/faostat/en/#data/FS), a comprehensive collection developed following recommendations from the Committee on World Food Security. These indicators capture various dimensions of food insecurity using expert judgment and data with sufficient coverage to enable meaningful comparisons across regions and over time. The dataset includes measurements across multiple indicators, regions, and time periods, with confidence intervals provided for many observations to reflect measurement uncertainty. Values are expressed in diverse units including grams per capita per day, kilocalories per capita per day, international dollars, percentages, and indices, allowing for a multifaceted assessment of global food security trends.
+
+![.................](tidy_world_food_day.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # for maps
+  patchwork  # Composing Plots
+)
+
+food_security <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-10-14/food_security.csv') |> 
+  janitor::clean_names()
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+# Get the actual colors from chosen palette
+day_colors <- paletteer::paletteer_d("ghibli::PonyoDark", n = 7)
+names(day_colors) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Carl Börstell; The Food and Agriculture Organization of the United Nations (FAO)",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "tidy_world_food_day"
+
+plot_subtitle <- "tidy_world_food_day" |> 
+  str_wrap(100)
+
+str_view(plot_subtitle)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+pacman::p_load(summarytools)
+
+food_security |> 
+  dfSummary() |> 
+  view()
+
+pacman::p_unload(summarytools)
+
+food_security |> 
+  distinct()
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+
+
+
+
+
+
+
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    colour = NULL,
+    fill = NULL,
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Grid Lines and Axes Text
+    panel.grid = element_line(
+      linewidth = 0.3,
+      linetype = 3,
+      colour = text_hil
+    ),
+    axis.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.length = unit(0, "mm"),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 3.2 * bts,
+      family = "body_font",
+      face = "bold",
+      lineheight = 0.25
+    ),
+    plot.subtitle = element_text(
+      margin = margin(2, 0, 5, 0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.4 * bts,
+      hjust = 0.5,
+      family = "caption_font",
+      lineheight = 0.3
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_world_food_day.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_world_food_day.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_world_food_day.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
