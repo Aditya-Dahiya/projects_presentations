@@ -1,0 +1,445 @@
+---
+title: "UK Weather Extremes: A Century of Records"
+author: "Aditya Dahiya"
+date: "2025-10-21"
+subtitle: "Mapping extreme weather across the UK using Met Office data (1853-2025)"
+categories:
+  - "#TidyTuesday"
+  - "{ggrepel}"
+  - "Maps"
+  - "{ggtext}"
+image: "thumbnails/tidy_uk_meteorological_data.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This dataset features historic meteorological data from 37 weather stations across the United Kingdom, curated from the [UK Met Office](https://www.metoffice.gov.uk/)'s [historic station data collection](https://www.metoffice.gov.uk/research/climate/maps-and-data/historic-station-data). The [Met Office](https://www.metoffice.gov.uk/), established in 1854 as one of the world's oldest weather services, serves as the UK's national weather and climate authority. The dataset includes monthly measurements spanning from as early as 1853 to the present, tracking key variables such as maximum and minimum temperatures, air frost days, rainfall, and sunshine duration. Each station's metadata provides geographic coordinates in [EPSG:4326 format](https://epsg.io/4326) and opening dates. The data undergoes basic cleaning with estimated data flags and historical monitoring technique variations removed for simplicity, though these details remain available in the raw source data. Station files are updated monthly, approximately 10 days after month-end, with measurements reflecting the stations' operational history without adjustments for site changes or instrumentation developments over time. This comprehensive dataset was curated by [Jack Davison](https://github.com/jack-davison) for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) project.
+
+![Geographic distribution of UK Met Office weather stations with their record-breaking measurements. Each station marker is labeled with its most extreme climate events: maximum temperature (red), minimum temperature (blue), and highest monthly rainfall (green). Dates in parentheses indicate when these records were set. Station opening years range from 1853 to recent decades, representing one of the most comprehensive historic meteorological datasets in the world and documenting Britain's climate variability across generations.](tidy_uk_meteorological_data.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # for maps
+  patchwork  # Composing Plots
+)
+
+pacman::p_load(
+  sf,
+  ggrepel,
+  ggtext
+)
+
+historic_station_met <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-10-21/historic_station_met.csv') |> 
+  janitor::clean_names()
+
+station_meta <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-10-21/station_meta.csv') |> 
+  janitor::clean_names()
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 180
+
+# Get the actual colors from chosen palette
+day_colors <- paletteer::paletteer_d("ghibli::PonyoDark", n = 7)
+names(day_colors) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Jack Davison, UK Met Office",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "UK Weather Extremes:\nA Century of Records"
+
+plot_subtitle <- "Visualizing historic meteorological\ndata from 37 UK Met Office weather\nstations (1853-2025).\n \nCreated with\n{ggplot2}, {sf}, and\n{ggtext} to map\nextreme temperature\nand rainfall records\nacross Britain and\nIreland."
+
+str_view(plot_subtitle)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# pacman::p_load(summarytools)
+# 
+# historic_station_met |> 
+#   dfSummary() |> 
+#   view()
+# pacman::p_unload(summarytools)
+
+df_tmax <- historic_station_met |>
+  group_by(station) |>
+  slice_max(
+    order_by = tmax,
+    n = 1,
+    with_ties = FALSE
+  ) |>
+  mutate(
+    tmax = paste0(round(tmax,1), "°C"),
+    tmax_month = paste0(month.abb[month], " ", year),
+    .keep = "none"
+  )
+
+df_tmin <- historic_station_met |>
+  group_by(station) |>
+  slice_min(
+    order_by = tmin,
+    n = 1,
+    with_ties = FALSE
+  ) |>
+  mutate(
+    tmin = paste0(round(tmin,1), "°C"),
+    tmin_month = paste0(month.abb[month], " ", year),
+    .keep = "none"
+  )
+
+df_rain <- historic_station_met |>
+  group_by(station) |>
+  slice_max(
+    order_by = rain,
+    n = 1,
+    with_ties = FALSE
+  ) |>
+  mutate(
+    rain = paste0(round(rain, 0), " mm"),
+    rain_month = paste0(month.abb[month], " ", year),
+    .keep = "none"
+  )
+
+
+# Make a map of Stations of UK Met
+plotdf <- station_meta |>
+  left_join(df_tmax) |> 
+  left_join(df_tmin) |> 
+  left_join(df_rain) |> 
+  st_as_sf(
+    coords = c("lng", "lat"),
+    crs = "EPSG:4326"
+  )
+
+british_map <- rnaturalearth::ne_countries(
+  returnclass = "sf",
+  scale = 10
+) |> 
+  filter(
+    iso_a2 %in% c("GB", "IE")
+  ) |> 
+  select(name, iso_a2, geometry)
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+bts = 160
+
+g <- plotdf |> 
+  ggplot() +
+  geom_sf(
+    data = british_map,
+    mapping = aes(fill = name),
+    linewidth = 0.3,
+    alpha = 0.25,
+    colour = text_hil
+  ) +
+  scale_fill_manual(
+    values = c("grey80", "grey50")
+  ) +
+  geom_sf(
+    size = 9,
+    colour = text_hil,
+    alpha = 0.2
+  ) +
+  ggtext::geom_richtext(
+    mapping = aes(
+      label = paste0(
+        "<b style='font-size:", bts/3, "pt;'>",
+        station_name, "</b>",
+        "<span style='font-size:", bts/4, "pt;'> (", 
+        opened, ")</span><br>",
+        "<b style='font-size:", bts/6, "pt; color:#D9565CFF;'>",
+        tmax, "</b>",
+        "<span style='font-size:", bts/6, "pt;'> (", 
+        tmax_month, ")</span>",
+        "<span style='font-size:", bts/6, "pt;'>   |   </span>",
+        "<b style='font-size:", bts/6, "pt; color:#1BB6AFFF;'>",
+        tmin, "</b>",
+        "<span style='font-size:", bts/6, "pt;'> (", 
+        tmin_month, ")</span><br>",
+        "<b style='font-size:", bts/6, "pt; color:#0076C0FF;'>",
+        rain, "</b>",
+        "<span style='font-size:", bts/6, "pt;'> (", 
+        rain_month, ")</span>"
+      ),
+      geometry = geometry
+    ),
+    stat = "sf_coordinates",
+    lineheight = 0.4,
+    family = "caption_font",
+    colour = text_col,
+    fill = NA,
+    label.size = NA
+  ) +
+  annotate(
+    geom = "richtext",
+    x = -10.5,
+    y = 51,
+    label = paste0(
+        "<b style='font-size:", bts, "pt;'>",
+        "Met Station", "</b>",
+        "<span style='font-size:", bts, "pt;'> (", 
+        "Year Opened", ")</span><br>",
+        "<b style='font-size:", bts/1.5, "pt; color:#D9565CFF;'>",
+        "Max. Temp Ever", "</b>",
+        "<span style='font-size:", bts/1.5, "pt;'>   |   </span>",
+        "<b style='font-size:", bts/1.5, "pt; color:#1BB6AFFF;'>",
+        "Min. Temp Ever", "</b>",
+        "<br>",
+        "<b style='font-size:", bts/1.5, "pt; color:#0076C0FF;'>",
+        "Max. Recorded Rainfall", "</b>"
+      ),
+    lineheight = 0.7,
+    family = "caption_font",
+    colour = text_col,
+    fill = NA,
+    label.size = NA,
+    hjust = 0,
+    vjust = 1
+  ) +
+  
+  # Add plot_title and plot_subtitle
+  annotate(
+    geom = "text",
+    x = -12.5,
+    y = 60.3,
+    hjust = 0,
+    vjust = 1,
+    label = plot_title,
+    size = bts  / 2,
+    lineheight = 0.3,
+    family = "body_font",
+    colour = text_hil,
+    fontface = "bold"
+  ) +
+  annotate(
+    geom = "text",
+    x = -12.1,
+    y = 58.7,
+    hjust = 0,
+    vjust = 1,
+    label = plot_subtitle,
+    size = bts  / 5,
+    lineheight = 0.3,
+    family = "body_font",
+    colour = text_hil
+  ) +
+
+
+  coord_sf(
+    crs = "EPSG:27700",
+    default_crs = "EPSG:4326",
+    expand = FALSE,
+    xlim = c(-12, 3),
+    clip = "off"
+  ) +
+  scale_x_continuous(breaks = seq(-12, 10, by = 1)) +
+  scale_y_continuous(breaks = seq(48, 62, by = 1)) +
+  labs(
+    title = NULL,
+    subtitle = NULL,
+    caption = plot_caption,
+    colour = NULL,
+    fill = NULL,
+    x = NULL, y = NULL
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts / 2
+  ) +
+  theme(
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Grid Lines and Axes Text
+    panel.grid.major = element_line(
+    linewidth = 0.3,
+    linetype = 1,
+    colour = alpha(text_hil, 0.3)
+    ),
+    panel.grid.minor = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm"),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 1,
+      margin = margin(-3,0,5,0, "mm"),
+      colour = text_hil,
+      size = bts / 3
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_uk_meteorological_data.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_uk_meteorological_data.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_uk_meteorological_data.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
