@@ -2,11 +2,13 @@
 title: "UK Weather Extremes: A Century of Records"
 author: "Aditya Dahiya"
 date: "2025-10-21"
-subtitle: "Mapping extreme weather across the UK using Met Office data (1853-2025)"
+subtitle: "Mapping extreme weather across the UK using Met Office data (1853-2025): {ggrepel} with richly formatted text on maps in R"
 categories:
   - "#TidyTuesday"
   - "{ggrepel}"
   - "Maps"
+  - "Repel richtext"
+  - "{marquee}"
   - "{ggtext}"
 image: "thumbnails/tidy_uk_meteorological_data.png"
 format:
@@ -410,7 +412,7 @@ library(magick)
 # Saving a thumbnail for the webpage
 image_read(here::here(
   "data_vizs",
-  "tidy_uk_meteorological_data.png"
+  "tidy_uk_meteorological_data2.png"
 )) |>
   image_resize(geometry = "x400") |>
   image_write(
@@ -448,10 +450,10 @@ sessioninfo::session_info()$packages |>
 
 ### Attempt 2: Add custom functions
 
-Source: <https://github.com/slowkow/ggrepel/tree/0bbdee8174712929f297da6f0e4170059b0a9344/R>
+This code defines `geom_marquee_repel()`, a specialized ggplot2 geom that combines rich text rendering capabilities from the marquee package with intelligent label positioning from ggrepel. The implementation follows a similar architecture to `geom_label_repel()` but replaces standard text grobs with marquee's formatted text grobs, allowing users to create plots with richly styled, non-overlapping labels that include features like bold text, colors, and other formatting options. The geom uses the same repulsion algorithm to automatically adjust label positions, preventing overlaps between labels and data points while respecting plot boundaries and user-defined constraints. **Source:** [ggrepel R directory](https://github.com/slowkow/ggrepel/tree/0bbdee8174712929f297da6f0e4170059b0a9344/R) **Credits:** [teunbrand](https://github.com/teunbrand)
 
 ```{r}
-#| label: geom-marquee-repel
+#| label: geom-marquee-repel-create
 
 #' Name ggplot grid object
 #' Convenience function to name grid objects
@@ -2927,9 +2929,15 @@ repel_boxes2 <- function(data_points, point_size, point_padding_x, point_padding
 
 ```
 
+### Create repelled marquee text plot
+
+This map leverages [`geom_marquee_repel()`](https://github.com/slowkow/ggrepel) to create richly formatted, non-overlapping labels for 37 UK Met Office weather stations, each displaying the station name, opening year, and three color-coded climate extremes (maximum temperature in red, minimum temperature in teal, and maximum rainfall in blue). The implementation uses [`marquee::marquee_glue()`](https://github.com/r-lib/marquee) to construct markdown-formatted labels with custom colors and bold text, while the repulsion algorithm (controlled by `force = 5` and `force_pull = 0.5` parameters) automatically positions these labels to avoid overlaps with both the data points and each other. The styling is managed through [`marquee::classic_style()`](https://github.com/r-lib/marquee), which sets a condensed, lightweight font with custom line height and center alignment, while [`ggplot2::geom_sf()`](https://ggplot2.tidyverse.org/reference/ggsf.html) renders the base map and weather station points. Additional annotations are added using [`ggtext::element_markdown()`](https://github.com/wilkelab/ggtext) for the caption and [`annotate()`](https://ggplot2.tidyverse.org/reference/annotate.html) with `geom = "richtext"` for the legend. This combination of [**{marquee}**](https://github.com/r-lib/marquee)'s rich text capabilities and [**{ggrepel}**](https://github.com/slowkow/ggrepel)'s intelligent positioning creates a clean, readable visualization that would be difficult to achieve with standard [**{ggplot2}**](https://ggplot2.tidyverse.org/) text geoms, especially given the density of information and the geographic constraints of the map.
+
 ```{r}
+#| label: plot-with-repelled-HTML-text
+
 bts = 140
-plot_subtitle <- "Visualizing historic meteorological\ndata from 37 UK Met Office weather\nstations (1853-2025).\n \nCreated by combining\n{ggplot2}, {ggrepel}, and\n{marquee} + {ggtext} to\nmap extreme temperature\nand rainfall records\nacross Britain."
+plot_subtitle <- "Visualizing historic meteorological\ndata from 37 UK Met Office weather\nstations (1853-2025).\n \nCreated by combining\n{ggplot2}, {ggrepel}, and\n{marquee} + {ggtext} to\ndisplay extreme\ntemperature and\nrainfall records\nacross Britain."
 g <- plotdf |> 
   ggplot() +
   geom_sf(
@@ -2943,16 +2951,17 @@ g <- plotdf |>
     values = c("grey80", "grey50")
   ) +
   geom_sf(
-    size = 3,
+    size = 6,
     colour = text_col,
-    alpha = 0.9
+    alpha = 0.9,
+    pch = 20
   ) +
   geom_marquee_repel(
     mapping = aes(
       label = marquee::marquee_glue(
-        "#### {station_name} ",
-        "({opened}) \n ",
-        "{#D9565CFF **{tmax}**} ({tmax_month})   |   ",
+        "### {#4d4d4d {station_name}} ",
+        "{#4d4d4d ({opened})} \n ",
+        "{#D9565CFF **{tmax}**} ({tmax_month}) \n \n  ",
         "{#1BB6AFFF **{tmin}**} ({tmin_month})  \n \n",
         "{#0076C0FF **{rain}**} ({rain_month})"
       ),
@@ -2960,17 +2969,20 @@ g <- plotdf |>
     ),
     stat = "sf_coordinates",
     fill = NA,
-    force = 2,
+    force = 5,
     force_pull = 0.5,
     seed = 42,
     min.segment.length = unit(1, "mm"),
+    segment.colour = text_col,         # Change segment color
+    segment.size = 0.3,                # Adjust line thickness
+    segment.alpha = 1,                 # Adjust transparency
+    box.padding = 0.5, 
     style = marquee::classic_style(
-      body_font   = "caption_font",
-      code_font   = "caption_font",
-      header_font = "caption_font",
+      weight      = "light",
+      width       = "condensed",
       base_size   = bts / 16,
       lineheight  = 0.5,
-      color       = text_col,
+      color       = text_hil,
       background  = NA,
       align       = "center",
       margin      = marquee::trbl(0, 0, 0, 0),
@@ -2980,18 +2992,18 @@ g <- plotdf |>
   
   annotate(
     geom = "richtext",
-    x = -10.5,
-    y = 51,
+    x = -8.3,
+    y = 51.5,
     label = paste0(
         "<b style='font-size:", bts, "pt;'>",
         "Met Station", "</b>",
         "<span style='font-size:", bts, "pt;'> (", 
         "Year Opened", ")</span><br>",
         "<b style='font-size:", bts/1.5, "pt; color:#D9565CFF;'>",
-        "Max. Temp Ever", "</b>",
-        "<span style='font-size:", bts/1.5, "pt;'>   |   </span>",
+        "Max. Recorded Temp.", "</b><br>",
+        "<span style='font-size:", bts/1.5, "pt;'></span>",
         "<b style='font-size:", bts/1.5, "pt; color:#1BB6AFFF;'>",
-        "Min. Temp Ever", "</b>",
+        "Min. Recorded Temp.", "</b>",
         "<br>",
         "<b style='font-size:", bts/1.5, "pt; color:#0076C0FF;'>",
         "Max. Recorded Rainfall", "</b>"
@@ -3001,7 +3013,7 @@ g <- plotdf |>
     colour = text_col,
     fill = NA,
     label.size = NA,
-    hjust = 0,
+    hjust = 0.5,
     vjust = 1
   ) +
   
@@ -3021,15 +3033,16 @@ g <- plotdf |>
   ) +
   annotate(
     geom = "text",
-    x = -12.1,
-    y = 58.7,
+    x = -12,
+    y = 59,
     hjust = 0,
     vjust = 1,
     label = plot_subtitle,
     size = bts  / 4.5,
     lineheight = 0.3,
     family = "body_font",
-    colour = text_hil
+    colour = text_hil,
+    fontface = "bold"
   ) +
 
 
@@ -3099,4 +3112,4 @@ ggsave(
 )
 ```
 
-![Geographic distribution of UK Met Office weather stations with their record-breaking measurements. Each station marker is labeled with its most extreme climate events: maximum temperature (red), minimum temperature (blue), and highest monthly rainfall (green). Dates in parentheses indicate when these records were set. Station opening years range from 1853 to recent decades, representing one of the most comprehensive historic meteorological datasets in the world and documenting Britain's climate variability across generations.](tidy_uk_meteorological_data2.png)
+![This map displays historic meteorological data from 37 UK Met Office weather stations spanning 1853-2025. Each station is labeled with its name and opening year, followed by three key climate extremes: the highest temperature ever recorded (shown in red), the lowest temperature ever recorded (shown in teal), and the maximum rainfall in a 24-hour period (shown in blue). Notable patterns emerge across the geography: southern England recorded the hottest temperatures (exceeding 40°C at Heathrow in 2022), Scotland's highlands experienced the coldest conditions (below -27°C at Braemar and Altnaharra), and western coastal regions saw the highest rainfall totals (over 300mm in places like Seathwaite). This visualization demonstrates how modern R packages—{ggplot2}, {ggrepel}, {marquee}, and {ggtext}—can be combined to create information-dense yet readable maps that reveal spatial patterns in long-term climate data.](tidy_uk_meteorological_data2.png)
