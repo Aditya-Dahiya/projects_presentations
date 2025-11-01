@@ -1,14 +1,16 @@
 ---
-title: "wb_tfr_pop_treemap"
+title: "Tree-Maps: The Great Fertility Transition"
 author: "Aditya Dahiya"
-date: "2025-10-26"
-subtitle: "Visualizing World Bank fertility data (1960-2024) using {wbstats}"
+date: "2025-11-01"
+subtitle: "A hierarchical treemap visualization where rectangle size reflects population and color intensity shows fertility rates"
 categories:
   - "World Bank Data"
   - "A4 Size Viz"
   - "Governance"
   - "Demographics"
   - "Public Health"
+  - "{treemapify}"
+  - "{ggflags}"
 image: "thumbnails/wb_tfr_pop_treemap.png"
 format:
   html:
@@ -36,9 +38,9 @@ comments:
 
 ### **About the Data**
 
-....................
+Total Fertility Rate (TFR) represents the average number of children a woman would bear during her lifetime based on current age-specific fertility rates. A TFR of 2.1 is considered 'replacement level' in developed countries—the rate needed to maintain population stability without immigration, accounting for mortality. The 0.1 above two children compensates for infant and childhood deaths. This analysis uses [World Bank DataBank](https://databank.worldbank.org) indicators SP.DYN.TFRT.IN for TFR and SP.POP.TOTL for population, spanning 1960-2024. Data was accessed using the [`wbstats`](https://github.com/gshs-ornl/wbstats) R package.
 
-![..............](a4_wb_tfr_pop_treemap.png)
+![This treemap displays countries as rectangles proportional to population size, arranged by continent. Color intensity indicates Total Fertility Rate, with cooler tones below 2.1 (replacement level) and warmer tones above. Larger countries show both names and flags for clarity. The visualization integrates `{ggplot2},` `{treemapify}` for spatial layouts, and `{ggflags}` for flag graphics, processing World Bank demographic data spanning 1960-2023 to reveal global fertility trends across eight time points.](a4_wb_tfr_pop_treemap.png)
 
 ### **How I made this graphic?**
 
@@ -195,11 +197,11 @@ Annotation Text for the Plot
 ```{r}
 #| label: text-for-plot
 
-plot_title <- ".........."
+plot_title <- "Shrinking Families, Shifting Continents"
 
-plot_subtitle <- glue::glue(
-  ".............."
-)
+plot_subtitle <- "Global fertility rates have plummeted from over 5 children per woman in 1960 to below 2.5 by 2023. Most developed nations now sit well below the 2.1 replacement level, with Europe and Americas leading this demographic transition. Africa remains the exception, maintaining higher fertility rates that position it for significant population growth." |> 
+  str_wrap(180)
+str_view(plot_subtitle)
 
 inset_text <- "..................."
 
@@ -251,7 +253,11 @@ df1 <- rawdf |>
 # Define desired continent order (bottom-left to top-right)
 continent_order <- c("Africa", "Asia", "Europe", "Americas", "Oceania")
 
+# Range of Font Sizes for Country Name and Flag Size in graphic
+cfs <- c(bts / 20, bts / 2)
+ffs <- c(bts / 100, bts / 6)
 
+# Actual data processing and wrangling
 plotdf <- df1 |> 
   filter(year %in% c(seq(1960, 2020, 10), 2023)) |> 
  
@@ -274,7 +280,14 @@ plotdf <- df1 |>
   }) |> 
   left_join(
     df1
-  )
+  ) |> 
+  # Further final improvements in the plot - minor adjustments of text and flag sizes, locations
+  group_by(year) |> 
+  mutate(
+    country_fs = cfs[1] + (pop - min(pop)) / (max(pop) - min(pop)) * (cfs[2] - cfs[1]),
+    flag_fs = ffs[1] + (pop - min(pop)) / (max(pop) - min(pop)) * (ffs[2] - ffs[1])
+  ) |> 
+  ungroup()
 
 plotdf_grouped <- plotdf |> 
       group_by(year, continent) |> 
@@ -285,6 +298,10 @@ plotdf_grouped <- plotdf |>
         ymax = max(ymax),
         .groups = "drop"
       )
+
+# Check the ranges
+range(plotdf$country_fs)
+range(plotdf$flag_fs)
 ```
 
 The base plot
@@ -293,109 +310,106 @@ The base plot
 #| label: base-plot
 
 g <- plotdf |> 
-  filter(year == 1970) |> 
   ggplot(
     aes(
       area = pop,
       fill = tfr
     )
   ) +
-  geom_treemap(
+
+  # Replace geom_treemap() with geom_rect():
+  geom_rect(
     mapping = aes(
-      area = pop,
-      fill = tfr,
-      subgroup = continent
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax,
+      fill = tfr
     ),
     alpha = 0.75,
     colour = bg_col,
-    size = 0.4
+    size = 0.4,
+    inherit.aes = FALSE
   ) +
-  # Replace geom_treemap() with:
-  # geom_rect(
-  #   mapping = aes(
-  #     xmin = xmin,
-  #     xmax = xmax,
-  #     ymin = ymin,
-  #     ymax = ymax,
-  #     fill = tfr
-  #   ),
-  #   alpha = 0.75,
-  #   colour = bg_col,
-  #   size = 0.4,
-  #   inherit.aes = FALSE
-  # ) +
-  # 
-  # # Replace geom_treemap_subgroup_border() with:
-  # geom_rect(
-  #   data = plotdf_grouped |> filter(year == 1970),
-  #   mapping = aes(
-  #     xmin = xmin,
-  #     xmax = xmax,
-  #     ymin = ymin,
-  #     ymax = ymax
-  #   ),
-  #   fill = NA,
-  #   colour = bg_col,
-  #   size = 1.5,
-  #   inherit.aes = FALSE
-  # ) +
-  # ggflags::geom_flag(
-  #   mapping = aes(
-  #     x = xmin + (xmax - xmin) * 0.15,
-  #     y = ymin + (ymax - ymin) * 0.15,
-  #     size = (xmax - xmin) * (ymax - ymin),
-  #     country = iso2c
-  #   )
-  # ) +
-  # geom_text(
-  #   mapping = aes(x = xmin, y = min, size = pop),
-  #   family = "body_font",
-  #   colour = "black",
-  #   hjust = 0.1,
-  #   vjust = -0.1
-  # ) +
-  # scale_size(
-  #   range = c(bts / 20, bts / 2)
-  # ) +
-  # geom_treemap_subgroup_border(
-  #   colour = text_col,
-  #   size = 1.5
-  # ) +
-  # geom_treemap_subgroup_text(
-  #   mapping = aes(label = continent),
-  #   place = "centre",
-  #   grow = TRUE,
-  #   alpha = 0.3,
-  #   family = "title_font"
-  # ) +
-  # ggflags::geom_flag(
-  #   data = treemap_layout,
-  #   mapping = aes(
-  #     x = (xmin + xmax) / 2,
-  #     y = ymin + (ymax - ymin) * 0.15,
-  #     country = tolower(iso2c)
-  #   ),
-  #   inherit.aes = FALSE,
-  #   size = 3
-  # ) +
+
+  # Replace geom_treemap_subgroup_border() with geom_rect():
+  geom_rect(
+    data = plotdf_grouped,
+    mapping = aes(
+      xmin = xmin,
+      xmax = xmax,
+      ymin = ymin,
+      ymax = ymax
+    ),
+    fill = NA,
+    colour = bg_col,
+    size = 1.5,
+    inherit.aes = FALSE
+  ) +
+  
+  # Add Text Labels of the countries above a specific size
+  geom_text(
+    data = plotdf |> filter(country_fs > 5),
+    mapping = aes(
+      x = (xmin + xmax)/2,
+      y = ymin + (0.05 * (ymax - ymin)),
+      label = country,
+      size = country_fs
+    ),
+    family = "body_font",
+    colour = text_col,
+    hjust = 0.5,
+    vjust = 0,
+    check_overlap = TRUE
+  ) +
+  ggflags::geom_flag(
+    data = plotdf |> filter(country_fs > 5),
+    mapping = aes(
+      x = (xmin + xmax)/2,
+      y = (ymin + ymax)/2,
+      size = flag_fs,
+      country = iso2c
+    ),
+    hjust = 0,
+    vjust = 1
+  ) +
+  scale_size_identity() +
+
+  geom_treemap_subgroup_text(
+    mapping = aes(
+      area = pop,
+      fill = tfr,
+      subgroup = continent,
+      label = continent
+    ),
+    place = "centre",
+    grow = TRUE,
+    alpha = 0.3,
+    family = "body_font",
+    min.size = 2
+  ) +
   paletteer::scale_fill_paletteer_c(
     "grDevices::Geyser",
     direction = -1,
-    limits = c(0.8, 6),
-    values = scales::rescale(c(0.8, 2.1, 6), to = c(0, 1)),
-    oob = scales::squish
+    limits = c(0.8, 5.7),
+    values = scales::rescale(c(0.8, 2.1, 5.7), to = c(0, 1)),
+    oob = scales::squish,
+    breaks = seq(1, 5.5, 0.5)
   ) +
   facet_wrap(
     ~year,
     nrow = 2
   ) +
-  coord_cartesian(expand = expansion(0)) +
+  coord_cartesian(
+    expand = expansion(0),
+    clip = "off"
+  ) +
   labs(
     title = plot_title,
     subtitle = plot_subtitle,
     caption = plot_caption,
     colour = NULL,
-    fill = NULL,
+    fill = "Total Fertility Rate (avg. children / woman)",
     x = NULL,
     y = NULL
   ) +
@@ -404,11 +418,24 @@ g <- plotdf |>
     base_size = bts
   ) +
   theme(
-    legend.position = "bottom",
+    legend.position = "inside",
+    legend.position.inside = c(0.15,0),
+    legend.justification.inside = c(0, 1),
+    legend.direction = "horizontal",
     legend.margin = margin(0,0,0,0, "mm"),
     legend.box.margin = margin(0,0,0,0, "mm"),
-    legend.key.width = unit(20, "mm"),
-    legend.text = element_text(margin = margin(0,0,0,0, "mm")),
+    legend.key.width = unit(55, "mm"),
+    legend.key.height = unit(4, "mm"),
+    legend.title.position = "top",
+    legend.text = element_text(
+      margin = margin(1,0,0,0, "mm"),
+      size = bts
+    ),
+    legend.title = element_text(
+      margin = margin(10,0,2,0, "mm"),
+      size = bts,
+      hjust = 0.5
+    ),
     
     
     # Overall
@@ -421,12 +448,16 @@ g <- plotdf |>
     # Strip Labels
     strip.text = element_text(
       colour = text_hil, 
-      size = bts * 1.2,
-      margin = margin(0,0,3,0, "mm"),
+      size = bts * 1.5,
+      margin = margin(1,0,3,0, "mm"),
       face = "bold"
     ),
     panel.spacing.x = unit(2, "mm"),
-    panel.spacing.y = unit(10, "mm"),
+    panel.spacing.y = unit(2, "mm"),
+    panel.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
     
     # Labels and Strip Text
     plot.title = element_text(
@@ -434,66 +465,30 @@ g <- plotdf |>
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2.3 * bts,
+      size = 3.5 * bts,
       family = "body_font",
       face = "bold",
       lineheight = 0.25
     ),
-    plot.subtitle = element_textbox(
-      margin = margin(2, 0, 5, 0, "mm"),
+    plot.subtitle = element_text(
+      margin = margin(2, 0, 2, 0, "mm"),
       vjust = 0.5,
       colour = text_hil,
-      size = 1.3 * bts,
+      size = 1.15 * bts,
       hjust = 0.5,
-      halign = 0.5,
       family = "caption_font",
-      lineheight = 0.4
+      lineheight = 0.3
     ),
     plot.caption = element_markdown(
       family = "caption_font",
-      hjust = 0.5,
-      margin = margin(5,0,0,0, "mm"),
+      hjust = 1,
+      margin = margin(22,0,0,0, "mm"),
       colour = text_hil
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
     plot.margin = margin(5, 5, 5, 5, "mm")
   )
-
-ggsave(
-  filename = here::here(
-    "data_vizs",
-    "a4_wb_tfr_pop_treemap.png"
-  ),
-  plot = g,
-  width = 297 * 2,
-  height = 210 * 2,
-  units = "mm",
-  bg = bg_col
-)
-```
-
-Manual Computation of `treemapify` positions using Claude Sonnet 4.5
-
-```{r}
-# First, compute the treemap layout manually
-library(ggflags)
-
-
-
-  
-
-ggsave(
-  filename = here::here(
-    "data_vizs",
-    "a4_wb_tfr_pop_treemap.png"
-  ),
-  plot = g,
-  width = 297 * 2,
-  height = 210 * 2,
-  units = "mm",
-  bg = bg_col
-)
 ```
 
 Adding annotations to the plot
@@ -517,11 +512,11 @@ plot_qr <- ggplot(
   ggqr::geom_qr(
     colour = text_hil, 
     fill = bg_col,
-    size = 0.7
+    size = 0.9
     ) +
   annotate(
     geom = "text",
-    x = 0.075,
+    x = 0.045,
     y = 0,
     label = "Scan for complete\nCode used to make\nthis graphic",
     hjust = 0,
@@ -551,9 +546,9 @@ plot_qr <- ggplot(
 g_full <- g +
   inset_element(
     p = plot_qr,
-    left = 0.02, right = 0.15,
-    bottom = 0.04, top = 0.1,
-    align_to = "panel",
+    left = 0, right = 0.12,
+    bottom = 0, top = 0.09,
+    align_to = "full",
     clip = FALSE
   ) + 
   plot_annotation(
@@ -565,7 +560,17 @@ g_full <- g +
     )
   )
 
-
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "a4_wb_tfr_pop_treemap.png"
+  ),
+  plot = g_full,
+  width = 297 * 2,
+  height = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
 
 ```
 
