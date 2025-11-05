@@ -1,10 +1,12 @@
 ---
-title: "tidy_pima_diabetes_study"
+title: "Logistic Regression Visualization with ggplot2 and ggnewscale"
 author: "Aditya Dahiya"
 date: "2025-11-05"
-subtitle: "...."
+subtitle: "Using dual color scales, text annotations, and curved arrows to communicate model predictions"
 categories:
   - "#TidyTuesday"
+  - "Logistic Regression"
+  - "{ggnewscale}"
 image: "thumbnails/tidy_pima_diabetes_study.png"
 format:
   html:
@@ -35,7 +37,7 @@ comments:
 
 This dataset originates from a prospective observational cohort study of type 2 diabetes among women of [Pima Indian](https://en.wikipedia.org/wiki/Pima_people) heritage living near Phoenix, Arizona. The study focused exclusively on women aged 21 and older who underwent regular [oral glucose tolerance tests](https://en.wikipedia.org/wiki/Glucose_tolerance_test), with diabetes diagnosis determined using [World Health Organization (WHO) criteria](https://www.who.int/health-topics/diabetes). The dataset includes key clinical measurements such as plasma glucose concentration, [serum insulin levels](https://en.wikipedia.org/wiki/Insulin), [body mass index (BMI)](https://en.wikipedia.org/wiki/Body_mass_index), [triceps skinfold thickness](https://en.wikipedia.org/wiki/Skinfold) (a measure of subcutaneous fat), and a diabetes pedigree score that quantifies family history by weighting the genetic relatedness of family members with diabetes. The Pima Indian community has been extensively studied in diabetes research due to historically high rates of type 2 diabetes, making this dataset particularly valuable for understanding the disease's progression and risk factors. This week's [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) dataset was curated by [Darakhshan Nehal](https://github.com/darakhshannehal) and is available for exploration in R, Python, and Julia.
 
-![.............................................](tidy_pima_diabetes_study.png){#fig-1}
+![This visualization displays predicted diabetes probabilities from a logistic regression model using plasma glucose levels, BMI, and family history. Each colored line represents a different BMI category, showing how diabetes risk increases with glucose levels. Higher BMI categories (warmer colors) show steeper probability curves. Vertical marks indicate actual patient outcomes: green marks represent women who remained diabetes-free after 5 years, while red marks indicate those diagnosed with diabetes. The clustering of red marks at higher glucose values confirms the model's predictive accuracy.](tidy_pima_diabetes_study.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -43,7 +45,7 @@ This dataset originates from a prospective observational cohort study of type 2 
 
 ```{r}
 #| label: setup
-#| eval: true
+#| eval: false
 
 pacman::p_load(
   tidyverse, # All things tidy
@@ -112,7 +114,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**  Darakhshan Nehal",
+  "**Data:**  Darakhshan Nehal; Pima Indian Diabetes Study",
   " |  **Code:** ",
   social_caption_1,
   " |  **Graphics:** ",
@@ -149,50 +151,54 @@ plot_subtitle |> str_view()
 # pacman::p_unload(summarytools)
 
 
-# Data wrangling
-diabetes_clean <- diabetes |>
+library(tidyverse)
+library(broom)
+
+# Read data, create BMI categories, fit model, generate predictions, and plot
+diabetes <- diabetes |> 
+  mutate(diabetes_binary = if_else(diabetes_5y == "pos", 1, 0)) |>
+  # Create BMI categories based on standard clinical cutoffs
+  mutate(bmi_category = cut(bmi, 
+                            breaks = c(-Inf, 18.5, 25, 30, 35, Inf),
+                            labels = c("Underweight (<18.5)", 
+                                      "Normal (18.5-25)", 
+                                      "Overweight (25-30)", 
+                                      "Obese I (30-35)", 
+                                      "Obese II+ (>35)"),
+                            right = FALSE)) |>
   # Remove rows with missing values in key variables
-  filter(!is.na(`glucose_mg-dl`), !is.na(bmi), !is.na(pedigree)) |>
-  # Convert diabetes outcome to binary (1 = pos, 0 = neg)
-  mutate(diabetes_binary = ifelse(diabetes_5y == "pos", 1, 0)) |>
-  # Create pedigree categories (tertiles)
-  mutate(pedigree_cat = cut(pedigree, 
-                            breaks = quantile(pedigree, probs = c(0, 1/3, 2/3, 1)),
-                            labels = c("Low family history", 
-                                      "Medium family history", 
-                                      "High family history"),
-                            include.lowest = TRUE))
+  drop_na(`glucose_mg-dl`, bmi, pedigree, diabetes_binary)
 
 # Fit logistic regression model
 model <- glm(diabetes_binary ~ `glucose_mg-dl` + bmi + pedigree, 
-             data = diabetes_clean, 
-             family = binomial(link = "logit"))
+             data = diabetes, 
+             family = binomial())
 
-# Display model summary
-summary(model)
-
-# Create prediction grid for heatmap
-# Generate a grid of glucose and BMI values for each pedigree category
-pred_grid <- expand_grid(
-  `glucose_mg-dl` = seq(min(diabetes_clean$`glucose_mg-dl`), 
-                        max(diabetes_clean$`glucose_mg-dl`), 
+# Generate prediction data and create plot
+plotdf <- expand_grid(
+  `glucose_mg-dl` = seq(min(diabetes$`glucose_mg-dl`), 
+                        1.5 * max(diabetes$`glucose_mg-dl`), 
                         length.out = 100),
-  bmi = seq(min(diabetes_clean$bmi), 
-            max(diabetes_clean$bmi), 
-            length.out = 100),
-  pedigree_cat = unique(diabetes_clean$pedigree_cat)
+  bmi = c(17, 22, 27.5, 32.5, 40),  # Representative values for each category
+  pedigree = median(diabetes$pedigree)
 ) |>
-  # Add the median pedigree value for each category for prediction
-  left_join(
-    diabetes_clean |>
-      group_by(pedigree_cat) |>
-      summarize(pedigree = median(pedigree)),
-    by = "pedigree_cat"
-  )
+  mutate(bmi_category = cut(bmi, 
+                            breaks = c(-Inf, 18.5, 25, 30, 35, Inf),
+                            labels = c("Underweight (<18.5)", 
+                                      "Normal (18.5-25)", 
+                                      "Overweight (25-30)", 
+                                      "Obese I (30-35)", 
+                                      "Obese II+ (>35)"),
+                            right = FALSE)) |>
+  rowwise() |>
+  mutate(pred_prob = predict(model, 
+                             newdata = tibble(`glucose_mg-dl` = `glucose_mg-dl`, 
+                                            bmi = bmi, 
+                                            pedigree = pedigree), 
+                             type = "response")) |>
+  ungroup()
 
-# Generate predictions
-pred_grid <- pred_grid %>%
-  mutate(pred_prob = predict(model, newdata = pred_grid, type = "response"))
+
 ```
 
 ### The Plot
@@ -200,55 +206,143 @@ pred_grid <- pred_grid %>%
 ```{r}
 #| label: base-plot
 
-# Create the visualization
-g <- ggplot() +
-  # Heatmap layer
-  geom_tile(data = pred_grid, 
-            aes(x = `glucose_mg-dl`, y = bmi, fill = pred_prob)) +
-  
-  # Overlay actual patient data points
-  geom_point(data = diabetes_clean, 
-             aes(x = `glucose_mg-dl`, y = bmi, color = diabetes_5y),
-             alpha = 0.6, size = 1.5, shape = 16) +
-  
-  # Facet by pedigree category
-  facet_wrap(~ pedigree_cat, nrow = 3) +
-  
-  # Color scales
-  paletteer::paletteer_c(
-    "ggthemes::Red-Green Diverging",
-    name = "Predicted Diabetes Probability",
-    labels = scales::percent_format()
+g <- plotdf |> 
+  ggplot(
+    mapping = aes(
+      x = `glucose_mg-dl`, 
+      y = pred_prob,
+      colour = bmi_category
+    )
   ) +
-  scale_color_manual(values = c("neg" = "#2ECC71", "pos" = "#E74C3C"),
-                     name = "Actual\nDiagnosis",
-                     labels = c("neg" = "Negative", "pos" = "Positive")) +
+  geom_line(
+    linewidth = 1.2
+  ) +
+  scale_x_continuous(
+    expand = expansion(0),
+    limits = c(50, 220)
+  ) +
+  paletteer::scale_colour_paletteer_d(
+    "fishualize::Epinephelus_striatus",
+    name = expression("BMI Category (kg/m"^2*")")
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(),
+    expand = expansion(c(0.02, 0.01))
+  ) +
+  ggnewscale::new_scale_colour() +
+  geom_point(
+    data = diabetes, 
+    mapping = aes(
+      x = `glucose_mg-dl`, 
+      y = diabetes_binary, 
+      color = diabetes_5y
+    ),
+    alpha = 0.8, 
+    size = 36,
+    shape = 124  # "|" character
+  ) +
+  paletteer::scale_colour_paletteer_d(
+    "ggthemes::wsj_red_green",
+    guide = "none"
+  ) +
+  # Subtitle annotation in top left
+  annotate(
+    "text",
+    x = 55, y = 0.75,
+    label = "Higher glucose levels and BMI increase diabetes risk dramatically. Risk varies 5-fold between lowest and highest BMI categories." |> str_wrap(50),
+    hjust = 0, 
+    vjust = 0,
+    size = bts * 0.45,
+    family = "body_font",
+    colour = text_hil,
+    lineheight = 0.3
+  ) +
+  # About the Data annotation
+  annotate(
+    "text",
+    x = 55, y = 0.72,
+    label = str_wrap("This dataset comes from a prospective study of Pima Indian women aged 21+ near Phoenix, Arizona. Participants underwent regular oral glucose tolerance tests, with diabetes diagnosed using WHO criteria. The study tracked women for at least 5 years to identify new diabetes cases. The Pima community has historically high diabetes rates, making this dataset valuable for understanding disease progression and risk factors.", 
+                     width = 55),
+    hjust = 0, 
+    vjust = 1,
+    size = bts * 0.3,
+    family = "body_font",
+    colour = text_col,
+    lineheight = 0.3
+  ) +
   
-  # Labels and theme
+  # Curved arrow and label for negative outcomes (green)
+  annotate(
+    "curve",
+    x = 140, y = 0.08,
+    xend = 125, yend = 0.01,
+    curvature = 0.3,
+    arrow = arrow(length = unit(2, "mm")),
+    colour = "#088158FF",
+    linewidth = 0.5
+  ) +
+  annotate(
+    "text",
+    x = 142, y = 0.08,
+    label = "Each mark is a case\nof No diabetes\nafter 5 years",
+    hjust = 0, vjust = 0.5,
+    size = bts * 0.3,
+    family = "body_font",
+    colour = "#088158FF",
+    lineheight = 0.25
+  ) +
+  
+  # Curved arrow and label for positive outcomes (red)
+  annotate(
+    "curve",
+    x = 150, y = 0.9,
+    xend = 165, yend = 0.99,
+    curvature = 0.3,
+    arrow = arrow(length = unit(2, "mm")),
+    colour = "#BA2F2AFF",
+    linewidth = 0.5
+  ) +
+  annotate(
+    "text",
+    x = 150, y = 0.9,
+    label = "Each mark is a case\nof Diabetes diagnosed\nwithin 5 years",
+    hjust = 1, vjust = 0.5,
+    size = bts * 0.3,
+    family = "body_font",
+    colour = "#BA2F2AFF",
+    lineheight = 0.25
+  ) +
   labs(
-    title = "Predicted Diabetes Probability by Glucose, BMI, and Family History",
-    subtitle = "Logistic regression model with actual patient outcomes overlaid",
+    title = "Diabetes Risk by Glucose and B.M.I.",
     x = "Plasma Glucose (mg/dL)",
-    y = "Body Mass Index (kg/m²)",
-    caption = "Data: Pima Indian Diabetes Study | #TidyTuesday 2025 Week 45"
+    y = "Predicted Probability of Diabetes",
+    caption = plot_caption
   ) +
-  coord_cartesian(
-    clip = "off"
-  ) +
-  # labs(
-  #   y = "Lead Concentration (ppb) (Log Scale)",
-  #   x = NULL,
-  #   title = plot_title,
-  #   subtitle = plot_subtitle,
-  #   caption = plot_caption,
-  #   fill = NULL, colour = NULL
-  # ) +
   theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
-    legend.position = "none",
+    legend.position = c(0.85, 0.15),
+    legend.background = element_rect(
+      fill = NA,
+      colour = NA,
+      linewidth = 0.3
+    ),
+    legend.key.height = unit(4, "mm"),
+    legend.key.width = unit(16, "mm"),
+    legend.key.spacing.y = unit(5, "mm"),
+    legend.title = element_text(
+      size = bts,
+      face = "bold",
+      colour = text_hil,
+      margin = margin(0,0,5,0, "mm")
+    ),
+    legend.text = element_text(
+      size = bts * 0.75,
+      colour = text_col,
+      margin = margin(0,0,0,2, "mm")
+    ),
     
     # Overall
     text = element_text(
@@ -260,47 +354,48 @@ g <- ggplot() +
     # Axes
     axis.text.x.bottom = element_text(
       size = bts * 1.2,
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(3, 3, 3, 3, "mm")
     ),
     axis.text.y.left = element_text(
       size = bts,
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(3, 6, 3, 3, "mm")
+    ),
+    axis.title = element_text(
+      margin = margin(2,2,2,2, "mm")
     ),
     axis.ticks.x.bottom = element_blank(),
     axis.ticks.length.x = unit(0, "mm"),
     axis.ticks.length.y.left = unit(0, "mm"),
-    axis.line = element_blank(),
-    panel.grid = element_blank(),
-    
-    strip.text = element_text(
-      margin = margin(0,0,0,0, "mm")
-    ), 
-    
+    axis.line = element_line(
+      colour = text_col,
+      arrow = arrow(length = unit(8, "mm")),
+      linewidth = 0.75
+    ),
+    panel.grid.major = element_line(
+      colour = "grey50",
+      linewidth = 0.5,
+      linetype = 3
+    ),
+    panel.grid.minor = element_line(
+      colour = "grey75",
+      linewidth = 0.25,
+      linetype = 3
+    ),
     # Labels and Strip Text
     plot.title = element_text(
-      margin = margin(5, 0, 5, 0, "mm"),
+      margin = margin(5, 0, 15, 0, "mm"),
       hjust = 0.5,
       vjust = 0.5,
       colour = text_hil,
-      size = 2.3 * bts,
+      size = 3 * bts,
       family = "body_font",
       face = "bold",
       lineheight = 0.25
     ),
-    plot.subtitle = element_text(
-      margin = margin(2, 0, -20, 0, "mm"),
-      vjust = 0.5,
-      colour = text_hil,
-      size = 1.3 * bts,
-      hjust = 0.5,
-      halign = 0.5,
-      family = "body_font",
-      lineheight = 0.3
-    ),
     plot.caption = element_markdown(
       family = "caption_font",
       hjust = 0.5,
-      margin = margin(5,0,0,0, "mm"),
+      margin = margin(5, 0, 0, 0, "mm"),
       colour = text_hil
     ),
     plot.caption.position = "plot",
@@ -352,6 +447,19 @@ image_read(here::here(
 #| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
 #| eval: true
 
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork,  # Composing Plots
+  gghalves # For half geoms with ggplot2
+)
+  
 sessioninfo::session_info()$packages |>
   as_tibble() |>
   
