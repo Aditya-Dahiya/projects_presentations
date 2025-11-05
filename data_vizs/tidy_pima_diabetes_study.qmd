@@ -1,0 +1,374 @@
+---
+title: "tidy_pima_diabetes_study"
+author: "Aditya Dahiya"
+date: "2025-11-05"
+subtitle: "...."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_pima_diabetes_study.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This dataset originates from a prospective observational cohort study of type 2 diabetes among women of [Pima Indian](https://en.wikipedia.org/wiki/Pima_people) heritage living near Phoenix, Arizona. The study focused exclusively on women aged 21 and older who underwent regular [oral glucose tolerance tests](https://en.wikipedia.org/wiki/Glucose_tolerance_test), with diabetes diagnosis determined using [World Health Organization (WHO) criteria](https://www.who.int/health-topics/diabetes). The dataset includes key clinical measurements such as plasma glucose concentration, [serum insulin levels](https://en.wikipedia.org/wiki/Insulin), [body mass index (BMI)](https://en.wikipedia.org/wiki/Body_mass_index), [triceps skinfold thickness](https://en.wikipedia.org/wiki/Skinfold) (a measure of subcutaneous fat), and a diabetes pedigree score that quantifies family history by weighting the genetic relatedness of family members with diabetes. The Pima Indian community has been extensively studied in diabetes research due to historically high rates of type 2 diabetes, making this dataset particularly valuable for understanding the disease's progression and risk factors. This week's [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) dataset was curated by [Darakhshan Nehal](https://github.com/darakhshannehal) and is available for exploration in R, Python, and Julia.
+
+![.............................................](tidy_pima_diabetes_study.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork,  # Composing Plots
+  gghalves # For half geoms with ggplot2
+)
+
+diabetes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-11-11/diabetes.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Darakhshan Nehal",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "tidy_pima_diabetes_study"
+
+plot_subtitle <- "tidy_pima_diabetes_study" |> str_wrap(90)
+
+plot_subtitle |> str_view()
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# pacman::p_load(summarytools)
+# 
+# diabetes |> 
+#   dfSummary() |> 
+#   view()
+# 
+# diabetes |> 
+#   summary()
+# 
+# pacman::p_unload(summarytools)
+
+
+# Data wrangling
+diabetes_clean <- diabetes |>
+  # Remove rows with missing values in key variables
+  filter(!is.na(`glucose_mg-dl`), !is.na(bmi), !is.na(pedigree)) |>
+  # Convert diabetes outcome to binary (1 = pos, 0 = neg)
+  mutate(diabetes_binary = ifelse(diabetes_5y == "pos", 1, 0)) |>
+  # Create pedigree categories (tertiles)
+  mutate(pedigree_cat = cut(pedigree, 
+                            breaks = quantile(pedigree, probs = c(0, 1/3, 2/3, 1)),
+                            labels = c("Low family history", 
+                                      "Medium family history", 
+                                      "High family history"),
+                            include.lowest = TRUE))
+
+# Fit logistic regression model
+model <- glm(diabetes_binary ~ `glucose_mg-dl` + bmi + pedigree, 
+             data = diabetes_clean, 
+             family = binomial(link = "logit"))
+
+# Display model summary
+summary(model)
+
+# Create prediction grid for heatmap
+# Generate a grid of glucose and BMI values for each pedigree category
+pred_grid <- expand_grid(
+  `glucose_mg-dl` = seq(min(diabetes_clean$`glucose_mg-dl`), 
+                        max(diabetes_clean$`glucose_mg-dl`), 
+                        length.out = 100),
+  bmi = seq(min(diabetes_clean$bmi), 
+            max(diabetes_clean$bmi), 
+            length.out = 100),
+  pedigree_cat = unique(diabetes_clean$pedigree_cat)
+) |>
+  # Add the median pedigree value for each category for prediction
+  left_join(
+    diabetes_clean |>
+      group_by(pedigree_cat) |>
+      summarize(pedigree = median(pedigree)),
+    by = "pedigree_cat"
+  )
+
+# Generate predictions
+pred_grid <- pred_grid %>%
+  mutate(pred_prob = predict(model, newdata = pred_grid, type = "response"))
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# Create the visualization
+g <- ggplot() +
+  # Heatmap layer
+  geom_tile(data = pred_grid, 
+            aes(x = `glucose_mg-dl`, y = bmi, fill = pred_prob)) +
+  
+  # Overlay actual patient data points
+  geom_point(data = diabetes_clean, 
+             aes(x = `glucose_mg-dl`, y = bmi, color = diabetes_5y),
+             alpha = 0.6, size = 1.5, shape = 16) +
+  
+  # Facet by pedigree category
+  facet_wrap(~ pedigree_cat, nrow = 3) +
+  
+  # Color scales
+  paletteer::paletteer_c(
+    "ggthemes::Red-Green Diverging",
+    name = "Predicted Diabetes Probability",
+    labels = scales::percent_format()
+  ) +
+  scale_color_manual(values = c("neg" = "#2ECC71", "pos" = "#E74C3C"),
+                     name = "Actual\nDiagnosis",
+                     labels = c("neg" = "Negative", "pos" = "Positive")) +
+  
+  # Labels and theme
+  labs(
+    title = "Predicted Diabetes Probability by Glucose, BMI, and Family History",
+    subtitle = "Logistic regression model with actual patient outcomes overlaid",
+    x = "Plasma Glucose (mg/dL)",
+    y = "Body Mass Index (kg/m²)",
+    caption = "Data: Pima Indian Diabetes Study | #TidyTuesday 2025 Week 45"
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  # labs(
+  #   y = "Lead Concentration (ppb) (Log Scale)",
+  #   x = NULL,
+  #   title = plot_title,
+  #   subtitle = plot_subtitle,
+  #   caption = plot_caption,
+  #   fill = NULL, colour = NULL
+  # ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Axes
+    axis.text.x.bottom = element_text(
+      size = bts * 1.2,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.y.left = element_text(
+      size = bts,
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.x.bottom = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
+    axis.line = element_blank(),
+    panel.grid = element_blank(),
+    
+    strip.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ), 
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2.3 * bts,
+      family = "body_font",
+      face = "bold",
+      lineheight = 0.25
+    ),
+    plot.subtitle = element_text(
+      margin = margin(2, 0, -20, 0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.3 * bts,
+      hjust = 0.5,
+      halign = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_pima_diabetes_study.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_pima_diabetes_study.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_pima_diabetes_study.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
