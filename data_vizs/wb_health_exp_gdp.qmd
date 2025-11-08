@@ -1,0 +1,575 @@
+---
+title: "Wealthier Nations Invest More in Health—But Not Equally"
+author: "Aditya Dahiya"
+date: "2025-11-07"
+subtitle: "Using wbstats for World Bank data access, faceted scatter plots with population-weighted trend lines, and ggtext for styled annotations."
+categories:
+  - "World Bank Data"
+  - "A4 Size Viz"
+  - "Public Health"
+  - "Health Financing"
+image: "thumbnails/wb_health_exp_gdp.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/session_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This visualization draws on three key indicators from the [**World Bank's World Development Indicators**](https://datatopics.worldbank.org/world-development-indicators/) database, accessed through the [**wbstats R package**](https://cran.r-project.org/web/packages/wbstats/index.html). The analysis incorporates [**GDP per capita (current US\$)**](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD) (indicator: NY.GDP.PCAP.CD), which measures a country's economic output divided by its population; [**Current health expenditure per capita (current US\$)**](https://data.worldbank.org/indicator/SH.XPD.CHEX.PC.CD) (indicator: SH.XPD.CHEX.PC.CD), reflecting both public and private spending on health services; and [**Total population**](https://data.worldbank.org/indicator/SP.POP.TOTL) (indicator: SP.POP.TOTL), used to weight the analysis and size data points. The dataset spans from 1960 to 2024, though complete data availability varies by country and indicator. Data is aggregated into decade-level averages (2000s, 2010s, 2020s) to smooth annual fluctuations and reveal long-term trends. Continental classifications are derived using the [**countrycode R package**](https://cran.r-project.org/web/packages/countrycode/index.html), which maps ISO country codes to geographic regions. Only country-level observations are included, excluding regional aggregates like "World" or "Sub-Saharan Africa" to ensure comparability. The World Bank compiles this data from national statistical offices, international organizations like the [**World Health Organization**](https://www.who.int/), and the [**International Monetary Fund**](https://www.imf.org/), making it one of the most comprehensive sources for cross-country development comparisons.
+
+![This visualization explores the relationship between national wealth and healthcare investment across 180+ countries over six decades (2000s-2020s). Each dot represents a country's decade-average values, with dot size proportional to population. The horizontal axis shows GDP per capita on a logarithmic scale, while the vertical axis displays current health expenditure as a percentage of GDP per capita. Colored trend lines reveal continent-specific patterns: as countries grow richer, they generally spend more on healthcare, but this correlation varies significantly. Europe (blue) and the Americas (yellow-green) show stronger positive relationships, while Africa (red) and Asia (teal) display weaker correlations—suggesting that factors beyond economic capacity, such as healthcare policy priorities, governance systems, and cultural values, shape how nations invest in population health.](wb_health_exp_gdp.png)
+
+### **How I made this graphic?**
+
+Loading required libraries, data import & creating custom functions
+
+```{r}
+#| label: setup
+
+# Data Import and Wrangling Tools
+pacman::p_load(
+  tidyverse,    # Data Wrangling and Plotting
+  scales,       # Nice scales for ggplot2
+  fontawesome,  # Icons display in ggplot2
+  ggtext,       # Markdown text support ggplot2
+  showtext,     # Display fonts in ggplot2
+  colorspace,   # Lighten and darken colours
+  patchwork,    # Combining plots together
+  magick,       # Image processing and editing
+  wbstats,      # World Bank data access
+  ggstream,     # Stream Plots in R
+  scales        # Nice scales with ggplot2
+)
+
+# temp_indicators <- wbstats::wb_indicators()
+# 
+# temp_indicators |> 
+#   as_tibble() |> 
+#   filter(str_detect(indicator_desc, "GDP per capita"))
+# 
+# temp_indicators |> 
+#   filter(str_detect(indicator_id, "SH.XPD.TOTL.CD")) |> 
+#   select(-indicator_desc, -source_org)
+
+
+temp_indicators |>
+  filter(str_detect(indicator_id, "SH.XPD.CHEX.PC.CD")) |> 
+  select(-source_org)
+
+# Source of all indicators: World Development Indicators
+selected_indicators <-  c(
+      "NY.GDP.PCAP.CD",    # GDP per capita (current US$)
+      "SP.POP.TOTL",       # Total population
+      "SH.XPD.CHEX.PC.CD"  # Current health expenditure per capita (current US$)
+    )
+
+
+raw_df <- wb_data(
+    indicator = selected_indicators,
+    start_date = 1960,
+    end_date   = 2024,
+    # return country-level only (excludes aggregates like "World" if supported)
+    country = "countries_only"
+  )
+```
+
+Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Roboto",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Roboto Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+mypal <- paletteer::paletteer_d("lisa::JackYoungerman") |> 
+  as.character() |> 
+  str_sub(1,7)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  World Bank's DataBank",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+```
+
+Annotation Text for the Plot
+
+```{r}
+#| label: text-for-plot
+
+plot_title <- "The Health-Wealth Paradox: Continental Divides in Healthcare Spending"
+str_view(plot_title)
+
+plot_subtitle <- glue::glue(
+  "As economies grow, healthcare spending rises as a share of GDP, but the strength of this relationship<br>",
+  "varies dramatically by continent. <span style='color:{mypal[4]}'>**European**</span> and ",
+  "<span style='color:{mypal[2]}'>**American**</span> nations show the steepest increases, while<br>",
+  "<span style='color:{mypal[1]}'>**African**</span> and <span style='color:{mypal[3]}'>**Asian**</span> ",
+  "countries lag behind despite economic growth—raising questions about<br>",
+  "healthcare priorities, policy choices, and structural inequalities in global health systems."
+)
+
+str_view(plot_subtitle)
+```
+
+Exploratory Data Analysis & Data Wrangling
+
+```{r}
+#| label: eda
+
+# A tibble of all countries and their GDP per capita and health expenditure per capita
+# in current US $ as a percentage of GDP per capita in current US $
+df1 <- raw_df |>
+  
+  # standardize/rename columns and keep necessary cols
+  dplyr::rename(
+    year = date,
+    iso3c = iso3c,
+    country = country,
+    health_pc = selected_indicators[3],
+    gdp_pc = selected_indicators[1],
+    pop = selected_indicators[2]
+  ) |>
+  # add continent using iso3c
+  dplyr::mutate(
+    continent = countrycode::countrycode(
+      iso3c,
+      origin = "iso3c",
+      destination = "continent",
+      warn = FALSE
+      ),
+    # assign decade label like "1990s", "2000s"
+    decade = paste0(floor(as.integer(year) / 10) * 10, "s"),
+    health_pc = health_pc / gdp_pc,
+  ) |> 
+  # keep rows that have all three values - country anme and two indicators
+  dplyr::filter(!is.na(gdp_pc) & !is.na(health_pc)) |> 
+  select(-iso2c)
+
+# Decade wise summary for countries
+df2 <- df1 |> 
+  # aggregate per country-decade (mean of available yearly values)
+  dplyr::group_by(iso3c, country, continent, decade) |>
+  
+  dplyr::summarise(
+    gdp_pc_mean = mean(gdp_pc, na.rm = TRUE),
+    health_pc_mean = mean(health_pc, na.rm = TRUE),
+    pop_mean = mean(pop, na.rm = TRUE),
+    n_years = sum(!is.na(gdp_pc) | !is.na(health_pc)),
+    .groups = "drop"
+  ) |>
+  # remove groups with missing core values
+  dplyr::filter(!is.na(gdp_pc_mean), !is.na(health_pc_mean), n_years > 0) |> 
+
+  group_by(decade) |>
+  mutate(
+    # Flag top 10 by population in each decade
+    top10_pop = rank(-pop_mean) <= 10,
+    
+    # Calculate distance from cluster center (outliers)
+    # Using standardized residuals from the overall trend
+    gdp_std = as.vector(scale(log10(gdp_pc_mean))),  # Convert to vector
+    health_std = as.vector(scale(health_pc_mean)),    # Convert to vector
+    dist_from_center = sqrt(gdp_std^2 + health_std^2),
+    is_outlier = dist_from_center > quantile(dist_from_center, 0.85),
+    
+    # Flag for labeling: top 10 pop OR outliers (roughly 20-25 countries per panel)
+    label_this = top10_pop | is_outlier
+  ) |>
+  ungroup() |> 
+  mutate(
+    iso2c = countrycode::countrycode(
+      iso3c,
+      origin = "iso3c",
+      destination = "iso2c"
+    ),
+    iso2c = str_to_lower(iso2c)
+  )
+
+```
+
+The Base Plot
+
+```{r}
+#| label: base-plot
+
+# plotting: log scales on both axes, each decade facet, one point per country
+g <- df2 |>
+  ggplot(
+    mapping = aes(
+      x = gdp_pc_mean, 
+      y = health_pc_mean
+      )
+    ) +
+  
+    geom_point(
+      mapping = aes(
+        size = sqrt(pop_mean)  # Square root of population
+      ),
+      alpha = 0.3,
+      pch = 19,
+      colour = "grey40",  # or your preferred color
+      stroke = 0  # Remove borders
+    ) +
+   
+  scale_size(range = c(1, 20)) +
+  guides(size = "none") +
+  
+  geom_smooth(
+    mapping = aes(
+      group = continent, 
+      weight = pop_mean, 
+      colour = continent
+      ),
+    method = "lm",
+    span = 1,
+    se = FALSE,
+    linewidth = 2.5, 
+    alpha  = 0.75,
+    lineend = "round"
+  ) +
+  
+  
+  geom_text(
+    data = df2 |> filter(label_this == TRUE),  # Only label selected countries
+    mapping = aes(
+      label = country
+    ),
+    nudge_y = 0.003,
+    size = bts / 4,
+    check_overlap = TRUE,
+    colour = text_hil,
+    family = "caption_font"
+  ) +
+
+    scale_x_log10(
+    labels = scales::label_number(
+      big.mark = ",",
+      scale_cut = cut_short_scale()
+    )
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent()
+  ) +
+  scale_colour_manual(values = mypal) +
+  facet_wrap(~ decade, ncol = 3) +
+  
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    x = "GDP per Capita (current US$) — Decade Mean, Log Scale",
+    y = "Health Expenditure as % of GDP per Capita",
+    caption = plot_caption
+  ) +
+  coord_cartesian(
+    clip = "off",
+    expand = FALSE
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(0,0),
+    legend.justification = c(0,1),
+    legend.margin = margin(20,0,0,0, "mm"),
+    legend.box.margin = margin(0,0,0,0, "mm"),
+    legend.direction = "horizontal",
+    # legend.key.height = unit(5, "mm"),
+    # legend.key.width = unit(15, "mm"),
+    legend.text.position = "bottom",
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm"),
+      size = bts * 1.1
+    ),
+    legend.title = element_blank(),
+    legend.key.spacing.x = unit(5, "mm"),
+
+    # Overall
+    text = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    panel.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    panel.grid.major = element_line(
+      linewidth = 0.4,
+      linetype = 3,
+      colour = alpha("black", 0.8)
+    ), 
+    panel.grid.minor = element_line(
+      linewidth = 0.2,
+      linetype = 3,
+      colour = alpha("black", 0.6)
+    ),
+    axis.line = element_line(
+      linewidth = 0.5,
+      colour = text_col,
+      arrow = arrow()
+    ),
+    axis.text.x.bottom = element_text(
+      margin = margin(5,1,1,1, "mm" ),
+      size = 0.9 * bts
+    ),
+    axis.text.y.left = element_text(
+      margin = margin(2,2,2,2, "mm"),
+      size = 1.1 * bts
+    ),
+    axis.title.x.bottom = element_text(
+      margin = margin(2,0,0,0, "mm")
+    ),
+    axis.title.y.left = element_text(
+      margin = margin(0,2,0,0, "mm")
+    ),
+    strip.text = element_text(
+      size = 2 * bts,
+      colour = text_hil,
+      margin = margin(0,0,0,0, "mm"),
+      face = "bold",
+      family = "title_font"
+    ),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2 * bts,
+      family = "title_font",
+      face = "bold",
+      lineheight = 0.25
+    ),
+    plot.subtitle = element_textbox(
+      margin = margin(2, 0, 2, 0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = 1.15 * bts,
+      hjust = 0,
+      halign = 0,
+      family = "body_font",
+      lineheight = 0.3
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 1,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+```
+
+Adding annotations to the plot
+
+```{r}
+#| label: add-annotations
+
+# A QR Code for the infographic
+url_graphics <- paste0(
+  "https://aditya-dahiya.github.io/projects_presentations/data_vizs/",
+  # The file name of the current .qmd file
+  "wb_health_exp_gdp",         
+  ".html"
+)
+# remotes::install_github('coolbutuseless/ggqr')
+# library(ggqr)
+plot_qr <- ggplot(
+  data = NULL, 
+  aes(x = 0, y = 0, label = url_graphics)
+  ) + 
+  ggqr::geom_qr(
+    colour = text_hil, 
+    fill = bg_col,
+    size = 1.5
+    ) +
+  annotate(
+    geom = "text",
+    x = -0.08,
+    y = 0,
+    label = "Scan for complete\nCode used to make\nthis graphic",
+    hjust = 1,
+    vjust = 0.5,
+    family = "caption_font",
+    colour = text_hil,
+    size = bts / 6,
+    lineheight = 0.35
+  ) +
+  coord_fixed(clip = "off") +
+  theme_void() +
+  theme(
+    plot.background = element_rect(
+      fill = NA, 
+      colour = NA
+    ),
+    panel.background = element_rect(
+      fill = NA,
+      colour = NA
+    ),
+    plot.margin = margin(0, 10, 0, 0, "mm")
+  )
+
+# Compiling the plots
+
+g_full <- g +
+  inset_element(
+    p = plot_qr,
+    left = 0.92, right = 0.98,
+    bottom = 0.84, top = 0.9,
+    align_to = "full",
+    clip = FALSE
+  ) + 
+  plot_annotation(
+    theme = theme(
+      plot.background = element_rect(
+        fill = "transparent",
+        colour = "transparent"
+      )
+    )
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "wb_health_exp_gdp.png"
+  ),
+  plot = g_full,
+  width = 297 * 2,
+  height = 210 * 2,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Savings the graphics
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail for the webpage
+image_read(here::here("data_vizs", "wb_health_exp_gdp.png")) |> 
+  image_resize(geometry = "400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails", 
+                         "wb_health_exp_gdp.png"))
+
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+# Data Import and Wrangling Tools
+pacman::p_load(
+  tidyverse,    # Data Wrangling and Plotting
+  scales,       # Nice scales for ggplot2
+  fontawesome,  # Icons display in ggplot2
+  ggtext,       # Markdown text support ggplot2
+  showtext,     # Display fonts in ggplot2
+  colorspace,   # Lighten and darken colours
+  patchwork,    # Combining plots together
+  magick,       # Image processing and editing
+  wbstats,      # World Bank data access
+  ggstream,     # Stream Plots in R
+  scales        # Nice scales with ggplot2
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
