@@ -1,0 +1,461 @@
+---
+title: "Two Decades of TB Deaths: Diverging Trends"
+author: "Aditya Dahiya"
+date: "2025-11-16"
+subtitle: "Proportional facet heights (ggh4x), rounded bars (ggchicklet), and smart labels (ggstream) applied to WHO tuberculosis mortality data."
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_who_tb_burden.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This dataset contains global tuberculosis (TB) burden estimates from the [World Health Organization (WHO)](https://www.who.int/), curated through [the getTBinR R package](https://samabbott.co.uk/getTBinR/) by [Sam Abbott](https://samabbott.co.uk/). The data provides country-level indicators spanning multiple years, including TB incidence rates, mortality estimates (both overall and stratified by [HIV](https://www.who.int/health-topics/hiv-aids) status), case detection rates, and population figures. Each observation is identified by standardized [ISO country codes](https://www.iso.org/iso-3166-country-codes.html) and organized by [WHO region](https://www.who.int/about/who-we-are/regional-offices). According to [WHO estimates](https://www.who.int/teams/global-tuberculosis-programme/tb-reports), [tuberculosis](https://www.who.int/news-room/fact-sheets/detail/tuberculosis) remains one of the world's deadliest infectious diseases, with 10.6 million people falling ill with TB in 2021 and 1.6 million deaths from the disease. This dataset was contributed by [Darakhshan Nehal](https://github.com/darakhshannehal) as part of the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) project, a weekly data visualization challenge organized by the [R4DS Online Learning Community](https://rfordatascience.slack.com/). The data enables researchers, [public health professionals](https://www.cdc.gov/tb/), and data enthusiasts to analyze TB burden patterns, track [case detection rates](https://www.who.int/teams/global-tuberculosis-programme/data), and understand the intersection of TB and HIV across different regions and time periods.
+
+![Annual tuberculosis mortality visualized through stacked rounded bars (ggchicklet), with fill colors distinguishing WHO regions. Facet panels use proportional heights (ggh4x::facet_grid2()) reflecting the stark difference between non-HIV (top) and HIV-related (bottom) death tolls. Dynamic labels (ggstream::geom_stream_label()) are sized by regional total deaths over the period. X-axis shows years (2000-2022), Y-axis represents absolute death counts. Data sourced from WHO via Sam Abbott's getTBinR R package, demonstrating advanced ggplot2 techniques for multi-faceted temporal comparisons.](tidy_who_tb_burden.png){#fig-1}
+
+## How I Made This Graphic
+
+.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork,  # Composing Plots
+  ggh4x,      # Proportional facets
+  ggchicklet, # Rounded bars
+  ggstream   # Labels in stacked bar chart
+)
+
+who_tb_data <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-11-11/who_tb_data.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+mypal <- paletteer::paletteer_d("ggthemes::excel_Ion") |> 
+  as.character() |> 
+  str_sub(1, 7)
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  World Health Organization, {getTBinR} by Sam Abbott",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "HIV-TB Deaths Plummet, Non-HIV Cases Persist"
+
+plot_subtitle <- "Between 2000 and 2022, global tuberculosis mortality declined substantially, with HIV-related TB deaths falling dramatically from 800,000 to under 200,000 annually. However, non-HIV TB deaths decreased more gradually from 1.9 million to 1.1 million. Africa and South-East Asia shoulder the greatest burden, particularly for HIV-associated cases. While medical advances have transformed HIV-TB outcomes, persistent non-HIV mortality signals ongoing public health challenges requiring sustained intervention." |> str_wrap(120)
+
+plot_subtitle |> str_view()
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+# pacman::p_load(summarytools)
+# 
+# who_tb_data |> 
+#   dfSummary() |> 
+#   view()
+# 
+# pacman::p_unload(summarytools)
+
+# Create df1 with selected columns
+# df1 <- who_tb_data |> 
+#   select(
+#     country,
+#     year,
+#     iso2,
+#     g_whoregion,
+#     pop = e_pop_num,
+#     tb_deaths_total = e_mort_num,
+#     tb_deaths_hiv = e_mort_tbhiv_num,
+#     tb_deaths_non_hiv = e_mort_exc_tbhiv_num
+#   )
+# Check if the numbers add up
+# df1 |> 
+#   mutate(
+#     calculated_total = tb_deaths_hiv + tb_deaths_non_hiv,
+#     difference = tb_deaths_total - calculated_total,
+#     # Check if difference is less than 100 (for rounding and estimation errors)
+#     matches = abs(difference) < 100 
+#   ) |> 
+#   count(matches)
+
+# Seems okay for estimation
+
+# Create df1 and pivot longer
+df1_long <- who_tb_data |>
+  select(
+    country,
+    year,
+    region = g_whoregion,
+    tb_deaths_hiv = e_mort_tbhiv_num,
+    tb_deaths_non_hiv = e_mort_exc_tbhiv_num
+  ) |>
+  pivot_longer(
+    cols = c(tb_deaths_hiv, tb_deaths_non_hiv),
+    names_to = "death_type",
+    values_to = "cases"
+  ) |>
+  mutate(
+    death_type_label = if_else(death_type == "tb_deaths_hiv", 
+                                "HIV-related TB Deaths", 
+                                "Non-HIV TB Deaths"),
+    death_type_label = factor(death_type_label, 
+                              levels = c("Non-HIV TB Deaths", "HIV-related TB Deaths"))
+  ) |>
+  filter(!is.na(cases)) |>
+  group_by(year, region, death_type_label) |>
+  summarise(cases = sum(cases, na.rm = TRUE), .groups = "drop")
+
+# Calculate total cases by region for label sizing
+region_totals <- df1_long |>
+  group_by(region, death_type_label) |>
+  summarise(total_cases = sum(cases, na.rm = TRUE), .groups = "drop")
+
+# Add region totals to df1_long
+df1_long <- df1_long |>
+  left_join(region_totals)
+
+
+
+# -------------------------------------------------------------------------------------------------
+library(ggh4x)  # install with: install.packages("ggh4x")
+
+# Create labels data for facet titles inside plot
+facet_labels <- df1_long |>
+  group_by(year, death_type_label) |> 
+  summarise(
+    cases = sum(cases, na.rm = TRUE)
+  ) |> 
+  group_by(death_type_label) |> 
+  summarise(
+    x = max(year, na.rm = TRUE),
+    y = max(cases, na.rm = TRUE) * 0.95,  # 95% of max y value
+    .groups = "drop"
+  )
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+g <- ggplot(df1_long, aes(x = year, y = cases)) +
+  ggchicklet::geom_chicklet(
+    mapping = aes(fill = region),
+    position = "stack",
+    alpha = 0.5
+  ) +
+  ggstream::geom_stream_label(
+    mapping = aes(
+      label = region,
+      size = total_cases,
+      colour = region,
+      fill = region
+    ),
+    type = "ridge",
+    hjust = "inward",
+    check_overlap = TRUE,
+    family = "body_font",
+    fontface = "bold"
+  ) +
+  scale_size_continuous(
+    range = c(bts / 4, bts / 1.5)
+  ) +
+  scale_fill_manual(values = mypal) +
+  scale_colour_manual(values = darken(mypal, 0.1)) +
+  
+  # Using facet_grid2 (for proportional heights of facets)
+  ggh4x::facet_grid2(
+    death_type_label ~ ., 
+    scales = "free_y", 
+    space = "free_y"
+    ) +
+  geom_text(
+    data = facet_labels,
+    mapping = aes(x = x, y = y, label = death_type_label),
+    hjust = 1,
+    vjust = 1,
+    fontface = "bold",
+    size = bts * 0.75,
+    inherit.aes = FALSE,
+    colour = text_hil
+    ) +
+  labs(
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption,
+    x = "Year",
+    y = "Estimated Annual Tuberculosis Deaths (Absolute Count)",
+    fill = "WHO Region"
+  ) +
+  scale_y_continuous(
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(),
+      big.mark = ","
+    ),
+    expand = expansion(0)
+  ) +
+  scale_x_continuous(
+    expand = expansion(0.015)
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "none",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_col,
+      lineheight = 0.3
+    ),
+    
+    # Axes
+    axis.text.x.bottom = element_text(
+      margin = margin(4,0,0,0, "mm")
+    ),
+    axis.title.x.bottom = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.y.left = element_text(
+      size = bts,
+      margin = margin(0,4,0,0, "mm")
+    ),
+    axis.title.y.left = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.x.bottom = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
+    axis.line = element_line(
+      arrow = arrow(
+        length = unit(5, "mm")
+      ),
+      linewidth = 0.5,
+      colour = text_col
+    ),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
+      linetype = 3,
+      linewidth = 0.6,
+      colour = text_hil
+    ),
+    panel.grid.minor.y = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = text_hil
+    ),
+    strip.text = element_blank(),
+    
+    # Labels and Strip Text
+    plot.title = element_text(
+      margin = margin(5, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      vjust = 0.5,
+      colour = text_hil,
+      size = 2.3 * bts,
+      family = "body_font",
+      face = "bold",
+      lineheight = 0.25
+    ),
+    plot.subtitle = element_text(
+      margin = margin(2, 0, 5, 0, "mm"),
+      vjust = 0.5,
+      colour = text_hil,
+      size = bts,
+      hjust = 0.5,
+      family = "body_font",
+      lineheight = 0.3
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_who_tb_burden.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_who_tb_burden.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_who_tb_burden.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork,  # Composing Plots
+  ggh4x,      # Proportional facets
+  ggchicklet, # Rounded bars
+  ggstream   # Labels in stacked bar chart
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
