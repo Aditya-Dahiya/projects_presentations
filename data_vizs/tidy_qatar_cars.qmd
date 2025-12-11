@@ -1,0 +1,354 @@
+---
+title: "tidy_qatar_cars"
+author: "Aditya Dahiya"
+date: "2025-12-06"
+subtitle: "tidy_qatar_cars"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_qatar_cars.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+The [Qatar Cars dataset](https://profmusgrave.github.io/qatarcars/) provides a modern, internationally-focused alternative to classic automotive datasets like [mtcars](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/mtcars.html) and [mpg](https://ggplot2.tidyverse.org/reference/mpg.html). Collected in early 2025 by [Paul Musgrave](https://musgrave.substack.com/p/introducing-the-qatar-cars-dataset) and students in his international politics course at [Georgetown University in Qatar](https://www.qatar.georgetown.edu/), this dataset addresses ["U.S. defaultism"](https://doi.org/10.1080/15512169.2025.2572320) in data science education by using [International System (SI) units](https://www.bipm.org/en/measurement-units/), featuring globally diverse car manufacturers including Chinese brands, and incorporating modern vehicle types like electric and hybrid cars. The dataset includes 2025 prices in [Qatari Riyals (QAR)](https://en.wikipedia.org/wiki/Qatari_riyal), with exchange rates of 1 USD = 3.64 QAR and 1 EUR = 4.15 QAR at the time of collection. Available through the [{qatarcars} R package](https://profmusgrave.github.io/qatarcars/) and as part of [#TidyTuesday](https://github.com/rfordatascience/tidytuesday), the dataset contains 15 variables covering car specifications (dimensions in meters, mass in kilograms), performance metrics (horsepower, 0-100 km/h acceleration time), economic factors (fuel economy in liters per 100 km, price), and categorical information (origin country, engine type, vehicle type).
+
+![tidy_qatar_cars](tidy_qatar_cars.png){#fig-1}
+
+## How I Made This Graphic
+
+.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork  # Composing Plots
+)
+
+pacman::p_load(ggbeeswarm)
+
+qatarcars <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-12-09/qatarcars.csv')
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Georgetown University in Qatar | Paul Musgrave",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+bts <- 90
+
+# Create the beeswarm plot
+qatarcars |> 
+  ggplot(
+    mapping = aes(
+      x = type, 
+      y = price, 
+      color = horsepower,
+      shape = enginetype
+    )
+  ) +
+  geom_beeswarm(
+    alpha = 0.7, 
+    cex = 2.5
+  ) +
+  scale_y_continuous(
+    trans = "log10",
+    labels = label_number(scale = 1e-3, suffix = "K")
+  ) +
+  paletteer::scale_colour_paletteer_c(
+    "grDevices::Purple-Blue",
+    trans = "log10"
+    ) +
+  # scale_color_manual(
+  #   values = c(
+  #     "Electric" = "#00BA38", 
+  #     "Hybrid" = "#619CFF", 
+  #     "Petrol" = "#F8766D"
+  #     ),
+  #   name = "Engine Type"
+  # ) +
+  scale_size_continuous(
+    range = c(2, 10),
+    name = "Horsepower"
+  ) +
+  labs(
+    title = "Price Distribution Across Car Types in Qatar",
+    subtitle = "Point size represents horsepower, color indicates engine type",
+    x = "Car Type",
+    y = "Price (QAR)",
+    caption = "Data: Qatar Cars Dataset 2025 | TidyTuesday Week 49"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(0.98,0.01),
+    legend.justification = c(1,0),
+    legend.direction = "horizontal",
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5
+    ),
+    legend.text = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.text.position = "bottom",
+    legend.title.position = "top",
+    legend.key.width = unit(50, "mm"),
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    
+    # Axes
+    axis.text.x.bottom = element_text(
+      margin = margin(4,0,0,0, "mm")
+    ),
+    axis.title.x.bottom = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.text.y.left = element_text(
+      size = bts,
+      margin = margin(0,4,0,0, "mm")
+    ),
+    axis.title.y.left = element_text(
+      margin = margin(0,0,0,0, "mm")
+    ),
+    axis.ticks.x.bottom = element_line(
+      linewidth = 0.3
+    ),
+    axis.ticks.y.left = element_line(
+      linewidth = 0.3
+    ),
+    axis.ticks.length.x = unit(4, "mm"),
+    axis.ticks.length.y.left = unit(4, "mm"),
+    axis.line = element_line(
+      arrow = arrow(
+        length = unit(5, "mm")
+      ),
+      linewidth = 0.5,
+      colour = text_col
+    ),
+    panel.grid = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = text_hil
+    ),
+    panel.grid.minor = element_line(
+      linetype = 3,
+      linewidth = 0.15,
+      colour = text_hil
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, 5, 5, 5, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_qatar_cars.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_qatar_cars.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_qatar_cars.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+
+  patchwork,  # Composing Plots
+  ggh4x,      # Proportional facets
+  ggchicklet, # Rounded bars
+  ggstream   # Labels in stacked bar chart
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
