@@ -1,10 +1,11 @@
 ---
-title: "tidy_qatar_cars"
+title: "Qatar Cars Dataset with ggbeeswarm"
 author: "Aditya Dahiya"
-date: "2025-12-06"
-subtitle: "tidy_qatar_cars"
+date: "2025-12-22"
+subtitle: "Using geom_beeswarm() for visualization of price distributions across vehicle types"
 categories:
   - "#TidyTuesday"
+  - "{ggbeeswarm}"
 image: "thumbnails/tidy_qatar_cars.png"
 format:
   html:
@@ -35,7 +36,7 @@ comments:
 
 The [Qatar Cars dataset](https://profmusgrave.github.io/qatarcars/) provides a modern, internationally-focused alternative to classic automotive datasets like [mtcars](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/mtcars.html) and [mpg](https://ggplot2.tidyverse.org/reference/mpg.html). Collected in early 2025 by [Paul Musgrave](https://musgrave.substack.com/p/introducing-the-qatar-cars-dataset) and students in his international politics course at [Georgetown University in Qatar](https://www.qatar.georgetown.edu/), this dataset addresses ["U.S. defaultism"](https://doi.org/10.1080/15512169.2025.2572320) in data science education by using [International System (SI) units](https://www.bipm.org/en/measurement-units/), featuring globally diverse car manufacturers including Chinese brands, and incorporating modern vehicle types like electric and hybrid cars. The dataset includes 2025 prices in [Qatari Riyals (QAR)](https://en.wikipedia.org/wiki/Qatari_riyal), with exchange rates of 1 USD = 3.64 QAR and 1 EUR = 4.15 QAR at the time of collection. Available through the [{qatarcars} R package](https://profmusgrave.github.io/qatarcars/) and as part of [#TidyTuesday](https://github.com/rfordatascience/tidytuesday), the dataset contains 15 variables covering car specifications (dimensions in meters, mass in kilograms), performance metrics (horsepower, 0-100 km/h acceleration time), economic factors (fuel economy in liters per 100 km, price), and categorical information (origin country, engine type, vehicle type).
 
-![tidy_qatar_cars](tidy_qatar_cars.png){#fig-1}
+![The graphic displays price distribution of 105 cars across four vehicle types (Coupe, Hatchback, Sedan, SUV) in Qatar's 2025 market. Each dot represents one car, with colors indicating engine type: petrol (orange), hybrid (green), or electric (blue). The vertical axis shows prices in Qatari Riyals on a logarithmic scale, ranging from 30,000 to over 30 million QAR. The beeswarm arrangement prevents dot overlap while revealing price clustering patterns within each category.](tidy_qatar_cars.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -104,6 +105,8 @@ line_col <- "grey30"
 # Define Base Text Size
 bts <- 80
 
+mypal <- paletteer::paletteer_d("ltc::trio3")[c(2, 3, 1)]
+
 # Caption stuff for the plot
 sysfonts::font_add(
   family = "Font Awesome 6 Brands",
@@ -127,6 +130,10 @@ rm(
   xtwitter_username, social_caption_1,
   social_caption_2
 )
+
+plot_title <- "<span style='color:#E8A628;'>**Petrol**</span> <span style='color:grey30;'>Dominates,</span> <span style='color:#3EB595;'>**Hybrids**</span> <span style='color:grey30;'>Rise,<br>and</span> <span style='color:#5AADE2;'>**Electric**</span> <span style='color:grey30;'>Stays Premium</span>"
+
+plot_subtitle <- "<span style='color:grey40;'>In Qatar's 2025 car market, <span style='color:#E8A628;'>**petrol vehicles**</span> span all price<br>ranges across every category. <span style='color:#3EB595;'>**Hybrids**</span> cluster in mid-to-high<br>tiers, particularly in SUVs and sedans, while <span style='color:#5AADE2;'>**electric cars**</span><br>command premium prices, especially in the coupe<br>and SUV segments.</span>"
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -134,7 +141,22 @@ rm(
 ```{r}
 #| label: eda
 
+bts = 80
 
+plotdf <- qatarcars |> 
+  left_join(
+    qatarcars |> 
+      slice_max(price, n = 15) |> 
+      mutate(label_var = paste(model, "\n",make))
+
+  ) |> 
+  left_join(
+    qatarcars |> 
+      slice_min(price, n = 15) |> 
+      mutate(label_var = paste(model, "\n",make))
+
+  )
+  
 ```
 
 ### The Plot
@@ -145,64 +167,78 @@ rm(
 bts <- 90
 
 # Create the beeswarm plot
-qatarcars |> 
+g <- plotdf |> 
   ggplot(
     mapping = aes(
       x = type, 
       y = price, 
-      color = horsepower,
-      shape = enginetype
+      color = enginetype
     )
   ) +
   geom_beeswarm(
-    alpha = 0.7, 
-    cex = 2.5
+    alpha = 0.9, 
+    cex = 3,
+    pch = 20
+  ) +
+  geom_text(
+    mapping = aes(label = label_var),
+    position = position_beeswarm(
+      cex = 3
+    ),
+    family = "caption_font",
+    size = bts / 3,
+    check_overlap = TRUE,
+    hjust = -0.1,
+    vjust = -0.2,
+    lineheight = 0.25
   ) +
   scale_y_continuous(
     trans = "log10",
-    labels = label_number(scale = 1e-3, suffix = "K")
+    labels = label_number(scale_cut = cut_short_scale()),
+    n.breaks = 15
   ) +
-  paletteer::scale_colour_paletteer_c(
-    "grDevices::Purple-Blue",
-    trans = "log10"
-    ) +
-  # scale_color_manual(
-  #   values = c(
-  #     "Electric" = "#00BA38", 
-  #     "Hybrid" = "#619CFF", 
-  #     "Petrol" = "#F8766D"
-  #     ),
-  #   name = "Engine Type"
-  # ) +
+  annotate(
+    geom = "richtext",
+    x = Inf, y = 30e6,
+    hjust = 1, vjust = 1,
+    label = plot_title,
+    size = bts / 1.2,
+    label.size = NA,
+    family = "body_font",
+    lineheight = 0.45,
+    fill = alpha(bg_col, 0.3)
+  ) +
+  annotate(
+    geom = "richtext",
+    x = Inf, y = 10e6,
+    hjust = 1, vjust = 1,
+    label = plot_subtitle,
+    size = bts / 2.5,
+    label.size = NA,
+    family = "body_font",
+    lineheight = 0.3,
+    fill = alpha(bg_col, 0.3)
+  ) +
   scale_size_continuous(
     range = c(2, 10),
     name = "Horsepower"
   ) +
+  scale_colour_manual(values = mypal) +
   labs(
-    title = "Price Distribution Across Car Types in Qatar",
-    subtitle = "Point size represents horsepower, color indicates engine type",
-    x = "Car Type",
-    y = "Price (QAR)",
-    caption = "Data: Qatar Cars Dataset 2025 | TidyTuesday Week 49"
+    title = NULL,
+    subtitle = NULL,
+    x = NULL,
+    y = "Price (in Qatari Riyal)",
+    caption = plot_caption
   ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(face = "bold", size = 16),
-    plot.subtitle = element_text(size = 11, color = "gray40"),
-    axis.text.x = element_text(angle = 0, hjust = 0.5),
-    legend.position = "right",
-    panel.grid.minor = element_blank(),
-    panel.grid.major.x = element_blank()
-  )
-
   theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
     legend.position = "inside",
-    legend.position.inside = c(0.98,0.01),
-    legend.justification = c(1,0),
+    legend.position.inside = c(1,0.7),
+    legend.justification = c(1,1),
     legend.direction = "horizontal",
     legend.margin = margin(0,0,0,0, "mm"),
     legend.title = element_text(
@@ -212,9 +248,8 @@ qatarcars |>
     legend.text = element_text(
       margin = margin(0,0,0,0, "mm")
     ),
-    legend.text.position = "bottom",
+    legend.text.position = "right",
     legend.title.position = "top",
-    legend.key.width = unit(50, "mm"),
     
     # Overall
     text = element_text(
@@ -225,42 +260,28 @@ qatarcars |>
     
     # Axes
     axis.text.x.bottom = element_text(
-      margin = margin(4,0,0,0, "mm")
-    ),
-    axis.title.x.bottom = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(4,0,0,0, "mm"),
+      size = bts * 1.5,
+      family = "caption_font"
     ),
     axis.text.y.left = element_text(
       size = bts,
       margin = margin(0,4,0,0, "mm")
     ),
     axis.title.y.left = element_text(
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,0,0, "mm"),
+      size = bts * 1.5
     ),
-    axis.ticks.x.bottom = element_line(
-      linewidth = 0.3
-    ),
-    axis.ticks.y.left = element_line(
-      linewidth = 0.3
-    ),
-    axis.ticks.length.x = unit(4, "mm"),
-    axis.ticks.length.y.left = unit(4, "mm"),
-    axis.line = element_line(
-      arrow = arrow(
-        length = unit(5, "mm")
-      ),
-      linewidth = 0.5,
-      colour = text_col
-    ),
-    panel.grid = element_line(
+    axis.ticks.x.bottom = element_blank(),
+    axis.ticks.y.left = element_blank(),
+    axis.ticks.length.x = unit(0, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
+    axis.line = element_blank(),
+    panel.grid = element_blank(),
+    panel.grid.major.y = element_line(
       linetype = 3,
       linewidth = 0.3,
-      colour = text_hil
-    ),
-    panel.grid.minor = element_line(
-      linetype = 3,
-      linewidth = 0.15,
-      colour = text_hil
+      colour = line_col
     ),
     plot.caption = element_markdown(
       family = "caption_font",
@@ -270,7 +291,7 @@ qatarcars |>
     ),
     plot.caption.position = "plot",
     plot.title.position = "plot",
-    plot.margin = margin(5, 5, 5, 5, "mm")
+    plot.margin = margin(5, 15, 5, 5, "mm")
   )
 
 ggsave(
