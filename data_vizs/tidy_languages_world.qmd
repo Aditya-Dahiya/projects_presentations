@@ -1,0 +1,394 @@
+---
+title: "Mapping Endangered Languages Worldwide"
+author: "Aditya Dahiya"
+date: "2025-12-27"
+subtitle: "A circle-packed visualization of linguistic diversity at risk across six macroareas"
+categories:
+  - "#TidyTuesday"
+  - "{packcircles}"
+  - "Circle Visualization"
+image: "thumbnails/tidy_languages_world.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+## About the Data
+
+This dataset explores the world's languages using data from [Glottolog 5.2.1](https://glottolog.org/), the most comprehensive language database in linguistics. Maintained by the [Max Planck Institute for Evolutionary Anthropology](https://www.eva.mpg.de/), Glottolog contains detailed information on over 8,000 languages worldwide, including names, genealogy, geographical distributions, and endangerment status. The dataset comprises three interconnected tables: `languages.csv` provides core information about each language including geographic coordinates, [ISO 639-3 codes](https://iso639-3.sil.org/), macroarea classifications, and whether the language is an isolate with no known relatives; `families.csv` catalogs the language families to which non-isolate languages belong; and `endangered_status.csv` documents the endangerment status of languages using a six-category classification system. This rich dataset enables exploration of fascinating questions about linguistic diversity, such as which regions have the highest concentrations of endangered languages, whether language isolates face greater endangerment risks, and how language families are distributed geographically across the globe. The data was curated by Darakhshan Nehal for [#TidyTuesday](https://github.com/rfordatascience/tidytuesday), a weekly data project in the [R for Data Science](https://r4ds.hadley.nz/) online learning community.
+
+![This visualization maps the distribution of endangered languages across countries and macroareas worldwide. Each circle represents a country, with size proportional to the number of endangered languages it contains. Countries are colored by their macroarea—the broad geographic region they belong to—revealing distinct patterns of linguistic endangerment. Africa (red) and Papunesia (teal) show particularly high concentrations, with Nigeria and Indonesia harboring the most endangered languages. The varying transparency of circles adds visual depth while highlighting the complex, overlapping nature of global linguistic diversity under threat.](tidy_languages_world.png){#fig-1}
+
+## How I Made This Graphic
+
+.
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles # for hierarchichal packing circles
+)
+
+endangered_status <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-12-23/endangered_status.csv')
+
+families <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-12-23/families.csv')
+
+languages <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-12-23/languages.csv')
+
+world <- rnaturalearth::ne_countries(returnclass = "sf")
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey40"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey30"
+seecolor::print_color(text_col)
+
+line_col <- "grey30"
+
+# Define Base Text Size
+bts <- 80
+
+mypal <- paletteer::paletteer_d("ltc::trio3")[c(2, 3, 1)]
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Max Planck Institute for Evolutionary Anthropology",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+plot_title <- "Global Linguistic Diversity"
+
+plot_subtitle <- "<span style='color:#D4526E'>Africa</span> (3,266 languages) and <span style='color:#C8B591'>Eurasia</span> (3,225) lead in endangered linguistic diversity,<br>followed by <span style='color:#42B7BD'>Papunesia</span> (2,242), <span style='color:#2F6A6C'>South America</span> (871), and <span style='color:#729B79'>North America</span> (819).<br><span style='color:#F4D35E'>Australia</span> (375) has fewer languages but faces significant endangerment risks."
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+bts = 80
+
+plotdf <- languages |> 
+  select(id, name, countries, macroarea) |> 
+  left_join(endangered_status) |> 
+  select(-status_code) |> 
+  drop_na() |> 
+  separate_longer_delim(cols = countries, ";") |> 
+  separate_longer_delim(cols = macroarea, ";") |> 
+  count(macroarea, countries) |> 
+  mutate(
+    countries = str_to_lower(countries),
+    country = countrycode::countrycode(
+      sourcevar = countries,
+      origin = "iso2c",
+      destination = "country.name.en"
+    ),
+    country = str_wrap(country, 15)
+  )
+
+plotdf <- plotdf |> 
+  mutate(alpha_var = runif(nrow(plotdf)))
+
+# endangered_status |> 
+#   count(status_label)
+# 
+# languages |> 
+#   drop_na(longitude, latitude) |> 
+#   st_as_sf(
+#     coords = c("longitude", "latitude"),
+#     crs = "EPSG:4326"
+#   ) |> 
+#   ggplot() +
+#   geom_sf(data = world) +
+#   geom_sf()
+
+
+# Prepare data for circle packing
+# Need to create a proper hierarchy with groups and subgroups
+packing_data <- plotdf |>
+  select(macroarea, country, n, alpha_var) |>
+  mutate(
+    group = macroarea,
+    subgroup = country,
+    value = n
+  )
+
+# Create the packing layout
+# First, we need to format data for circleProgressiveLayout
+packing <- circleProgressiveLayout(packing_data$value, sizetype = 'area')
+packing$radius <- 0.95 * packing$radius  # Add some spacing
+
+# Add packing coordinates back to data
+packing_data <- bind_cols(packing_data, packing)
+
+# Generate circle coordinates for plotting
+circle_data <- circleLayoutVertices(packing, npoints = 50)
+
+# Join back the grouping information
+circle_data <- circle_data |>
+  left_join(
+    packing_data |> 
+      mutate(id = row_number()) |> 
+      select(id, group, subgroup, value, alpha_var),
+    by = "id"
+  )
+
+# plotdf |> 
+#   group_by(macroarea) |> 
+#   summarise(n = sum(n))
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+bts = 90
+
+mypal <- paletteer::paletteer_d("calecopal::kelp1")
+
+# Create the plot
+g <- ggplot() +
+  # Draw the circles
+  geom_polygon(
+    data = circle_data,
+    aes(x = x, y = y, group = id, fill = group, alpha = alpha_var),
+    colour = "white",
+    linewidth = 0.5
+  ) +
+  # Add country labels for larger circles
+  geom_text(
+    data = packing_data |> filter(value > 50),
+    aes(x = x, y = y, label = subgroup, size = value),
+    colour = "white",
+    fontface = "bold",
+    alpha = 0.8,
+    lineheight = 0.3
+  ) +
+  
+  # Styling
+  scale_fill_manual(values = mypal) +
+  scale_alpha_continuous(range = c(0.3, 0.9), guide = "none") +
+  scale_size_continuous(range = c(bts / 10, bts / 3), guide = "none") +
+  coord_equal() +
+  guides(
+    size = "none",
+    alpha = "none",
+    fill = guide_legend(
+      nrow = 1
+    )
+  ) +
+  theme_void(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  labs(
+    x = NULL,
+    y = NULL,
+    caption = plot_caption,
+    title = plot_title,
+    subtitle = plot_subtitle
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.margin = margin(0,0,0,0, "mm"),
+    legend.title = element_blank(),
+    legend.text = element_text(
+      family = "caption_font",
+      size = bts * 1.2,
+      margin = margin(0,0,0,3, "mm")
+    ),
+    legend.text.position = "right",
+    
+    # Overall
+    text = element_text(
+      margin = margin(0, 0, 0, 0, "mm"),
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    
+    # Axes
+    plot.title = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      size = bts * 3.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_textbox(
+      margin = margin(5,0,-5,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.35,
+      size = bts * 1.2
+    ),
+    plot.caption = element_markdown(
+      family = "caption_font",
+      hjust = 0.5,
+      margin = margin(5,0,0,0, "mm"),
+      colour = text_hil
+    ),
+    plot.caption.position = "plot",
+    plot.title.position = "plot",
+    plot.margin = margin(5, -15, 5, -15, "mm"),
+    legend.key.width = unit(10, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_languages_world.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(here::here(
+  "data_vizs",
+  "tidy_languages_world.png"
+)) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_languages_world.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles # for hierarchichal packing circles
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
