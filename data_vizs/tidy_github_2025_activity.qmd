@@ -1,0 +1,624 @@
+---
+title: "Habits Tracking Chart for year 2025"
+author: "Aditya Dahiya"
+date: "2026-01-08"
+subtitle: "Building GitHub style timeseries charts for some tracked acitivites in 2025, building custom functions for rounded tiles, and interactivity with {ggiraph}."
+categories:
+  - "Data Visualization"
+  - "#TidyTuesday"
+  - "Interactive"
+  - "{ggiraph}"
+image: "thumbnails/tidy_github_2025_activity.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+![A geom_tile() customized to produce rounded corners, and three facets (three habits tracked) with opacity reflecting intensity of activity on a particular date.](tidy_github_2025_activity.png){width="900"}
+
+Loading Libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+# Loading the relevant packages
+library(tidyverse)          # Data Wrangling
+library(gt)                 # Displaying beautiful tables
+library(ggiraph)            # Interactive Graphics
+library(showtext)           # Display fancy text in ggplot2
+library(fontawesome)        # Icons and Fonts 
+library(janitor)            # Cleaning tidying raw data
+library(patchwork)          # Composing plots in R
+library(ggtext)             # Displaying custom text in ggplot2
+
+library(paletteer)          # Load colour palettes
+```
+
+Visualization Parameters
+
+```{r}
+#| eval: false
+
+# Font for titles
+font_add_google("Oswald",
+  family = "title_font"
+) 
+
+# Font for the caption
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+) 
+
+# Font for plot text
+font_add_google("Saira Condensed",
+  family = "body_font"
+) 
+
+showtext_auto()
+
+mypal <- c(
+  "#FFA400", "#EF3B2C", "#41AB5D", "grey30", "grey40"
+)
+
+# A base Colour
+bg_col <- "white"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- mypal[5]
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- mypal[4]
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 90
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data & Code:** ", 
+  social_caption_1, 
+  " |  **Graphics:** ", 
+  social_caption_2
+  )
+rm(github, github_username, xtwitter, 
+   xtwitter_username, social_caption_1, 
+   social_caption_2)
+
+# Add text to plot-------------------------------------------------
+plot_title <- "A Git-Hub style Habits tracking chart\n(2025) !"
+
+plot_subtitle <- str_wrap("2025 was transformative! Atomic Habits (read in June 2024) and Can’t Hurt Me (read in Oct 2024) helped me focus on my daily habits over the entire year.", 70)
+```
+
+Loading the data, E.D.A., and cleaning the names
+
+```{r}
+#####################################################################
+# Set the working directory (I didnt want to host raw data on GitHub)
+#####################################################################
+
+list.files("loop_habits")
+
+# Define the directory containing the CSV files
+directory <- "loop_habits"
+
+# List all CSV files in the directory
+csv_files <- list.files(
+  path = directory, 
+  pattern = "\\.csv$", 
+  full.names = TRUE
+  )
+
+# Extract base names (without file extension) to use as object names
+file_names <- tools::file_path_sans_ext(basename(csv_files)) |>
+  tolower()
+
+# Read each CSV file and assign it to an object with the corresponding name
+purrr::walk2(
+  csv_files, 
+  file_names, 
+  ~ assign(.y, read_csv(.x), 
+           envir = .GlobalEnv)
+  )
+
+# Apply janitor::clean_names() to all created objects
+purrr::walk(
+  file_names, ~
+    {
+      cleaned_data <- get(.x) |>  clean_names() 
+      # Retrieve object, clean names
+      
+      assign(.x, cleaned_data, envir = .GlobalEnv) 
+      # Reassign cleaned data back to the same object
+    }
+  )
+
+# Remove the temporary files
+rm(csv_files, directory, file_names)
+```
+
+Cleaning up the data and keeping only the relevant variables
+
+```{r}
+parse_custom_number <- function(...){
+  parse_number(..., na = "UNKNOWN") / 1000
+}
+
+parse_logic <- function(var_name){
+  case_when(
+    var_name == "NO" ~ "No",
+    var_name == "UNKNOWN" ~ "Not Known",
+    var_name == "YES_MANUAL" ~ "Yes",
+    .default = "Not Known"
+  ) |> 
+  fct(
+    levels = c("Yes", "No", "Not Known")
+  )  
+}
+
+checkmarks1 <- checkmarks |> 
+  mutate(
+    year = year(date),
+    day_of_week = wday(date, label = T, abbr = F),
+    day_number = yday(date),
+    week_number = week(date),
+    month_year = month(date, label = TRUE),
+    date = format(date, "%d %B"),
+    id = row_number()
+  ) |> 
+  mutate(
+    across(
+      .cols = c(sleep, walk, exercise, kids_studies,
+                social, german, data_viz_coding,
+                learn_ai_tools, office_decorum,
+                kids_junk_food, unhealthy_food),
+      .fns = parse_custom_number
+    )
+  ) |>
+  mutate(
+    across(
+      .cols = c(morning_manifesto, family_tel_calls,
+                care_wife, learn_new, office_goals,
+                daily_filework),
+      .fns = parse_logic
+    )
+  ) |> 
+  mutate(
+    day_of_week = fct_relevel(
+      day_of_week,
+        "Sunday", "Saturday", "Friday",
+        "Thursday", "Wednesday", "Tuesday",
+        "Monday"    
+    )
+  )
+
+# checkmarks1 |> 
+#   filter(year == 2025) |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+# 
+# 
+# checkmarks |> 
+#   filter(date >= as_date("2025-01-01")) |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+
+df1 <- checkmarks1 |>
+  filter(year == 2025) |> 
+  select(
+    date, day_number, month_year, week_number, day_of_week,
+    walk, exercise, sleep
+  ) |>
+  pivot_longer(
+    cols = c(walk, exercise, sleep),
+    names_to = "activity",
+    values_to = "value"
+  ) |>
+  group_by(activity) |>
+  mutate(
+    alpha_var = value / max(value, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  mutate(
+    activity = case_when(
+      activity == "walk" ~ "Minutes spent walking each day",
+      activity == "exercise" ~ "Minutes spent on kids' studies",
+      activity == "sleep" ~ "Hours spent sleeping each night"
+    )
+  )
+
+df1
+```
+
+Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners
+
+```{r}
+#| label: geom_rtile()-custom-function
+# Custom functions: creating a geom_rtile()
+# Credits: https://stackoverflow.com/questions/64355877/round-corners-in-ggplots-geom-tile-possible
+
+
+`%||%` <- function(a, b) {
+  if (is.null(a)) b else a
+}
+
+GeomRtile <- ggproto("GeomRtile", 
+                     statebins:::GeomRrect, # 1) only change compared to ggplot2:::GeomTile
+                     
+  extra_params = c("na.rm"),
+  setup_data = function(data, params) {
+    data$width <- data$width %||% params$width %||% resolution(data$x, FALSE)
+    data$height <- data$height %||% params$height %||% resolution(data$y, FALSE)
+
+    transform(data,
+      xmin = x - width / 2,  xmax = x + width / 2,  width = NULL,
+      ymin = y - height / 2, ymax = y + height / 2, height = NULL
+    )
+  },
+  default_aes = aes(
+    fill = "grey20", colour = NA, size = 0.1, linetype = 1,
+    alpha = NA, width = NA, height = NA
+  ),
+  required_aes = c("x", "y"),
+
+  # These aes columns are created by setup_data(). They need to be listed here so
+  # that GeomRect$handle_na() properly removes any bars that fall outside the defined
+  # limits, not just those for which x and y are outside the limits
+  non_missing_aes = c("xmin", "xmax", "ymin", "ymax"),
+  draw_key = draw_key_polygon
+)
+
+geom_rtile <- function(mapping = NULL, data = NULL,
+                       stat = "identity", position = "identity",
+                       radius = grid::unit(6, "pt"), # 2) add radius argument
+                       ...,
+                       na.rm = FALSE,
+                       show.legend = NA,
+                       inherit.aes = TRUE) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomRtile, # 3) use ggproto object here
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = rlang::list2(
+      radius = radius,
+      na.rm = na.rm,
+      ...
+    )
+  )
+}
+```
+
+Plotting in {ggplot2} with 3 facets - a static graphic
+
+```{r}
+#| label: plot
+
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = week_number,
+      y = day_of_week,
+      fill = alpha_var, 
+      alpha = alpha_var
+    )
+  ) +
+  geom_rtile(
+    radius = unit(bts/10, "pt"),
+    colour = bg_col,
+    linewidth = 1
+  ) +
+  geom_text(
+    data = df1 |> filter(alpha_var > 0.7),
+    mapping = aes(
+      label = round(value, 2)
+    ),
+    size = bts / 10,
+    family = "body_font",
+    hjust = 0.5,
+    vjust = 0,
+    nudge_y = 0.05
+  ) +
+  geom_text(
+    data = df1 |> filter(alpha_var > 0.7),
+    mapping = aes(
+      label = paste0(
+        parse_number(date), " ", month_year
+      )
+    ),
+    size = bts / 15,
+    family = "body_font",
+    hjust = 0.5,
+    vjust = 0,
+    nudge_y = -0.15
+  ) +
+  coord_fixed(clip = "off") +
+  scale_x_continuous(
+    limits = c(0, 54),
+    expand = expansion(c(0, 0)),
+    breaks = c(3, 11, 17, 25, 35, 45, 52),
+    labels = c("Jan", "Mar",  "Apr", "Jun", "Sep", "Nov", "Dec")
+  ) +
+  scale_y_discrete(
+    breaks = checkmarks$day_of_week |> levels(),
+    limits = checkmarks$day_of_week |> levels(),
+    labels = checkmarks$day_of_week |> levels(),
+    expand = expansion(0)
+  ) +
+  # scale_fill_manual(
+  #   values = mypal[c(1, 2, 3)]
+  # ) +
+  paletteer::scale_fill_paletteer_c(
+    "ggthemes::Temperature Diverging",
+    direction = -1,
+    trans = "sqrt"
+  ) +
+  scale_alpha_continuous(
+    range = c(0, 1),
+    na.value = 0,
+    trans = "sqrt"
+  ) +
+  facet_wrap(
+    ~activity,
+    ncol = 1
+  ) +
+  guides(
+    fill = "none",
+    alpha = "none"
+  ) +
+  labs(
+    x = NULL, y = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    caption = plot_caption
+  ) +
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    # Overall Plot
+    legend.position = "bottom",
+    legend.key.height = unit(bts / 80, "mm"),
+    legend.key.width = unit(bts / 2, "mm"),
+    panel.grid = element_blank(),
+    plot.title.position = "plot",
+      
+    # All margins
+    plot.margin = margin(10,0,10,0, "mm"),
+    panel.background = element_blank(),
+    panel.border = element_blank(),
+    # All texts appearing in the plot
+    text = element_text(
+      colour = text_col,
+      margin = margin(0,0,0,0, "mm"),
+      hjust = 0.5, vjust = 0.5
+    ),
+    plot.title = element_text(
+      margin = margin(10,0,10,0, "mm"),
+      hjust = 0.5,
+      colour = text_hil,
+      size = bts * 2,
+      # family = "title_font",
+      lineheight = 0.3,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      margin = margin(5,0,5,0, "mm"),
+      hjust = 0.5,
+      lineheight = 0.3, 
+      family = "body_font",
+      colour = text_hil
+    ),
+    plot.caption = element_textbox(
+        hjust = 0.5,
+        margin = margin(15,0,5,0, "mm"),
+        colour = text_hil,
+        family = "caption_font"
+    ),
+    strip.text = element_text(
+      margin = margin(10,0,5,0, "mm"),
+      hjust = 0.5, 
+      colour = text_hil,
+      size = 1.5 * bts
+    ),
+    axis.text.y = element_text(
+      margin = margin(0,-2,0,0, "mm")
+    ),
+    axis.text.x = element_text(
+      margin = margin(5,0,0,0, "mm"),
+      size = 1.2 * bts
+    ),
+    axis.ticks = element_blank(),
+    axis.ticks.length = unit(0, "mm")
+  )
+
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_github_2025_activity1.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+Display the Static Graph
+
+Making thumbnail for the webpage
+
+```{r}
+library(magick)
+
+image_read(here::here("data_vizs", "tidy_github_2025_activity.png")) |> 
+  image_resize("x400") |> 
+  image_write(here::here("data_vizs", 
+                         "thumbnails",
+                         "tidy_github_2025_activity.png"))
+```
+
+------------------------------------------------------------------------
+
+### Interactive Chart
+
+Part 1: Custom save the required data
+
+```{r}
+#| eval: true
+
+```
+
+### Part 2: Draw the interactive plot with {ggplot2} and {ggiraph}
+
+```{r}
+#| eval: true
+
+plot1 <- df |> 
+  mutate(id = row_number()) |> 
+  ggplot(
+    mapping = aes(
+      x = week_number,
+      y = day_of_week,
+      fill = activity, 
+      alpha = alpha_var,
+      data_id = id,
+      tooltip = paste0(
+        date, "\n", day_of_week, "\n", 
+        round(value, 2), " hours"
+      )
+    )
+  ) +
+  geom_tile_interactive(
+    colour = "white",
+    linewidth = 1
+  ) +
+  coord_fixed(clip = "off") +
+  scale_x_continuous(
+    limits = c(17, 54),
+    expand = expansion(c(0, 0)),
+    breaks = c(17, 25, 35, 45, 52),
+    labels = c("Apr", "Jun", "Sep", "Nov", "Dec")
+  ) +
+  scale_y_discrete(
+    breaks = df$day_of_week |> levels(),
+    limits = df$day_of_week |> levels(),
+    labels = df$day_of_week |> levels(),
+    expand = expansion(0)
+  ) +
+  scale_fill_manual(
+    values = c("#FFA400", "#EF3B2C", "#41AB5D")
+  ) +
+  scale_alpha_continuous(
+    range = c(0, 1),
+    na.value = 0
+  ) +
+  facet_wrap(
+    ~activity,
+    ncol = 1
+  ) +
+  guides(
+    fill = "none",
+    alpha = "none"
+  ) +
+  labs(
+    x = NULL, y = NULL,
+    title = "GitHub Contributions style Habits tracking chart !",
+    subtitle = "Interactive Version created with {ggiraph}.",
+    caption = "Data & Graphics:    Github @Aditya-Dahiya     X @AdityaDahiyaIAS"
+  ) +
+  theme_minimal(
+    base_size = 12
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    plot.title.position = "plot",
+    plot.title = element_text(
+      hjust = 0.5,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5
+    ),
+    strip.text = element_text(
+      face = "bold"
+    ),
+    plot.caption = element_text(
+      hjust = 0.5,
+      size = 6
+    )
+  )
+
+girafe(
+  ggobj = plot1,
+  options = list(
+    opts_hover_inv(css = "opacity:0.7;"),
+    opts_hover(css = "stroke:black;stroke-width:2;")
+  )
+)
+```
+
+### Session Info
+
+```{r}
+#| eval: true
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |> 
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |> 
+  gtExtras::gt_theme_espn()
+```
