@@ -115,11 +115,6 @@ plot_caption <- paste0(
 rm(github, github_username, xtwitter, 
    xtwitter_username, social_caption_1, 
    social_caption_2)
-
-# Add text to plot-------------------------------------------------
-plot_title <- "A Git-Hub style Habits tracking chart\n(2025) !"
-
-plot_subtitle <- str_wrap("2025 was transformative! Atomic Habits (read in June 2024) and Can’t Hurt Me (read in Oct 2024) helped me focus on my daily habits over the entire year.", 70)
 ```
 
 Loading the data, E.D.A., and cleaning the names
@@ -234,32 +229,6 @@ checkmarks1 <- checkmarks |>
 #   filter(date >= as_date("2025-01-01")) |> 
 #   summarytools::dfSummary() |> 
 #   summarytools::view()
-
-df1 <- checkmarks1 |>
-  filter(year == 2025) |> 
-  select(
-    date, day_number, month_year, week_number, day_of_week,
-    walk, exercise, sleep
-  ) |>
-  pivot_longer(
-    cols = c(walk, exercise, sleep),
-    names_to = "activity",
-    values_to = "value"
-  ) |>
-  group_by(activity) |>
-  mutate(
-    alpha_var = value / max(value, na.rm = TRUE)
-  ) |>
-  ungroup() |>
-  mutate(
-    activity = case_when(
-      activity == "walk" ~ "Minutes spent walking each day",
-      activity == "exercise" ~ "Minutes spent on kids' studies",
-      activity == "sleep" ~ "Hours spent sleeping each night"
-    )
-  )
-
-df1
 ```
 
 Write a custom function `geom_rtile()` for plotting `geom_tile()` with rounded corners
@@ -288,7 +257,7 @@ GeomRtile <- ggproto("GeomRtile",
     )
   },
   default_aes = aes(
-    fill = "grey20", colour = NA, size = 0.1, linetype = 1,
+    fill = "grey20", colour = NA, size = 0.1,
     alpha = NA, width = NA, height = NA
   ),
   required_aes = c("x", "y"),
@@ -324,38 +293,81 @@ geom_rtile <- function(mapping = NULL, data = NULL,
 }
 ```
 
-Plotting in {ggplot2} with 3 facets - a static graphic
+### Plotting in {ggplot2} with facets - a static graphic
 
 ```{r}
 #| label: plot
+
+bts = 90
+
+# Add text to plot-------------------------------------------------
+plot_title <- "Habits tracking (2025)"
+
+plot_subtitle <- str_wrap("2025 was transformative! Atomic Habits (read in June 2024) and Can’t Hurt Me (read in Oct 2024) helped me focus on my daily habits over the entire year, with some amazing results for both health and family.", 70)
+
+df1 <- checkmarks1 |>
+  filter(year == 2025) |> 
+  select(
+    date, day_number, month_year, week_number, day_of_week,
+    walk, exercise, social
+  ) |>
+  pivot_longer(
+    cols = c(walk, exercise, social),
+    names_to = "activity",
+    values_to = "value"
+  ) |>
+  group_by(activity) |>
+  mutate(
+    alpha_var = value / max(value, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  mutate(
+    activity = case_when(
+      activity == "walk" ~ "Walking everyday\n(minutes per day)",
+      activity == "exercise" ~ "Kids' studies\n(minutes per day)",
+      activity == "sleep" ~ "Hours spent sleeping each night",
+      activity == "social" ~ "Socializing\n(approx time each day)"
+    )
+  ) |> 
+  group_by(activity) |> 
+  arrange(desc(alpha_var)) |> 
+  mutate(
+    rank_num = row_number(),
+    text_var = if_else(
+      rank_num <= 35,
+      as.character(value),
+      ""
+    )
+  ) |> 
+  select(-rank_num)
 
 g <- df1 |> 
   ggplot(
     mapping = aes(
       x = week_number,
       y = day_of_week,
-      fill = alpha_var, 
+      fill = activity, 
       alpha = alpha_var
     )
   ) +
   geom_rtile(
-    radius = unit(bts/10, "pt"),
+    radius = unit(bts/20, "pt"),
     colour = bg_col,
     linewidth = 1
   ) +
   geom_text(
-    data = df1 |> filter(alpha_var > 0.7),
     mapping = aes(
-      label = round(value, 2)
+      label = text_var
     ),
     size = bts / 10,
     family = "body_font",
     hjust = 0.5,
     vjust = 0,
-    nudge_y = 0.05
+    nudge_y = 0.05,
+    colour = bg_col
   ) +
   geom_text(
-    data = df1 |> filter(alpha_var > 0.7),
+    data = df1 |> filter(text_var != ""),
     mapping = aes(
       label = paste0(
         parse_number(date), " ", month_year
@@ -380,18 +392,15 @@ g <- df1 |>
     labels = checkmarks$day_of_week |> levels(),
     expand = expansion(0)
   ) +
-  # scale_fill_manual(
-  #   values = mypal[c(1, 2, 3)]
+  paletteer::scale_fill_paletteer_d("MetBrewer::Egypt") +
+  # paletteer::scale_fill_paletteer_c(
+  #   "grDevices::Purple-Yellow",
+  #   direction = -1,
+  #   trans = "sqrt"
   # ) +
-  paletteer::scale_fill_paletteer_c(
-    "ggthemes::Temperature Diverging",
-    direction = -1,
-    trans = "sqrt"
-  ) +
   scale_alpha_continuous(
     range = c(0, 1),
-    na.value = 0,
-    trans = "sqrt"
+    na.value = 0
   ) +
   facet_wrap(
     ~activity,
@@ -430,11 +439,10 @@ g <- df1 |>
       hjust = 0.5, vjust = 0.5
     ),
     plot.title = element_text(
-      margin = margin(10,0,10,0, "mm"),
+      margin = margin(10,0,5,0, "mm"),
       hjust = 0.5,
       colour = text_hil,
-      size = bts * 2,
-      # family = "title_font",
+      size = bts * 3.5,
       lineheight = 0.3,
       face = "bold"
     ),
@@ -443,7 +451,8 @@ g <- df1 |>
       hjust = 0.5,
       lineheight = 0.3, 
       family = "body_font",
-      colour = text_hil
+      colour = text_hil,
+      size = bts * 2
     ),
     plot.caption = element_textbox(
         hjust = 0.5,
@@ -452,10 +461,11 @@ g <- df1 |>
         family = "caption_font"
     ),
     strip.text = element_text(
-      margin = margin(10,0,5,0, "mm"),
+      margin = margin(5,0,5,0, "mm"),
       hjust = 0.5, 
       colour = text_hil,
-      size = 1.5 * bts
+      size = 1.5 * bts,
+      lineheight = 0.3
     ),
     axis.text.y = element_text(
       margin = margin(0,-2,0,0, "mm")
