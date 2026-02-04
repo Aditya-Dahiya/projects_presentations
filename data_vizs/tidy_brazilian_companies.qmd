@@ -67,20 +67,6 @@ library(gghalves) # For half-violin plots (optional alternative)
 
 tuesdata <- tidytuesdayR::tt_load(2026, week = 4)
 
-companies <- tuesdata$companies
-legal_nature <- tuesdata$legal_nature
-qualifications <- tuesdata$qualifications
-size <- tuesdata$size
-
-df1 <- companies |> 
-  left_join(legal_nature) |> 
-  mutate(
-    legal_nature = fct(legal_nature),
-    legal_nature = fct_lump_n(legal_nature, n = 6)
-  ) |> 
-  select(company_id, capital_stock, legal_nature)
-
-
 ```
 
 ### Visualization Parameters
@@ -132,8 +118,8 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data:**  CNPJ (Cadastro Nacional da Pessoa Jurídica)",
-  " |  **Code:** ",
+  "**Data:**  CNPJ (Cadastro Nacional da Pessoa Jurídica); dados.gov.br",
+  "<br>  **Code:** ",
   social_caption_1,
   " |  **Graphics:** ",
   social_caption_2
@@ -157,77 +143,56 @@ plot_subtitle <- "ttidy_edible_plants" |>
 
 bts <- 90
 
+companies <- tuesdata$companies
+legal_nature <- tuesdata$legal_nature
+qualifications <- tuesdata$qualifications
+size <- tuesdata$size
+
+df1 <- companies |> 
+  left_join(legal_nature) |> 
+  mutate(
+    legal_nature = fct(legal_nature),
+    legal_nature = fct_lump_n(legal_nature, n = 6)
+  ) |> 
+  select(company_id, capital_stock, legal_nature)
 
 
-# Create the raincloud plot
-df1 |> 
-  ggplot(
-    mapping = aes(
-      x = legal_nature, 
-      y = capital_stock, 
-      fill = legal_nature
-      )
-    ) +
-  
-  # 1. Cloud (half violin on the right)
-  stat_halfeye(
-    adjust = 0.5,
-    width = 0.6,
-    .width = 0,
-    justification = -0.2,
-    point_colour = NA
-  ) +
-  
-  # 2. Rain (individual points on the left)
-  geom_point(
-    aes(color = legal_nature),
-    size = 0.8,
-    alpha = 0.3,
-    position = position_jitter(
-      seed = 42,
-      width = 0.1,
-      height = 0
-    )
-  ) +
-  
-  # 3. Box plot in the middle
-  geom_boxplot(
-    width = 0.15,
-    outlier.shape = NA,
-    alpha = 0.7
-  ) +
-  
-  # Flip coordinates for better readability
-  coord_flip() +
-  
-  # Use log scale for capital stock (likely very skewed)
-  scale_y_log10(
-    labels = scales::label_number(scale = 1e-6, suffix = "M BRL", accuracy = 0.1)
-  ) +
-  
-  # Clean theme
-  theme_minimal(base_size = 13) +
-  
-  # Labels
-  labs(
-    title = "Distribution of Capital Stock by Legal Nature",
-    subtitle = "Brazilian Companies from CNPJ Registry",
-    x = NULL,
-    y = "Capital Stock (BRL, log scale)",
-    caption = "Source: dados.gov.br | #TidyTuesday 2026-01-27"
-  ) +
-  
-  # Remove legend (redundant with x-axis)
-  theme(
-    legend.position = "none",
-    panel.grid.major.y = element_blank(),
-    plot.title = element_text(face = "bold", size = 16),
-    plot.subtitle = element_text(color = "gray40")
-  ) +
-  
-  # Color palette
-  scale_fill_brewer(palette = "Set2") +
-  scale_color_brewer(palette = "Set2")
+df2 <- df1 |> 
+  group_by(legal_nature) |> 
+  summarise(
+    n = n(),
+    mean = median(capital_stock, na.rm = TRUE),
+    x_text_var = quantile(capital_stock, probs = 0.95, na.rm = TRUE)
+  ) |> 
+  arrange(desc(mean))
+
+
+levels_legal <- df2 |> 
+  slice(-4) |> 
+  bind_rows(
+    df2 |> 
+      slice(4)
+  ) |> 
+  pull(legal_nature) |> 
+  as.character()
+
+df3 <- df1 |> 
+  mutate(
+    legal_nature = as.character(legal_nature)
+  ) |> 
+  mutate(
+    legal_nature = fct(legal_nature, levels = levels_legal)
+  ) |> 
+  mutate(legal_nature = str_wrap(legal_nature, 15))
+
+df4 <- df2 |> 
+  mutate(
+    legal_nature = as.character(legal_nature)
+  ) |> 
+  mutate(
+    legal_nature = fct(legal_nature, levels = levels_legal)
+  ) |> 
+  mutate(legal_nature = str_wrap(legal_nature, 15))
 ```
 
 ### The Plot
@@ -238,80 +203,232 @@ df1 |>
 # Define Base Text Size for the plot
 bts <- 90
 
-
-
+g <- df3 |> 
+  ggplot(
+    aes(
+      x = capital_stock,
+      y = legal_nature,
+      colour = legal_nature,
+      fill = legal_nature
+    )
+  ) +
+  geom_boxplot(
+    width = 1.5,
+    linewidth = 0.8,
+    alpha = 0.6,
+    outliers = FALSE,
+    whisker.linewidth = 0.3,
+    staplewidth = 0.75,
+    varwidth = TRUE,
+    notch = TRUE
+  ) +
+  
+  # Number of companies text
+  geom_text(
+    data = df4,
+    mapping = aes(
+      x = 100000,
+      label = scales::number(n, big.mark = ",")
+    ),
+    size = bts / 3,
+    colour = text_col,
+    hjust = 1
+  ) +
+  
+  # Median capital stock text
+  geom_text(
+    data = df4,
+    mapping = aes(
+      x = mean,
+      label = scales::number(
+        mean,
+        prefix = "BRL ",
+        scale_cut = cut_short_scale(space = T)
+      ),
+      colour = legal_nature
+    ),
+    size = bts / 2.5,
+    hjust = 0.5,
+    vjust = -0.2,
+    family = "caption_font",
+    fontface = "bold"
+  ) +
+  
+  # Curved arrow and annotation for "Number of Companies"
+  annotate(
+    geom = "curve",
+    x = 85000, y = 6.5,
+    xend = 100000, yend = 7,
+    curvature = -0.3,
+    arrow = arrow(length = unit(3, "mm"), type = "closed"),
+    linewidth = 0.5,
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "text",
+    x = 70000, y = 6.5,
+    label = "Number of\nCompanies",
+    size = bts / 3.5,
+    hjust = 1,
+    vjust = 0.5,
+    lineheight = 0.8,
+    family = "body_font",
+    colour = text_hil,
+    fontface = "bold"
+  ) +
+  
+  # Curved arrow and annotation for "Median Capital Stock"
+  annotate(
+    geom = "curve",
+    x = 8000000, y = 6.5,
+    xend = 4500000, yend = 7,
+    curvature = 0.3,
+    arrow = arrow(length = unit(3, "mm"), type = "closed"),
+    linewidth = 0.5,
+    colour = text_hil
+  ) +
+  annotate(
+    geom = "text",
+    x = 10000000, y = 6.5,
+    label = "Median Capital Stock\n(Brazilian Real)",
+    size = bts / 3.5,
+    hjust = 0,
+    vjust = 0.5,
+    lineheight = 0.8,
+    family = "body_font",
+    colour = text_hil,
+    fontface = "bold"
+  ) +
+  
+  # Use log scale for capital stock (likely very skewed)
+  scale_x_log10(
+    labels = scales::label_number(
+      scale_cut = cut_short_scale(
+        space = TRUE
+      )
+    ),
+    expand = expansion(c(0, 0.02))
+  ) +
+  
+  scale_y_discrete(
+    expand = expansion(add = c(0.6, 0.6))
+  ) +
+  
+  # Labels
+  labs(
+    title = "Capital Stock Distribution\nAcross Legal Structures in Brazil",
+    subtitle = "Limited Liability Companies dominate in numbers, while Privately Held Corporations\nshow the highest median capital stock among Brazilian registered entities",
+    x = "Capital Stock (BRL, log scale)",
+    y = NULL,
+    caption = plot_caption
+  ) +
+  
+  # Color palette
+  paletteer::scale_colour_paletteer_d("MetBrewer::Austria") +
+  paletteer::scale_fill_paletteer_d("MetBrewer::Austria") +
 
   theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
-    text = element_text(colour = "grey20"),
-    legend.position = "inside",
-    legend.position.inside = c(0, 0.7),
-    legend.justification = c(0, 1),
-    legend.direction = "vertical",
-    legend.text = element_text(
-      margin = margin(3,3,3,3, "mm"),
-      size = bts * 1.1
+    text = element_text(colour = text_col),
+    legend.position = "none",
+    
+    # Axis ticks
+    axis.ticks.x.bottom = element_line(
+      linewidth = 0.3,
+      colour = text_hil
     ),
-    legend.title = element_text(
-      margin = margin(0,0,0,0, "mm"),
-      lineheight = 0.3,
-      size = bts * 1.3,
-      face = "bold"
+    axis.ticks.y.left = element_line(
+      linewidth = 0.3,
+      colour = text_hil
     ),
-    legend.margin = margin(0,0,0,0, "mm"),
-    axis.ticks.x.bottom = element_blank(),
-    axis.ticks.length.x.bottom = unit(0, "mm"),
+    axis.ticks.length.x.bottom = unit(4, "mm"),
+    axis.ticks.length.y.left = unit(4, "mm"),
+    
+    # Grid
     panel.grid = element_blank(),
-    axis.line.x = element_line(
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = "grey60"
+    ),
+    
+    # Axis lines
+    axis.line = element_line(
       arrow = arrow(
-        ends = "both",
         length = unit(5, "mm")
       ),
-      linewidth = 0.5
+      linewidth = 0.5,
+      colour = text_hil
     ),
     
-    
+    # Text elements
     plot.title = element_text(
-      margin = margin(10, 0, 2, 0, "mm"),
+      margin = margin(10, 0, 5, 0, "mm"),
       hjust = 0.5,
       size = bts * 2,
       face = "bold",
-      colour = text_hil
+      colour = text_hil,
+      lineheight = 0.35
     ),
     plot.subtitle = element_text(
-      margin = margin(0, 0, 5, 0, "mm"),
+      margin = margin(0, 0, 8, 0, "mm"),
       hjust = 0.5,
-      size = bts * 1.5,
-      colour = text_hil
+      size = bts * 1.2,
+      colour = text_hil,
+      lineheight = 0.35
     ),
     plot.caption = element_textbox(
       hjust = 0.5,
       family = "caption_font",
       size = bts * 0.8,
+      colour = text_hil,
+      lineheight = 0.3,
+      margin = margin(5, 0, 0, 0, "mm")
+    ),
+    
+    # Axis text - reduced margins to minimize white space
+    axis.text.x = element_text(
+      margin = margin(2, 0, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    axis.text.y = element_text(
+      margin = margin(0, 2, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    
+    # Axis titles - reduced margins
+    axis.title.x = element_text(
+      margin = margin(3, 0, 0, 0, "mm"),
       colour = text_hil
     ),
-    axis.text.x = element_text(
-      margin = margin(1,1,1,1, "mm")
+    axis.title.y = element_text(
+      margin = margin(0, 3, 0, 0, "mm"),
+      colour = text_hil
     ),
-    axis.title.x = element_text(
-      margin = margin(1,1,1,1, "mm")
-    ),
-    axis.text.y = element_blank(),
-    axis.title.y = element_blank(),
+    
+    # Plot background
     plot.background = element_rect(
       fill = bg_col, 
-      color = NA
-      )
+      colour = NA
+    ),
+    
+    # Plot margins - reduced to minimize white space
+    plot.margin = margin(5, 5, 5, 5, "mm"),
+    
+    plot.title.position = "plot",
+    plot.caption.position = "plot"
   )
 
 # Save the plot
 ggsave(
   filename = here::here(
     "data_vizs",
-    "tidy_edible_plants.png"
+    "tidy_brazilian_companies.png"
   ),
   plot = g,
   width = 400,
@@ -319,7 +436,6 @@ ggsave(
   units = "mm",
   bg = bg_col
 )
-
 ```
 
 ### Savings the thumbnail for the webpage
