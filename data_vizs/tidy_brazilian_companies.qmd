@@ -1,0 +1,392 @@
+---
+title: "tidy_brazilian_companies"
+author: "Aditya Dahiya"
+date: "2026-02-04"
+subtitle: "tidy_brazilian_companies"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_brazilian_companies.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This week's [TidyTuesday](https://github.com/rfordatascience/tidytuesday) dataset explores Brazilian companies through the [CNPJ (Cadastro Nacional da Pessoa Jurídica)](https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/cadastros/cnpj) registry, Brazil's national database of legal entities. The data originates from official records published by the [Brazilian Ministry of Finance / Receita Federal](https://www.gov.br/receitafederal/) on the country's national open-data portal at [dados.gov.br](https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj). This large-scale public registry has been cleaned and enriched with lookup tables covering legal nature classifications, owner qualifications, and company size categories, then filtered to focus on firms above a minimum share-capital threshold. The dataset enables analysis of how capital stock concentrates across different legal structures, company sizes, and ownership types in [Brazil's](https://www.britannica.com/place/Brazil) corporate landscape. Special thanks to [Marcelo Silva](https://github.com/MarcleoSilva) for curating this week's dataset.
+
+![tidy_brazilian_companies](tidy_brazilian_companies.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: true
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles, # for hierarchichal packing circles
+  colorspace, # Modify and play with colours, extract dominant colours
+  magick  # Playing with images
+)
+
+library(ggdist)  # For the raincloud components
+library(gghalves) # For half-violin plots (optional alternative)
+
+
+tuesdata <- tidytuesdayR::tt_load(2026, week = 4)
+
+companies <- tuesdata$companies
+legal_nature <- tuesdata$legal_nature
+qualifications <- tuesdata$qualifications
+size <- tuesdata$size
+
+df1 <- companies |> 
+  left_join(legal_nature) |> 
+  mutate(
+    legal_nature = fct(legal_nature),
+    legal_nature = fct_lump_n(legal_nature, n = 6)
+  ) |> 
+  select(company_id, capital_stock, legal_nature)
+
+
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "grey95"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey10"
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  CNPJ (Cadastro Nacional da Pessoa Jurídica)",
+  " |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+plot_title <- "tidy_edible_plants"
+
+plot_subtitle <- "ttidy_edible_plants" |> 
+  str_wrap(110)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+bts <- 90
+
+
+
+# Create the raincloud plot
+df1 |> 
+  ggplot(
+    mapping = aes(
+      x = legal_nature, 
+      y = capital_stock, 
+      fill = legal_nature
+      )
+    ) +
+  
+  # 1. Cloud (half violin on the right)
+  stat_halfeye(
+    adjust = 0.5,
+    width = 0.6,
+    .width = 0,
+    justification = -0.2,
+    point_colour = NA
+  ) +
+  
+  # 2. Rain (individual points on the left)
+  geom_point(
+    aes(color = legal_nature),
+    size = 0.8,
+    alpha = 0.3,
+    position = position_jitter(
+      seed = 42,
+      width = 0.1,
+      height = 0
+    )
+  ) +
+  
+  # 3. Box plot in the middle
+  geom_boxplot(
+    width = 0.15,
+    outlier.shape = NA,
+    alpha = 0.7
+  ) +
+  
+  # Flip coordinates for better readability
+  coord_flip() +
+  
+  # Use log scale for capital stock (likely very skewed)
+  scale_y_log10(
+    labels = scales::label_number(scale = 1e-6, suffix = "M BRL", accuracy = 0.1)
+  ) +
+  
+  # Clean theme
+  theme_minimal(base_size = 13) +
+  
+  # Labels
+  labs(
+    title = "Distribution of Capital Stock by Legal Nature",
+    subtitle = "Brazilian Companies from CNPJ Registry",
+    x = NULL,
+    y = "Capital Stock (BRL, log scale)",
+    caption = "Source: dados.gov.br | #TidyTuesday 2026-01-27"
+  ) +
+  
+  # Remove legend (redundant with x-axis)
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(color = "gray40")
+  ) +
+  
+  # Color palette
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette = "Set2")
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# Define Base Text Size for the plot
+bts <- 90
+
+
+
+
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    text = element_text(colour = "grey20"),
+    legend.position = "inside",
+    legend.position.inside = c(0, 0.7),
+    legend.justification = c(0, 1),
+    legend.direction = "vertical",
+    legend.text = element_text(
+      margin = margin(3,3,3,3, "mm"),
+      size = bts * 1.1
+    ),
+    legend.title = element_text(
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3,
+      size = bts * 1.3,
+      face = "bold"
+    ),
+    legend.margin = margin(0,0,0,0, "mm"),
+    axis.ticks.x.bottom = element_blank(),
+    axis.ticks.length.x.bottom = unit(0, "mm"),
+    panel.grid = element_blank(),
+    axis.line.x = element_line(
+      arrow = arrow(
+        ends = "both",
+        length = unit(5, "mm")
+      ),
+      linewidth = 0.5
+    ),
+    
+    
+    plot.title = element_text(
+      margin = margin(10, 0, 2, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 2,
+      face = "bold",
+      colour = text_hil
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 1.5,
+      colour = text_hil
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      size = bts * 0.8,
+      colour = text_hil
+    ),
+    axis.text.x = element_text(
+      margin = margin(1,1,1,1, "mm")
+    ),
+    axis.title.x = element_text(
+      margin = margin(1,1,1,1, "mm")
+    ),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    plot.background = element_rect(
+      fill = bg_col, 
+      color = NA
+      )
+  )
+
+# Save the plot
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_edible_plants.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(
+  here::here(
+    "data_vizs",
+    "tidy_edible_plants.png"
+    )
+  ) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_edible_plants.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles # for hierarchichal packing circles
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
