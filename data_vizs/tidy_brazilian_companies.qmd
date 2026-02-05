@@ -1,8 +1,8 @@
 ---
-title: "tidy_brazilian_companies"
+title: "Brazilian Companies' capital distribution"
 author: "Aditya Dahiya"
-date: "2026-02-04"
-subtitle: "tidy_brazilian_companies"
+date: "2026-02-05"
+subtitle: "A boxplot of capital distribution using {ggplot2}, {paletteer} and {ggtext}"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_brazilian_companies.png"
@@ -35,7 +35,7 @@ comments:
 
 This week's [TidyTuesday](https://github.com/rfordatascience/tidytuesday) dataset explores Brazilian companies through the [CNPJ (Cadastro Nacional da Pessoa Jurídica)](https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/cadastros/cnpj) registry, Brazil's national database of legal entities. The data originates from official records published by the [Brazilian Ministry of Finance / Receita Federal](https://www.gov.br/receitafederal/) on the country's national open-data portal at [dados.gov.br](https://dados.gov.br/dados/conjuntos-dados/cadastro-nacional-da-pessoa-juridica---cnpj). This large-scale public registry has been cleaned and enriched with lookup tables covering legal nature classifications, owner qualifications, and company size categories, then filtered to focus on firms above a minimum share-capital threshold. The dataset enables analysis of how capital stock concentrates across different legal structures, company sizes, and ownership types in [Brazil's](https://www.britannica.com/place/Brazil) corporate landscape. Special thanks to [Marcelo Silva](https://github.com/MarcleoSilva) for curating this week's dataset.
 
-![tidy_brazilian_companies](tidy_brazilian_companies.png){#fig-1}
+![The graph shows the capital stock (in log scale, in Brazilian Real) along the X-axis, and the 7 different legal structures of companies along the Y-axis. Each boxplot's width corresponds to the total number of companies in that category. The text annotations show number of companies (on left of the boxplots) and the value of median capital stock for each category (i.e. the central line of the boxplot) is labelled.](tidy_brazilian_companies.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -43,7 +43,7 @@ This week's [TidyTuesday](https://github.com/rfordatascience/tidytuesday) datase
 
 ```{r}
 #| label: setup
-#| eval: true
+#| eval: false
 
 pacman::p_load(
   tidyverse, # All things tidy
@@ -119,7 +119,7 @@ social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
   "**Data:**  CNPJ (Cadastro Nacional da Pessoa Jurídica); dados.gov.br",
-  "<br>  **Code:** ",
+  "   |  **Code:** ",
   social_caption_1,
   " |  **Graphics:** ",
   social_caption_2
@@ -232,7 +232,8 @@ g <- df3 |>
     ),
     size = bts / 3,
     colour = text_col,
-    hjust = 1
+    hjust = 1,
+    fontface = "bold"
   ) +
   
   # Median capital stock text
@@ -244,34 +245,34 @@ g <- df3 |>
         mean,
         prefix = "BRL ",
         scale_cut = cut_short_scale(space = T)
-      ),
-      colour = legal_nature
+      )
     ),
     size = bts / 2.5,
     hjust = 0.5,
-    vjust = -0.2,
+    vjust = -0.7,
     family = "caption_font",
-    fontface = "bold"
+    fontface = "bold",
+    colour = text_hil
   ) +
   
   # Curved arrow and annotation for "Number of Companies"
   annotate(
     geom = "curve",
-    x = 85000, y = 6.5,
-    xend = 100000, yend = 7,
-    curvature = -0.3,
+    x = 100000, y = 7.1,
+    xend = 100000, yend = 7.5,
+    curvature = 0.3,
     arrow = arrow(length = unit(3, "mm"), type = "closed"),
     linewidth = 0.5,
     colour = text_hil
   ) +
   annotate(
     geom = "text",
-    x = 70000, y = 6.5,
+    x = 100000, y = 7.55,
     label = "Number of\nCompanies",
-    size = bts / 3.5,
+    size = bts / 3,
     hjust = 1,
-    vjust = 0.5,
-    lineheight = 0.8,
+    vjust = 0,
+    lineheight = 0.3,
     family = "body_font",
     colour = text_hil,
     fontface = "bold"
@@ -280,21 +281,21 @@ g <- df3 |>
   # Curved arrow and annotation for "Median Capital Stock"
   annotate(
     geom = "curve",
-    x = 8000000, y = 6.5,
-    xend = 4500000, yend = 7,
-    curvature = 0.3,
+    x = 300000, y = 7,
+    xend = 4500000, yend = 7.5,
+    curvature = 0.8,
     arrow = arrow(length = unit(3, "mm"), type = "closed"),
-    linewidth = 0.5,
+    linewidth = 0.3,
     colour = text_hil
   ) +
   annotate(
     geom = "text",
-    x = 10000000, y = 6.5,
-    label = "Median Capital Stock\n(Brazilian Real)",
-    size = bts / 3.5,
+    x = 4500000, y = 7.5,
+    label = "Median Capital Stock\n(in Brazilian Real)",
+    size = bts / 3,
     hjust = 0,
-    vjust = 0.5,
-    lineheight = 0.8,
+    vjust = 0,
+    lineheight = 0.3,
     family = "body_font",
     colour = text_hil,
     fontface = "bold"
@@ -307,12 +308,13 @@ g <- df3 |>
         space = TRUE
       )
     ),
-    expand = expansion(c(0, 0.02))
+    expand = expansion(c(0.05, 0))
   ) +
   
   scale_y_discrete(
-    expand = expansion(add = c(0.6, 0.6))
+    expand = expansion(add = c(0.1, 0.5))
   ) +
+  coord_cartesian(clip = "off") +
   
   # Labels
   labs(
@@ -324,15 +326,18 @@ g <- df3 |>
   ) +
   
   # Color palette
-  paletteer::scale_colour_paletteer_d("MetBrewer::Austria") +
-  paletteer::scale_fill_paletteer_d("MetBrewer::Austria") +
+  paletteer::scale_colour_paletteer_d("MetBrewer::Thomas") +
+  paletteer::scale_fill_paletteer_d("MetBrewer::Thomas") +
 
   theme_minimal(
     base_family = "body_font",
     base_size = bts
   ) +
   theme(
-    text = element_text(colour = text_col),
+    text = element_text(
+      colour = text_hil, 
+      margin = margin(0,0,0,0, "mm")
+    ),
     legend.position = "none",
     
     # Axis ticks
@@ -340,12 +345,9 @@ g <- df3 |>
       linewidth = 0.3,
       colour = text_hil
     ),
-    axis.ticks.y.left = element_line(
-      linewidth = 0.3,
-      colour = text_hil
-    ),
+    axis.ticks.y.left = element_blank(),
     axis.ticks.length.x.bottom = unit(4, "mm"),
-    axis.ticks.length.y.left = unit(4, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
     
     # Grid
     panel.grid = element_blank(),
@@ -356,13 +358,14 @@ g <- df3 |>
     ),
     
     # Axis lines
-    axis.line = element_line(
+    axis.line.x = element_line(
       arrow = arrow(
         length = unit(5, "mm")
       ),
       linewidth = 0.5,
       colour = text_hil
     ),
+    axis.line.y = element_blank(),
     
     # Text elements
     plot.title = element_text(
@@ -371,10 +374,10 @@ g <- df3 |>
       size = bts * 2,
       face = "bold",
       colour = text_hil,
-      lineheight = 0.35
+      lineheight = 0.3
     ),
     plot.subtitle = element_text(
-      margin = margin(0, 0, 8, 0, "mm"),
+      margin = margin(0, 0, 18, 0, "mm"),
       hjust = 0.5,
       size = bts * 1.2,
       colour = text_hil,
@@ -385,13 +388,13 @@ g <- df3 |>
       family = "caption_font",
       size = bts * 0.8,
       colour = text_hil,
-      lineheight = 0.3,
+      lineheight = 0.4,
       margin = margin(5, 0, 0, 0, "mm")
     ),
     
     # Axis text - reduced margins to minimize white space
-    axis.text.x = element_text(
-      margin = margin(2, 0, 0, 0, "mm"),
+    axis.text.x.bottom = element_text(
+      margin = margin(-1, 0, 0, 0, "mm"),
       lineheight = 0.3,
       colour = text_col
     ),
@@ -459,7 +462,7 @@ image_read(
     here::here(
       "data_vizs",
       "thumbnails",
-      "tidy_edible_plants.png"
+      "tidy_brazilian_companies.png"
     )
   )
 ```
@@ -479,11 +482,7 @@ pacman::p_load(
   fontawesome, # Icons display in ggplot2
   ggtext, # Markdown text support for ggplot2
   showtext, # Display fonts in ggplot2
-  colorspace, # Lighten and Darken colours
-  sf, # Spatial Features
-
-  patchwork,  # Composing Plots
-  packcircles # for hierarchichal packing circles
+  colorspace # Lighten and Darken colours
 )
 
 sessioninfo::session_info()$packages |>
