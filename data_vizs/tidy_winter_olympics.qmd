@@ -1,0 +1,342 @@
+---
+title: "....................."
+author: "Aditya Dahiya"
+date: "2026-02-05"
+subtitle: "A boxplot of capital distribution using {ggplot2}, {paletteer} and {ggtext}"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_winter_olympics.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+The [2026 Winter Olympics](https://olympics.com/en/olympic-games/milano-cortina-2026) dataset contains comprehensive scheduling information for all 1,866 Olympic events taking place in [Milan-Cortina, Italy](https://en.wikipedia.org/wiki/2026_Winter_Olympics). Curated by [Daniel Chen](https://github.com/chendaniely) from [Posit PBC](https://posit.co/) and the [University of British Columbia](https://www.ubc.ca/), this dataset is part of the weekly [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) social data project in the [R for Data Science](https://r4ds.hadley.nz/) online learning community. The data includes both competition and training sessions across various [winter sport disciplines](https://olympics.com/en/sports/), with detailed information about start and end times in both local and [UTC](https://en.wikipedia.org/wiki/Coordinated_Universal_Time) timezones, venue details, and metadata indicating whether events award medals. Participants can access the dataset using [R](https://www.r-project.org/) with the [tidytuesdayR package](https://github.com/dslc-io/tidytuesdayR), [Python](https://www.python.org/) with [pandas](https://pandas.pydata.org/), or [Julia](https://julialang.org/), and are encouraged to create visualizations, models, [Quarto](https://quarto.org/) reports, [Shiny apps](https://shiny.posit.co/), or [Quarto dashboards](https://quarto.org/docs/dashboards/) to explore questions about event distribution, scheduling patterns, and venue utilization. The complete dataset and example code are available in the [GitHub repository](https://github.com/chendaniely/olympics-2026), by [Daniel Chen](twitter.com/chendaniely).
+
+![tidy_winter_olympics](tidy_winter_olympics.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: false
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles, # for hierarchichal packing circles
+  colorspace, # Modify and play with colours, extract dominant colours
+  magick  # Playing with images
+)
+
+schedule <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-10/schedule.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "grey95"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey10"
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data: Daniel Chen**  ",
+  "   |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+plot_title <- "tidy_winter_olympics"
+
+plot_subtitle <- "tidy_winter_olympics" |> 
+  str_wrap(110)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+schedule |> 
+  summarytools::dfSummary() |> 
+  summarytools::view()
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# Define Base Text Size for the plot
+bts <- 90
+
+
+  
+  # Labels
+  labs(
+    title = "Capital Stock Distribution\nAcross Legal Structures in Brazil",
+    subtitle = "Limited Liability Companies dominate in numbers, while Privately Held Corporations\nshow the highest median capital stock among Brazilian registered entities",
+    x = "Capital Stock (BRL, log scale)",
+    y = NULL,
+    caption = plot_caption
+  ) +
+  
+  # Color palette
+  paletteer::scale_colour_paletteer_d("MetBrewer::Thomas") +
+  paletteer::scale_fill_paletteer_d("MetBrewer::Thomas") +
+
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    text = element_text(
+      colour = text_hil, 
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.position = "none",
+    
+    # Axis ticks
+    axis.ticks.x.bottom = element_line(
+      linewidth = 0.3,
+      colour = text_hil
+    ),
+    axis.ticks.y.left = element_blank(),
+    axis.ticks.length.x.bottom = unit(4, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
+    
+    # Grid
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = "grey60"
+    ),
+    
+    # Axis lines
+    axis.line.x = element_line(
+      arrow = arrow(
+        length = unit(5, "mm")
+      ),
+      linewidth = 0.5,
+      colour = text_hil
+    ),
+    axis.line.y = element_blank(),
+    
+    # Text elements
+    plot.title = element_text(
+      margin = margin(10, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 2,
+      face = "bold",
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0, 0, 18, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 1.2,
+      colour = text_hil,
+      lineheight = 0.35
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      size = bts * 0.8,
+      colour = text_hil,
+      lineheight = 0.4,
+      margin = margin(5, 0, 0, 0, "mm")
+    ),
+    
+    # Axis text - reduced margins to minimize white space
+    axis.text.x.bottom = element_text(
+      margin = margin(-1, 0, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    axis.text.y = element_text(
+      margin = margin(0, 2, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    
+    # Axis titles - reduced margins
+    axis.title.x = element_text(
+      margin = margin(3, 0, 0, 0, "mm"),
+      colour = text_hil
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 3, 0, 0, "mm"),
+      colour = text_hil
+    ),
+    
+    # Plot background
+    plot.background = element_rect(
+      fill = bg_col, 
+      colour = NA
+    ),
+    
+    # Plot margins - reduced to minimize white space
+    plot.margin = margin(5, 5, 5, 5, "mm"),
+    
+    plot.title.position = "plot",
+    plot.caption.position = "plot"
+  )
+
+# Save the plot
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_winter_olympics.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(
+  here::here(
+    "data_vizs",
+    "tidy_winter_olympics.png"
+    )
+  ) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_winter_olympics.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace # Lighten and Darken colours
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
