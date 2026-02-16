@@ -1,8 +1,8 @@
 ---
-title: "....................."
+title: "Milano Cortina 2026 Winter Olympics"
 author: "Aditya Dahiya"
 date: "2026-02-05"
-subtitle: "A boxplot of capital distribution using {ggplot2}, {paletteer} and {ggtext}"
+subtitle: "A heatmap using {ggplot2}, {paletteer} and {ggtext}"
 categories:
   - "#TidyTuesday"
 image: "thumbnails/tidy_winter_olympics.png"
@@ -35,7 +35,7 @@ comments:
 
 The [2026 Winter Olympics](https://olympics.com/en/olympic-games/milano-cortina-2026) dataset contains comprehensive scheduling information for all 1,866 Olympic events taking place in [Milan-Cortina, Italy](https://en.wikipedia.org/wiki/2026_Winter_Olympics). Curated by [Daniel Chen](https://github.com/chendaniely) from [Posit PBC](https://posit.co/) and the [University of British Columbia](https://www.ubc.ca/), this dataset is part of the weekly [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) social data project in the [R for Data Science](https://r4ds.hadley.nz/) online learning community. The data includes both competition and training sessions across various [winter sport disciplines](https://olympics.com/en/sports/), with detailed information about start and end times in both local and [UTC](https://en.wikipedia.org/wiki/Coordinated_Universal_Time) timezones, venue details, and metadata indicating whether events award medals. Participants can access the dataset using [R](https://www.r-project.org/) with the [tidytuesdayR package](https://github.com/dslc-io/tidytuesdayR), [Python](https://www.python.org/) with [pandas](https://pandas.pydata.org/), or [Julia](https://julialang.org/), and are encouraged to create visualizations, models, [Quarto](https://quarto.org/) reports, [Shiny apps](https://shiny.posit.co/), or [Quarto dashboards](https://quarto.org/docs/dashboards/) to explore questions about event distribution, scheduling patterns, and venue utilization. The complete dataset and example code are available in the [GitHub repository](https://github.com/chendaniely/olympics-2026), by [Daniel Chen](twitter.com/chendaniely).
 
-![tidy_winter_olympics](tidy_winter_olympics.png){#fig-1}
+![This calendar heatmap shows the daily distribution of medal events at the Milano Cortina 2026 Winter Olympics. Each tile represents a competition day, with deeper shades indicating a higher number of medal events. The schedule reveals how medal intensity builds across the Games, highlighting peak competition days and quieter transitions, offering a clear visual rhythm of the Olympic fortnight.](tidy_winter_olympics.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -87,7 +87,7 @@ font_add_google("Saira Extra Condensed",
 showtext_auto()
 
 # A base Colour
-bg_col <- "grey95"
+bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
@@ -113,7 +113,7 @@ xtwitter_username <- "@adityadahiyaias"
 social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
 social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
 plot_caption <- paste0(
-  "**Data: Daniel Chen**  ",
+  "**Data:**  Daniel Chen",
   "   |  **Code:** ",
   social_caption_1,
   " |  **Graphics:** ",
@@ -139,6 +139,18 @@ plot_subtitle <- "tidy_winter_olympics" |>
 schedule |> 
   summarytools::dfSummary() |> 
   summarytools::view()
+
+# Prepare calendar heatmap data
+calendar_data <- schedule |> 
+  mutate(
+    date = date(end_datetime_local)
+  ) |> 
+  group_by(discipline_name, date) |> 
+  summarise(
+    medal_events = sum(is_medal_event, na.rm = TRUE),
+    medal_events = as.numeric(medal_events),
+    .groups = "drop"
+  )
 ```
 
 ### The Plot
@@ -149,21 +161,40 @@ schedule |>
 # Define Base Text Size for the plot
 bts <- 90
 
-
-  
-  # Labels
-  labs(
-    title = "Capital Stock Distribution\nAcross Legal Structures in Brazil",
-    subtitle = "Limited Liability Companies dominate in numbers, while Privately Held Corporations\nshow the highest median capital stock among Brazilian registered entities",
-    x = "Capital Stock (BRL, log scale)",
-    y = NULL,
-    caption = plot_caption
+# Plot true calendar heatmap
+g <- calendar_data |> 
+  ggplot(
+    mapping = aes(
+      x = date, 
+      y = discipline_name, 
+      fill = medal_events
+      )
   ) +
   
-  # Color palette
-  paletteer::scale_colour_paletteer_d("MetBrewer::Thomas") +
-  paletteer::scale_fill_paletteer_d("MetBrewer::Thomas") +
-
+  geom_tile(
+    color = bg_col, 
+    linewidth = 0.4
+    ) +
+  
+  paletteer::scale_fill_paletteer_c(
+    "grDevices::Reds 2",
+    direction = -1,
+    breaks = seq(0, 8, 2)
+  ) +
+  
+  labs(
+    title = "Milano Cortina 2026 Winter Olympics",
+    subtitle = "Calendar Heatmap of Daily Medal Events",
+    x = NULL, y = NULL,
+    caption = plot_caption,
+    fill = "Number of Medal Events"
+  ) +
+  
+  scale_x_date(
+    date_breaks = "2 days",
+    date_labels = "%d %b",
+    expand = c(0, 0)
+  ) +
   theme_minimal(
     base_family = "body_font",
     base_size = bts
@@ -173,7 +204,15 @@ bts <- 90
       colour = text_hil, 
       margin = margin(0,0,0,0, "mm")
     ),
-    legend.position = "none",
+    legend.position = "bottom",
+    legend.margin = margin(-20,0,0,0, "mm"),
+    legend.title = element_text(
+      margin = margin(0,5,2,0, "mm")
+    ),
+    legend.text = element_text(
+      margin = margin(2,0,0,0, "mm")
+    ),
+    legend.key.width = unit(30, "mm"),
     
     # Axis ticks
     axis.ticks.x.bottom = element_line(
@@ -186,11 +225,6 @@ bts <- 90
     
     # Grid
     panel.grid = element_blank(),
-    panel.grid.major.x = element_line(
-      linetype = 3,
-      linewidth = 0.3,
-      colour = "grey60"
-    ),
     
     # Axis lines
     axis.line.x = element_line(
@@ -206,7 +240,7 @@ bts <- 90
     plot.title = element_text(
       margin = margin(10, 0, 5, 0, "mm"),
       hjust = 0.5,
-      size = bts * 2,
+      size = bts * 2.3,
       face = "bold",
       colour = text_hil,
       lineheight = 0.3
@@ -214,7 +248,7 @@ bts <- 90
     plot.subtitle = element_text(
       margin = margin(0, 0, 18, 0, "mm"),
       hjust = 0.5,
-      size = bts * 1.2,
+      size = bts * 1.5,
       colour = text_hil,
       lineheight = 0.35
     ),
@@ -229,9 +263,13 @@ bts <- 90
     
     # Axis text - reduced margins to minimize white space
     axis.text.x.bottom = element_text(
-      margin = margin(-1, 0, 0, 0, "mm"),
+      margin = margin(2, 0, 0, 0, "mm"),
       lineheight = 0.3,
-      colour = text_col
+      colour = text_col,
+      angle = 90,
+      hjust = 1,
+      vjust = 0.5,
+      size = bts * 1.1
     ),
     axis.text.y = element_text(
       margin = margin(0, 2, 0, 0, "mm"),
@@ -240,14 +278,8 @@ bts <- 90
     ),
     
     # Axis titles - reduced margins
-    axis.title.x = element_text(
-      margin = margin(3, 0, 0, 0, "mm"),
-      colour = text_hil
-    ),
-    axis.title.y = element_text(
-      margin = margin(0, 3, 0, 0, "mm"),
-      colour = text_hil
-    ),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
     
     # Plot background
     plot.background = element_rect(
