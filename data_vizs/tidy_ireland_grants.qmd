@@ -1,0 +1,417 @@
+---
+title: "tidy_ireland_grants"
+author: "Aditya Dahiya"
+date: "2026-02-05"
+subtitle: "A boxplot of capital distribution using {ggplot2}, {paletteer} and {ggtext}"
+categories:
+  - "#TidyTuesday"
+image: "thumbnails/tidy_ireland_grants.png"
+format:
+  html:
+    code-fold: true
+editor_options: 
+  chunk_output_type: console
+execute: 
+  error: false
+  message: false
+  warning: false
+  eval: false
+filters:
+  - linkate
+  - social-share
+share:
+  permalink: "https://aditya-dahiya.github.io/projects_presentations/data_vizs.html"
+  twitter: true
+  linkedin: true
+  email: true
+  mastodon: true
+bibliography: references.bib
+comments:
+  giscus: 
+    repo: Aditya-Dahiya/projects_presentations
+---
+
+# About the Data
+
+This dataset explores Irish STEM research projects funded by [Science Foundation Ireland (SFI)](https://www.sfi.ie/) — the national foundation for investment in scientific and engineering research — covering the period from its foundation in 2000 to its dissolution on 31st July 2024. The data was sourced from [Ireland's Open Data Portal](https://data.gov.ie/dataset/science-foundation-ireland-grants-commitments) and curated by [Cormac Monaghan](https://github.com/C-Monaghan) for [TidyTuesday Week 8, 2026](https://github.com/rfordatascience/tidytuesday/tree/main/data/2026/2026-02-24). It can be accessed directly as a [CSV file on GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-24/sfi_grants.csv), or loaded conveniently via the [`tidytuesdayR`](https://cran.r-project.org/web/packages/tidytuesdayR/index.html) R package or the [`pydytuesday`](https://github.com/posit-dev/python-tidytuesday-challenge) Python library. Each row in the dataset represents an individual grant award and includes details such as the grant's start and end dates, programme name and sub-programme, the [Research Organization Registry (ROR)](https://ror.org/) ID of the receiving institution, the full value of the grant, and the title of the research proposal — making it a rich resource for exploring questions like which [Higher Education Institutes](https://hea.ie/) received the most funding and how SFI's annual research investment evolved over time.
+
+![tidy_ireland_grants](tidy_ireland_grants.png){#fig-1}
+
+## How I Made This Graphic
+
+### Loading required libraries
+
+```{r}
+#| label: setup
+#| eval: false
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace, # Lighten and Darken colours
+  sf, # Spatial Features
+
+  patchwork,  # Composing Plots
+  packcircles, # for hierarchichal packing circles
+  colorspace, # Modify and play with colours, extract dominant colours
+  magick  # Playing with images
+)
+
+pacman::p_load(treemapify)
+
+sfi_grants <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-24/sfi_grants.csv')
+```
+
+### Visualization Parameters
+
+```{r}
+#| label: viz-params
+
+# Font for titles
+font_add_google("Saira",
+  family = "title_font"
+)
+
+# Font for the caption
+font_add_google("Saira Condensed",
+  family = "body_font"
+)
+
+# Font for plot text
+font_add_google("Saira Extra Condensed",
+  family = "caption_font"
+)
+
+showtext_auto()
+
+# A base Colour
+bg_col <- "grey95"
+seecolor::print_color(bg_col)
+
+# Colour for highlighted text
+text_hil <- "grey20"
+seecolor::print_color(text_hil)
+
+# Colour for the text
+text_col <- "grey10"
+seecolor::print_color(text_col)
+
+# Define Base Text Size
+bts <- 120
+
+# Caption stuff for the plot
+sysfonts::font_add(
+  family = "Font Awesome 6 Brands",
+  regular = here::here("docs", "Font Awesome 6 Brands-Regular-400.otf")
+)
+github <- "&#xf09b"
+github_username <- "aditya-dahiya"
+xtwitter <- "&#xe61b"
+xtwitter_username <- "@adityadahiyaias"
+social_caption_1 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{github};</span> <span style='color: {text_hil}'>{github_username}  </span>")
+social_caption_2 <- glue::glue("<span style='font-family:\"Font Awesome 6 Brands\";'>{xtwitter};</span> <span style='color: {text_hil}'>{xtwitter_username}</span>")
+plot_caption <- paste0(
+  "**Data:**  Ireland's Open Data Portal",
+  "   |  **Code:** ",
+  social_caption_1,
+  " |  **Graphics:** ",
+  social_caption_2
+)
+rm(
+  github, github_username, xtwitter,
+  xtwitter_username, social_caption_1,
+  social_caption_2
+)
+
+plot_title <- "tidy_ireland_grants"
+
+plot_subtitle <- "tidy_ireland_grants" |> 
+  str_wrap(110)
+```
+
+### Exploratory Data Analysis and Wrangling
+
+```{r}
+#| label: eda
+
+bts <- 90
+
+# sfi_grants |> 
+#   summarytools::dfSummary() |> 
+#   summarytools::view()
+# 
+# sfi_grants |> 
+#   mutate(
+#     grant_year = year(start_date)
+#   ) |> 
+#   group_by(grant_year) |> 
+#   summarise(
+#     current_total_commitment = sum(current_total_commitment, na.rm = T)
+#   ) |> 
+#   ggplot(aes(grant_year, current_total_commitment)) +
+#   geom_col()
+
+set.seed(42)
+
+df1 <- sfi_grants |>
+  group_by(programme_name, sub_programme) |>
+  summarise(
+    current_total_commitment = sum(current_total_commitment, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  drop_na() |>                                        
+  filter(
+    current_total_commitment > 0,                     
+    programme_name != "",                           
+    sub_programme  != ""
+  ) |>
+  drop_na() |> 
+  mutate(
+    programme_name = as.character(programme_name),   
+    sub_programme  = as.character(sub_programme)
+  ) |> 
+  mutate(alpha_val = runif(n(), min = 0.4, max = 1.0))
+
+```
+
+### The Plot
+
+```{r}
+#| label: base-plot
+
+# Define Base Text Size for the plot
+bts <- 90
+
+df1 |>
+  ggplot(
+    mapping = aes(
+      area     = current_total_commitment,
+      fill     = programme_name,
+      subgroup = programme_name
+    )
+  ) +
+  geom_treemap(
+    mapping = aes(
+      alpha = alpha_val
+    )
+  ) +
+  geom_treemap_subgroup_border(colour = "white", size = 2) +
+  geom_treemap_subgroup_text(
+    colour    = "white",
+    fontface  = "bold",
+    alpha     = 0.5,
+    place     = "centre",
+    grow      = TRUE,
+    reflow    = TRUE
+  ) +
+  geom_treemap_text(
+    aes(label = sub_programme),
+    colour    = "white",
+    fontface  = "italic",
+    place     = "bottomright",
+    size      = 6,
+    grow      = FALSE,
+    reflow    = TRUE,
+    padding.x = grid::unit(2, "mm"),
+    padding.y = grid::unit(2, "mm")
+  ) +
+  scale_alpha_identity() +
+  guides(
+    fill  = guide_legend(title = "Programme"),
+    alpha = "none"
+  ) +
+  labs(
+    title    = "Science Foundation Ireland Grant Commitments",
+    subtitle = "Grouped by Programme, subdivided by Sub-Programme. Area = Total Commitment (€).",
+    caption  = "Source: Ireland's Open Data Portal | TidyTuesday 2026 Week 8"
+  ) +
+  theme(
+    legend.position  = "none",
+    plot.title       = element_text(face = "bold", size = 14),
+    plot.subtitle    = element_text(size = 10, colour = "grey40"),
+    plot.caption     = element_text(size = 8, colour = "grey60"),
+    legend.text      = element_text(size = 7),
+    legend.title     = element_text(face = "bold", size = 9)
+  )
+  coord_cartesian(clip = "off") +
+  
+  theme_minimal(
+    base_family = "body_font",
+    base_size = bts
+  ) +
+  theme(
+    text = element_text(
+      colour = text_hil, 
+      margin = margin(0,0,0,0, "mm")
+    ),
+    legend.position = "none",
+    
+    # Axis ticks
+    axis.ticks.x.bottom = element_line(
+      linewidth = 0.3,
+      colour = text_hil
+    ),
+    axis.ticks.y.left = element_blank(),
+    axis.ticks.length.x.bottom = unit(4, "mm"),
+    axis.ticks.length.y.left = unit(0, "mm"),
+    
+    # Grid
+    panel.grid = element_blank(),
+    panel.grid.major.x = element_line(
+      linetype = 3,
+      linewidth = 0.3,
+      colour = "grey60"
+    ),
+    
+    # Axis lines
+    axis.line.x = element_line(
+      arrow = arrow(
+        length = unit(5, "mm")
+      ),
+      linewidth = 0.5,
+      colour = text_hil
+    ),
+    axis.line.y = element_blank(),
+    
+    # Text elements
+    plot.title = element_text(
+      margin = margin(10, 0, 5, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 2,
+      face = "bold",
+      colour = text_hil,
+      lineheight = 0.3
+    ),
+    plot.subtitle = element_text(
+      margin = margin(0, 0, 18, 0, "mm"),
+      hjust = 0.5,
+      size = bts * 1.2,
+      colour = text_hil,
+      lineheight = 0.35
+    ),
+    plot.caption = element_textbox(
+      hjust = 0.5,
+      family = "caption_font",
+      size = bts * 0.8,
+      colour = text_hil,
+      lineheight = 0.4,
+      margin = margin(5, 0, 0, 0, "mm")
+    ),
+    
+    # Axis text - reduced margins to minimize white space
+    axis.text.x.bottom = element_text(
+      margin = margin(-1, 0, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    axis.text.y = element_text(
+      margin = margin(0, 2, 0, 0, "mm"),
+      lineheight = 0.3,
+      colour = text_col
+    ),
+    
+    # Axis titles - reduced margins
+    axis.title.x = element_text(
+      margin = margin(3, 0, 0, 0, "mm"),
+      colour = text_hil
+    ),
+    axis.title.y = element_text(
+      margin = margin(0, 3, 0, 0, "mm"),
+      colour = text_hil
+    ),
+    
+    # Plot background
+    plot.background = element_rect(
+      fill = bg_col, 
+      colour = NA
+    ),
+    
+    # Plot margins - reduced to minimize white space
+    plot.margin = margin(5, 5, 5, 5, "mm"),
+    
+    plot.title.position = "plot",
+    plot.caption.position = "plot"
+  )
+
+# Save the plot
+ggsave(
+  filename = here::here(
+    "data_vizs",
+    "tidy_ireland_grants.png"
+  ),
+  plot = g,
+  width = 400,
+  height = 500,
+  units = "mm",
+  bg = bg_col
+)
+```
+
+### Savings the thumbnail for the webpage
+
+```{r}
+#| label: save-image
+
+# Saving a thumbnail
+
+library(magick)
+
+# Saving a thumbnail for the webpage
+image_read(
+  here::here(
+    "data_vizs",
+    "tidy_ireland_grants.png"
+    )
+  ) |>
+  image_resize(geometry = "x400") |>
+  image_write(
+    here::here(
+      "data_vizs",
+      "thumbnails",
+      "tidy_ireland_grants.png"
+    )
+  )
+```
+
+### Session Info
+
+```{r}
+#| label: tbl-session-info
+#| tbl-cap: "R Packages and their versions used in the creation of this page and graphics"
+#| eval: true
+
+
+pacman::p_load(
+  tidyverse, # All things tidy
+
+  scales, # Nice Scales for ggplot2
+  fontawesome, # Icons display in ggplot2
+  ggtext, # Markdown text support for ggplot2
+  showtext, # Display fonts in ggplot2
+  colorspace # Lighten and Darken colours
+)
+
+sessioninfo::session_info()$packages |>
+  as_tibble() |>
+  
+  # The attached column is TRUE for packages that were 
+  # explicitly loaded with library()
+  dplyr::filter(attached == TRUE) |>
+  dplyr::select(package,
+    version = loadedversion,
+    date, source
+  ) |>
+  dplyr::arrange(package) |>
+  janitor::clean_names(
+    case = "title"
+  ) |>
+  gt::gt() |>
+  gt::opt_interactive(
+    use_search = TRUE
+  ) |>
+  gtExtras::gt_theme_espn()
+```
