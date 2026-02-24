@@ -1,10 +1,12 @@
 ---
-title: "tidy_ireland_grants"
+title: "Science Foundation Ireland Grant Commitments (2000–2024)"
 author: "Aditya Dahiya"
 date: "2026-02-05"
-subtitle: "A boxplot of capital distribution using {ggplot2}, {paletteer} and {ggtext}"
+subtitle: "Treemap of € billions invested across research programmes and sub-programmes."
 categories:
   - "#TidyTuesday"
+  - "{treemapify}"
+  - "Treemap"
 image: "thumbnails/tidy_ireland_grants.png"
 format:
   html:
@@ -35,7 +37,7 @@ comments:
 
 This dataset explores Irish STEM research projects funded by [Science Foundation Ireland (SFI)](https://www.sfi.ie/) — the national foundation for investment in scientific and engineering research — covering the period from its foundation in 2000 to its dissolution on 31st July 2024. The data was sourced from [Ireland's Open Data Portal](https://data.gov.ie/dataset/science-foundation-ireland-grants-commitments) and curated by [Cormac Monaghan](https://github.com/C-Monaghan) for [TidyTuesday Week 8, 2026](https://github.com/rfordatascience/tidytuesday/tree/main/data/2026/2026-02-24). It can be accessed directly as a [CSV file on GitHub](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-24/sfi_grants.csv), or loaded conveniently via the [`tidytuesdayR`](https://cran.r-project.org/web/packages/tidytuesdayR/index.html) R package or the [`pydytuesday`](https://github.com/posit-dev/python-tidytuesday-challenge) Python library. Each row in the dataset represents an individual grant award and includes details such as the grant's start and end dates, programme name and sub-programme, the [Research Organization Registry (ROR)](https://ror.org/) ID of the receiving institution, the full value of the grant, and the title of the research proposal — making it a rich resource for exploring questions like which [Higher Education Institutes](https://hea.ie/) received the most funding and how SFI's annual research investment evolved over time.
 
-![tidy_ireland_grants](tidy_ireland_grants.png){#fig-1}
+![This treemap visualises the total grant commitments made by Science Foundation Ireland (SFI) between 2000 and 2024, broken down by programme and sub-programme. Each tile's area is proportional to total funding awarded, with tiles grouped and coloured by parent programme. The large faded labels identify programme groups, while smaller italic labels denote individual sub-programmes.](tidy_ireland_grants.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -89,7 +91,7 @@ font_add_google("Saira Extra Condensed",
 showtext_auto()
 
 # A base Colour
-bg_col <- "grey95"
+bg_col <- "white"
 seecolor::print_color(bg_col)
 
 # Colour for highlighted text
@@ -186,7 +188,7 @@ df1 <- sfi_grants |>
 # Define Base Text Size for the plot
 bts <- 90
 
-df1 |>
+g <- df1 |>
   ggplot(
     mapping = aes(
       area     = current_total_commitment,
@@ -197,48 +199,44 @@ df1 |>
   geom_treemap(
     mapping = aes(
       alpha = alpha_val
-    )
+    ),
+    colour = bg_col,
+    size = 1
   ) +
-  geom_treemap_subgroup_border(colour = "white", size = 2) +
+  geom_treemap_subgroup_border(
+    colour = bg_col, size = 3
+  ) +
   geom_treemap_subgroup_text(
-    colour    = "white",
+    colour    = "black",
     fontface  = "bold",
-    alpha     = 0.5,
+    family    = "body_font",
+    alpha     = 0.3,
     place     = "centre",
     grow      = TRUE,
-    reflow    = TRUE
+    reflow    = TRUE,
+    lineheight = 0.3
   ) +
   geom_treemap_text(
     aes(label = sub_programme),
-    colour    = "white",
+    colour    = bg_col,
     fontface  = "italic",
+    family    = "body_font",
     place     = "bottomright",
-    size      = 6,
+    size      = bts/4,
     grow      = FALSE,
     reflow    = TRUE,
     padding.x = grid::unit(2, "mm"),
-    padding.y = grid::unit(2, "mm")
+    padding.y = grid::unit(2, "mm"),
+    lineheight = 0.3
   ) +
   scale_alpha_identity() +
-  guides(
-    fill  = guide_legend(title = "Programme"),
-    alpha = "none"
-  ) +
+  paletteer::scale_fill_paletteer_d("ggsci::default_igv") +
   labs(
     title    = "Science Foundation Ireland Grant Commitments",
-    subtitle = "Grouped by Programme, subdivided by Sub-Programme. Area = Total Commitment (€).",
-    caption  = "Source: Ireland's Open Data Portal | TidyTuesday 2026 Week 8"
+    subtitle = "Grouped by Programme, subdivided by Sub-Programme.\nArea shows Total Commitment (€).",
+    caption  = plot_caption
   ) +
-  theme(
-    legend.position  = "none",
-    plot.title       = element_text(face = "bold", size = 14),
-    plot.subtitle    = element_text(size = 10, colour = "grey40"),
-    plot.caption     = element_text(size = 8, colour = "grey60"),
-    legend.text      = element_text(size = 7),
-    legend.title     = element_text(face = "bold", size = 9)
-  )
-  coord_cartesian(clip = "off") +
-  
+
   theme_minimal(
     base_family = "body_font",
     base_size = bts
@@ -250,46 +248,20 @@ df1 |>
     ),
     legend.position = "none",
     
-    # Axis ticks
-    axis.ticks.x.bottom = element_line(
-      linewidth = 0.3,
-      colour = text_hil
-    ),
-    axis.ticks.y.left = element_blank(),
-    axis.ticks.length.x.bottom = unit(4, "mm"),
-    axis.ticks.length.y.left = unit(0, "mm"),
-    
-    # Grid
-    panel.grid = element_blank(),
-    panel.grid.major.x = element_line(
-      linetype = 3,
-      linewidth = 0.3,
-      colour = "grey60"
-    ),
-    
-    # Axis lines
-    axis.line.x = element_line(
-      arrow = arrow(
-        length = unit(5, "mm")
-      ),
-      linewidth = 0.5,
-      colour = text_hil
-    ),
-    axis.line.y = element_blank(),
-    
     # Text elements
     plot.title = element_text(
       margin = margin(10, 0, 5, 0, "mm"),
       hjust = 0.5,
-      size = bts * 2,
+      size = bts * 2.5,
       face = "bold",
       colour = text_hil,
-      lineheight = 0.3
+      lineheight = 0.3,
+      family = "caption_font"
     ),
     plot.subtitle = element_text(
       margin = margin(0, 0, 18, 0, "mm"),
       hjust = 0.5,
-      size = bts * 1.2,
+      size = bts * 1.8,
       colour = text_hil,
       lineheight = 0.35
     ),
@@ -300,28 +272,6 @@ df1 |>
       colour = text_hil,
       lineheight = 0.4,
       margin = margin(5, 0, 0, 0, "mm")
-    ),
-    
-    # Axis text - reduced margins to minimize white space
-    axis.text.x.bottom = element_text(
-      margin = margin(-1, 0, 0, 0, "mm"),
-      lineheight = 0.3,
-      colour = text_col
-    ),
-    axis.text.y = element_text(
-      margin = margin(0, 2, 0, 0, "mm"),
-      lineheight = 0.3,
-      colour = text_col
-    ),
-    
-    # Axis titles - reduced margins
-    axis.title.x = element_text(
-      margin = margin(3, 0, 0, 0, "mm"),
-      colour = text_hil
-    ),
-    axis.title.y = element_text(
-      margin = margin(0, 3, 0, 0, "mm"),
-      colour = text_hil
     ),
     
     # Plot background
