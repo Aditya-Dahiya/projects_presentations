@@ -156,23 +156,27 @@ normalized_data <- dataset |>
   select(year, measure, value_normalized) |>
   rename(value = value_normalized)
 
-# Preview
-print(normalized_data)
+selected_measures <- normalized_data |> 
+  count(measure, sort = T) |> 
+  slice_head(n = 10) |> 
+  pull(measure)
 
-# Plot
-ggplot(normalized_data, aes(x = year, y = value, colour = measure)) +
-  geom_line(linewidth = 0.8) +
-  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
-  labs(
-    title = "New Zealand Agricultural Production",
-    subtitle = "Indexed to earliest available year (base = 1)",
-    x = "Year",
-    y = "Value relative to base year",
-    colour = "Measure"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  scale_y_log10()
+measure_labels <- c(
+  "Barley (yield)"                                    = "Barley Yield",
+  "Breeding Ewes 2 Tooth and Over put to Ram"         = "Breeding Ewes",
+  "Maize (yield)"                                     = "Maize Yield",
+  "Number of Farm Holdings"                           = "Farm Holdings",
+  "Oats (yield)"                                      = "Oats Yield",
+  "Rising 1 Year Old Dairy Heifers and Heifer Calves" = "Dairy Heifers",
+  "Total Area of Farms"                               = "Farm Area",
+  "Total Lambs Marked and/or Tailed"                  = "Lambs Marked",
+  "Total Sheep"                                       = "Total Sheep",
+  "Wheat (yield)"                                     = "Wheat Yield"
+)
+
+df1 <- normalized_data |> 
+  filter(measure %in% selected_measures) |>
+  mutate(measure = recode(measure, !!!measure_labels))
 ```
 
 ### The Plot
@@ -183,8 +187,57 @@ ggplot(normalized_data, aes(x = year, y = value, colour = measure)) +
 # Define Base Text Size for the plot
 bts <- 90
 
-
-
+# Plot
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = year, 
+      y = value, 
+      colour = measure
+      )
+  ) +
+  geom_hline(
+    yintercept = 1, 
+    linetype = 1, 
+    colour = "black",
+    linewidth = 2,
+    alpha = 0.5
+  ) +
+  geom_line(
+    linewidth = 1,
+    alpha = 0.8,
+    lineend = "round",
+    linejoin = "round"
+  ) +
+  
+  ggrepel::geom_text_repel(
+    data = df1 |> group_by(measure) |> slice_max(year, n = 1),
+    mapping = aes(
+      x = 2024, 
+      label = measure,
+      colour = measure
+    ),
+    hjust = 0,
+    family = "body_font",
+    size = bts / 3.5,
+    direction = "y",
+    min.segment.length = unit(0, "mm")
+  ) +
+  paletteer::scale_colour_paletteer_d("ggsci::default_jco") +
+  labs(
+    title = "New Zealand Agricultural Production",
+    subtitle = "Indexed to earliest available year (base = 1)",
+    x = "Year",
+    y = "Value relative to base year",
+    colour = NULL,
+    caption = plot_caption
+  ) +
+  scale_y_log10(
+    label = label_percent()
+  ) +
+  scale_x_continuous(
+    expand = expansion(c(0, 0.15))
+  ) +
   theme_minimal(
     base_family = "body_font",
     base_size = bts
@@ -232,7 +285,17 @@ bts <- 90
     plot.margin = margin(5, 5, 5, 5, "mm"),
     
     plot.title.position = "plot",
-    plot.caption.position = "plot"
+    plot.caption.position = "plot",
+    axis.line.y.left = element_line(
+      arrow = arrow(),
+      linewidth = 0.5,
+      colour = text_col
+    ),
+    panel.grid = element_line(
+      linewidth = 0.7,
+      linetype = 3,
+      colour = text_col
+    )
   )
 
 # Save the plot
