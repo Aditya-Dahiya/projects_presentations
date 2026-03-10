@@ -1,10 +1,11 @@
 ---
-title: "tidy_golem_tortoise"
+title: "Beeswarm Plot of Tortoise Body Mass"
 author: "Aditya Dahiya"
-date: "2026-03-03"
-subtitle: "tidy_golem_tortoise"
+date: "2026-03-10"
+subtitle: "Using {ggbeeswarm} for dot layout, {paletteer} for colour palettes, and {ggtext} for styled annotations"
 categories:
   - "#TidyTuesday"
+  - "{ggbeeswarm}"
 image: "thumbnails/tidy_golem_tortoise.png"
 format:
   html:
@@ -35,7 +36,7 @@ comments:
 
 This dataset comes from a [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) challenge (Week 9, 2026) and is sourced from the research paper "[Sex Ratio Bias Triggers Demographic Suicide in a Dense Tortoise Population](https://onlinelibrary.wiley.com/doi/10.1111/ele.70296)," which garnered widespread attention including coverage by [The New York Times](https://www.nytimes.com/2026/02/14/science/tortoises-island-sex-cliff.html). The study examines an exceptionally dense island population of [Hermann's tortoises](https://en.wikipedia.org/wiki/Hermann%27s_tortoise) at [Golem Grad](https://en.wikipedia.org/wiki/Golem_Grad) in [Lake Prespa](https://en.wikipedia.org/wiki/Lake_Prespa), [North Macedonia](https://en.wikipedia.org/wiki/North_Macedonia), where sexually coercive males dramatically outnumber females, leading to an ongoing extinction event predicted to claim its last female by 2083. The dataset was curated by [Novica Nakov of Free Software Macedonia](https://github.com/novica) and consists of two CSV files — [`clutch_size_cleaned`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-03-03/clutch_size_cleaned.csv) and [`tortoise_body_condition_cleaned`](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-03-03/tortoise_body_condition_cleaned.csv) — which can be loaded in [R](https://www.r-project.org/) via the [tidytuesdayR package](https://cran.r-project.org/web/packages/tidytuesdayR/index.html), in [Python](https://www.python.org/) via [pydytuesday](https://pypi.org/project/pydytuesday/), or in [Julia](https://julialang.org/) via [TidierTuesday.jl](https://github.com/TidierOrg/TidierTuesday.jl).
 
-![tidy_golem_tortoise](tidy_golem_tortoise.png){#fig-1}
+![Data: Ivanović et al. (2025), Elements — "Sex Ratio Bias Triggers Demographic Suicide in a Dense Tortoise Population"; curated by Novica Nakov, Free Software Macedonia. Each dot represents one Hermann's tortoise (Testudo hermanni) from its most recent recorded year, coloured by locality (Beach, Konjsko, Plateau) on Golem Grad island, Lake Prespa, North Macedonia.](tidy_golem_tortoise.png){#fig-1}
 
 ## How I Made This Graphic
 
@@ -126,10 +127,10 @@ rm(
   social_caption_2
 )
 
-plot_title <- "tidy_golem_tortoise"
+plot_title <- "Outnumbered & Overwhelmed"
 
-plot_subtitle <- "tidy_golem_tortoise" |> 
-  str_wrap(110)
+plot_subtitle <- "At Golem Grad, females grow heavier than males — yet are vastly outnumbered. Sexual coercion by dominant males is driving the population toward extinction." |> 
+  str_wrap(70)
 ```
 
 ### Exploratory Data Analysis and Wrangling
@@ -139,19 +140,24 @@ plot_subtitle <- "tidy_golem_tortoise" |>
 
 bts <- 90
 
-tortoise_body_condition_cleaned |> 
+df1 <- tortoise_body_condition_cleaned |> 
   group_by(individual) |> 
   slice_max(year, n = 1, with_ties = FALSE) |> 
-  ungroup() |> 
-  ggplot(
-    mapping = aes(
-      x = sex,
-      y = straight_carapace_length_mm
-    )
-  ) +
-  ggbeeswarm::geom_beeswarm(
-    
-  )
+  ungroup()
+
+# tortoise_body_condition_cleaned |> 
+#   group_by(individual) |> 
+#   slice_max(year, n = 1, with_ties = FALSE) |> 
+#   ungroup() |> 
+#   ggplot(
+#     aes(
+#       x = body_mass_grams,
+#       y = straight_carapace_length_mm
+#     )
+#   ) +
+#   geom_point(
+#     alpha = 0.2
+#   )
 ```
 
 ### The Plot
@@ -162,22 +168,48 @@ tortoise_body_condition_cleaned |>
 # Define Base Text Size for the plot
 bts <- 90
 
-
-
-
+g <- df1 |> 
+  ggplot(
+    mapping = aes(
+      x = sex,
+      y = body_mass_grams,
+      colour = locality,
+      fill = locality
+    )
+  ) +
+  ggbeeswarm::geom_beeswarm(
+    alpha = 0.9,
+    size = 3,
+    stroke = 1,
+    shape = 21,
+    corral.width = 1.5
+  ) +
+  scale_y_continuous(
+    limits = c(600, 2500)
+  ) +
+  scale_x_discrete(
+    expand = expansion(c(-0.08, 0.2)),
+    labels = c("Females", "Males")
+  ) +
+  coord_cartesian(
+    clip = "off"
+  ) +
+  guides(
+    fill = "none"
+  ) +
+  paletteer::scale_colour_paletteer_d(
+    "khroma::highcontrast"
+    ) +
+  paletteer::scale_fill_paletteer_d(
+    "khroma::highcontrast"
+    ) +
   labs(
-    title = "New Zealand Agricultural Production",
-    subtitle = "Indexed to earliest available year (base = 100%)",
-    x = "Year",
-    y = "Value relative to base year",
-    colour = NULL,
+    title = plot_title,
+    subtitle = plot_subtitle,
+    x = NULL,
+    y = "Body Mass (in grams)",
+    colour = "Locality\nof the\nTortoise",
     caption = plot_caption
-  ) +
-  scale_y_log10(
-    label = label_percent()
-  ) +
-  scale_x_continuous(
-    expand = expansion(c(0, 0.15))
   ) +
   theme_minimal(
     base_family = "body_font",
@@ -186,24 +218,52 @@ bts <- 90
   theme(
     text = element_text(
       colour = text_hil, 
-      margin = margin(0,0,0,0, "mm")
+      margin = margin(0,0,0,0, "mm"),
+      lineheight = 0.3
     ),
-    legend.position = "none",
+    legend.position = "inside",
+    legend.position.inside = c(1,1),
+    legend.justification = c(1,1),
+    legend.direction = "vertical",
+    legend.margin = margin(5,5,5,5, "mm"),
+    legend.spacing.y = unit(15, "mm"),
+    legend.background = element_rect(
+      fill = alpha(bg_col, 0.5),
+      colour = NULL,
+      linewidth = 0
+    ),
+    legend.text = element_text(
+      margin = margin(10,0,10,5, "mm"),
+      size = bts * 1.2
+    ),
+    legend.title = element_text(
+      margin = margin(10,0,0,0, "mm"),
+      size = bts * 1.2
+    ),
+    axis.text.y.left = element_text(
+      size = bts  * 1.2,
+      margin = margin(0,4,0,0, "mm")
+    ),
+    axis.text.x.bottom = element_text(
+      margin = margin(-10,0,10,0, "mm"),
+      size = bts * 1.5
+    ),
+    axis.ticks.length.y = unit(2, "mm"),
     
     # Text elements
     plot.title = element_text(
       margin = margin(10, 0, 5, 0, "mm"),
       hjust = 0.5,
-      size = bts * 2.5,
+      size = bts * 3,
       face = "bold",
       colour = text_hil,
       lineheight = 0.3,
       family = "caption_font"
     ),
     plot.subtitle = element_text(
-      margin = margin(0, 0, 18, 0, "mm"),
+      margin = margin(5, 0, 0, 0, "mm"),
       hjust = 0.5,
-      size = bts * 1.8,
+      size = bts * 1.5,
       colour = text_hil,
       lineheight = 0.35
     ),
@@ -218,8 +278,7 @@ bts <- 90
     
     # Plot background
     plot.background = element_rect(
-      fill = bg_col, 
-      colour = NA
+      fill = bg_col
     ),
     
     # Plot margins - reduced to minimize white space
@@ -232,11 +291,19 @@ bts <- 90
       linewidth = 0.5,
       colour = text_col
     ),
-    panel.grid = element_line(
+    panel.grid.major.y = element_line(
       linewidth = 0.7,
       linetype = 3,
       colour = text_col
-    )
+    ),
+    panel.grid.minor.y = element_line(
+      linewidth = 0.4,
+      linetype = 3,
+      colour = text_col
+    ),
+    
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
   )
 
 # Save the plot
